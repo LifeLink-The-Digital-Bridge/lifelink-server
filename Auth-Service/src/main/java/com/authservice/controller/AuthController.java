@@ -15,13 +15,9 @@ public class AuthController {
         this.authService = authService;
     }
 
-    @PostMapping("/login/email")
-    public ResponseEntity<AuthResponse> loginViaEmail(@RequestBody LoginRequestEmail request) {
-        return ResponseEntity.ok(authService.loginViaEmail(request));
-    }
-    @PostMapping("/login/username")
-    public ResponseEntity<AuthResponse> loginViaUsername(@RequestBody LoginRequestUsername request) {
-        return ResponseEntity.ok(authService.loginViaUsername(request));
+    @PostMapping("/login")
+    public ResponseEntity<AuthResponse> login(@RequestBody UnifiedLoginRequest request) {
+        return ResponseEntity.ok(authService.login(request));
     }
 
     @GetMapping("/validate")

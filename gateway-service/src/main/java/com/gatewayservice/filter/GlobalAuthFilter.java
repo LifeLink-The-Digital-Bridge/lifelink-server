@@ -11,7 +11,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import org.springframework.core.io.buffer.DataBuffer;
-import org.springframework.core.io.buffer.DataBufferFactory;
 import org.springframework.http.MediaType;
 import java.nio.charset.StandardCharsets;
 
@@ -24,11 +23,10 @@ public class GlobalAuthFilter implements GlobalFilter, Ordered {
     private final WebClient.Builder webClientBuilder;
 
     private static final List<String> PUBLIC_ENDPOINTS = List.of(
-            "^/auth/login(/.*)?$",
-            "^/auth/password-recovery(/.*)?$",
-            "^/users/register$"
+            "/auth/login",
+            "/auth/password-recovery",
+            "/users/register"
     );
-
 
     public GlobalAuthFilter(WebClient.Builder webClientBuilder) {
         this.webClientBuilder = webClientBuilder;
@@ -47,10 +45,6 @@ public class GlobalAuthFilter implements GlobalFilter, Ordered {
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
         }
-
-        System.out.println("Requested Path: " + path);
-
-        System.out.println("Auth header: " + authHeader);
         String token = authHeader.substring(7);
 
         return webClientBuilder.build()
@@ -63,30 +57,24 @@ public class GlobalAuthFilter implements GlobalFilter, Ordered {
                             .request(builder -> builder
                                     .header("id", String.valueOf(user.getId()))
                                     .header("username", user.getUsername())
-                                    .header("user", String.valueOf(user))
                                     .header("email", user.getEmail())
-                                    .header("roles", String.valueOf(user.getRoles()))
+                                    .header("roles", String.join(",", user.getRoles()))
                             )
                             .build();
-                    System.out.println("Passing to service with headers: ");
-                    mutatedExchange.getRequest().getHeaders().forEach((key, value) -> System.out.println(key + ": " + value));
-
                     return chain.filter(mutatedExchange);
                 })
                 .onErrorResume(error -> unauthorizedResponse(exchange, "Invalid token"));
     }
 
     private boolean isPublicEndpoint(String path) {
-        System.out.println("Path :"+path+" = "+PUBLIC_ENDPOINTS.stream().anyMatch(path::matches));
-        return PUBLIC_ENDPOINTS.stream().anyMatch(publicPath -> path.matches(publicPath));
+        return PUBLIC_ENDPOINTS.stream().anyMatch(path::startsWith);
     }
 
     private Mono<Void> unauthorizedResponse(ServerWebExchange exchange, String message) {
         exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
         exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
-        DataBufferFactory bufferFactory = exchange.getResponse().bufferFactory();
-        String body = "{\"message\":\"" + message + "\"}";
-        DataBuffer buffer = bufferFactory.wrap(body.getBytes(StandardCharsets.UTF_8));
+        DataBuffer buffer = exchange.getResponse().bufferFactory()
+                .wrap(("{\"message\":\"" + message + "\"}").getBytes(StandardCharsets.UTF_8));
         return exchange.getResponse().writeWith(Mono.just(buffer));
     }
 

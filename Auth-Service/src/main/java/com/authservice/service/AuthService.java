@@ -25,32 +25,22 @@ public class AuthService {
         this.passwordEncoder = passwordEncoder;
     }
 
-    public AuthResponse loginViaEmail(LoginRequestEmail request) {
-        UserDTO user = userClient.getUserByEmail(request.getEmail());
-        if (user == null) {
-            throw new UserNotFoundException("User not found for email: " + request.getEmail());
+    public AuthResponse login(UnifiedLoginRequest request) {
+        UserDTO user;
+        if ("email".equalsIgnoreCase(request.getLoginType())) {
+            user = userClient.getUserByEmail(request.getIdentifier());
+        } else if ("username".equalsIgnoreCase(request.getLoginType())) {
+            user = userClient.getUserByUsername(request.getIdentifier());
+        } else {
+            throw new IllegalArgumentException("Invalid loginType: " + request.getLoginType());
         }
 
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+        if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new InvalidCredentialsException("Invalid credentials");
         }
 
         String token = jwtUtil.generateToken(user);
-        return new AuthResponse(token,user.getId(), user.getEmail(), user.getUsername(), user.getRoles());
-    }
-
-    public AuthResponse loginViaUsername(LoginRequestUsername request) {
-        UserDTO user = userClient.getUserByUsername(request.getUsername());
-        if (user == null) {
-            throw new UserNotFoundException("User not found for username: " + request.getUsername());
-        }
-
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new InvalidCredentialsException("Invalid credentials");
-        }
-
-        String token = jwtUtil.generateToken(user);
-        return new AuthResponse(token, user.getId(),user.getEmail(), user.getUsername(), user.getRoles());
+        return new AuthResponse(token, user.getId(), user.getEmail(), user.getUsername(), user.getRoles());
     }
 
     public ValidationUserResponse validateTokenAndUser(String token) {
@@ -59,17 +49,13 @@ public class AuthService {
         }
 
         UUID userId = jwtUtil.extractUserId(token);
-        try {
-            ValidationUserResponse validationUserResponse = new ValidationUserResponse();
-            UserDTO userDTO = userClient.getUserById(userId);
-            if (userDTO == null) {
-                throw new UserNotFoundException("User not found for ID: " + userId);
-            }
-
-            BeanUtils.copyProperties(userDTO, validationUserResponse);
-            return validationUserResponse;
-        } catch (Exception e) {
+        UserDTO userDTO = userClient.getUserById(userId);
+        if (userDTO == null) {
             throw new UserNotFoundException("User not found for ID: " + userId);
         }
+
+        ValidationUserResponse response = new ValidationUserResponse();
+        BeanUtils.copyProperties(userDTO, response);
+        return response;
     }
 }
