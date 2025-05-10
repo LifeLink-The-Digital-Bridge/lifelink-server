@@ -6,6 +6,7 @@ import com.userservice.dto.SignUpRequest;
 import com.userservice.dto.UserDTO;
 import com.userservice.dto.UserDTOPassword;
 import com.userservice.service.UserService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,8 +26,7 @@ public class UserController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<UserDTO> createUser(@RequestBody SignUpRequest signUpRequest) {
-        System.out.println(signUpRequest);
+    public ResponseEntity<UserDTO> createUser(@Valid @RequestBody SignUpRequest signUpRequest) {
         UserDTO createdUser = userService.registerUser(signUpRequest);
         return ResponseEntity.ok(createdUser);
     }

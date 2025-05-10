@@ -2,6 +2,7 @@ package com.authservice.controller;
 
 import com.authservice.dto.*;
 import com.authservice.service.AuthService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,7 +17,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@RequestBody UnifiedLoginRequest request) {
+    public ResponseEntity<AuthResponse> login(@Valid  @RequestBody UnifiedLoginRequest request) {
         return ResponseEntity.ok(authService.login(request));
     }
 
