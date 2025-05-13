@@ -77,48 +77,40 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserDTOPassword getUserById(UUID id) {
-        User user = userRepository.findById(id)
+        User user = userRepository.findByIdWithRoles(id)
                 .orElseThrow(() -> new UserNotFoundException("User not found with id: " + id));
-
         UserDTOPassword responseDTO = new UserDTOPassword();
         BeanUtils.copyProperties(user, responseDTO);
-
         responseDTO.setRoles(user.getUserRoles().stream()
                 .map(role -> role.getRole().getName().name())
                 .collect(Collectors.toSet()));
-
-        System.out.println("Response DTO: " + responseDTO);
         return responseDTO;
     }
 
     @Override
     public UserDTOPassword getUserByEmail(String email) {
-        User user = userRepository.findByEmail(email)
+        User user = userRepository.findByEmailWithRoles(email)
                 .orElseThrow(() -> new UserNotFoundException("User not found with email: " + email));
-
         UserDTOPassword responseDTO = new UserDTOPassword();
         BeanUtils.copyProperties(user, responseDTO);
-
         responseDTO.setRoles(user.getUserRoles().stream()
                 .map(role -> role.getRole().getName().name())
                 .collect(Collectors.toSet()));
-        System.out.println("Response DTO from getUserByEmail: " + responseDTO);
         return responseDTO;
     }
 
     @Override
     public UserDTOPassword getUserByUsername(String username) {
-        User user = userRepository.findByUsername(username)
+        User user = userRepository.findByUsernameWithRoles(username)
                 .orElseThrow(() -> new UserNotFoundException("User not found with username: " + username));
         UserDTOPassword responseDTO = new UserDTOPassword();
         BeanUtils.copyProperties(user, responseDTO);
-
         responseDTO.setRoles(user.getUserRoles().stream()
                 .map(role -> role.getRole().getName().name())
                 .collect(Collectors.toSet()));
-        System.out.println("Response DTO from getUserByUsername: " + responseDTO);
         return responseDTO;
     }
+
 
     @Override
     public boolean updatePassword(ChangePasswordRequest changePasswordRequest) {

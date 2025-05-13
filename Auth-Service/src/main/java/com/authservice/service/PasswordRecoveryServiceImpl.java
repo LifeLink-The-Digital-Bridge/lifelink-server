@@ -1,6 +1,6 @@
 package com.authservice.service;
 
-import com.authservice.client.UserClient;
+import com.authservice.client.UserGrpcClient;
 import com.authservice.dto.ChangePasswordRequest;
 import com.authservice.dto.PasswordUpdateRequest;
 import com.authservice.dto.UserDTO;
@@ -23,16 +23,16 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
     private final RedisTemplate<String, String> redisTemplate;
 
     private final JavaMailSender javaMailSender;
-    private final UserClient userClient;
+    private final UserGrpcClient userGrpcClient;
     private final JwtUtil jwtUtil;
     private final PasswordEncoder passwordEncoder;
 
     private static final long OTP_EXPIRATION_MINUTES = 2;
 
-    public PasswordRecoveryServiceImpl(RedisTemplate<String, String> redisTemplate, JavaMailSender javaMailSender, UserClient userClient, JwtUtil jwtUtil, PasswordEncoder passwordEncoder) {
+    public PasswordRecoveryServiceImpl(RedisTemplate<String, String> redisTemplate, JavaMailSender javaMailSender, UserGrpcClient userGrpcClient, JwtUtil jwtUtil, PasswordEncoder passwordEncoder) {
         this.redisTemplate = redisTemplate;
         this.javaMailSender = javaMailSender;
-        this.userClient = userClient;
+        this.userGrpcClient = userGrpcClient;
         this.jwtUtil = jwtUtil;
         this.passwordEncoder = passwordEncoder;
     }
@@ -41,7 +41,7 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
     private String fromEmail;
     @Override
     public String sendOtpToEmail(String email) {
-        UserDTO user = userClient.getUserByEmail(email);
+        UserDTO user = userGrpcClient.getUserByEmail(email);
         if (user == null) {
             throw new UserNotFoundException("User not found for email: " + email);
         }
@@ -65,16 +65,25 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
         if (storedOtp == null || !storedOtp.equals(otp)) throw new InvalidOTPException("Invalid or expired OTP");
 
         redisTemplate.delete("OTP:" + email);
-        return jwtUtil.generateToken(userClient.getUserByEmail(email));
+        return jwtUtil.generateToken(userGrpcClient.getUserByEmail(email));
     }
 
     @Override
     public boolean changePassword(ChangePasswordRequest request) {
+        System.out.println(request);
+        if (request == null ||
+                request.getEmail() == null || request.getEmail().isBlank() ||
+                request.getNewPassword() == null || request.getNewPassword().isBlank() ||
+                request.getRepeatPassword() == null || request.getRepeatPassword().isBlank()) {
+            throw new IllegalArgumentException("Email, new password, and repeat password must not be blank");
+        }
 
-        userClient.updatePassword(request);
-
-        return true;
+        if (!request.getNewPassword().equals(request.getRepeatPassword())) {
+            return false;
+        }
+        return userGrpcClient.updatePassword(request);
     }
+
 
     private String generateOtp() {
         String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";

@@ -43,4 +43,5 @@ public class PasswordRecoveryController {
         if (!updated) return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Password mismatch or user not found");
         return ResponseEntity.ok("Password updated successfully");
     }
+
 }

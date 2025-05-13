@@ -1,6 +1,6 @@
 package com.authservice.service;
 
-import com.authservice.client.UserClient;
+import com.authservice.client.UserGrpcClient;
 import com.authservice.dto.*;
 import com.authservice.exception.InvalidCredentialsException;
 import com.authservice.exception.TokenInvalidException;
@@ -16,21 +16,21 @@ import java.util.UUID;
 public class AuthService {
 
     private final JwtUtil jwtUtil;
-    private final UserClient userClient;
+    private final UserGrpcClient userGrpcClient;
     private final PasswordEncoder passwordEncoder;
 
-    public AuthService(JwtUtil jwtUtil, UserClient userClient, PasswordEncoder passwordEncoder) {
+    public AuthService(JwtUtil jwtUtil, UserGrpcClient  userClient, PasswordEncoder passwordEncoder) {
         this.jwtUtil = jwtUtil;
-        this.userClient = userClient;
+        this.userGrpcClient = userClient;
         this.passwordEncoder = passwordEncoder;
     }
 
     public AuthResponse login(UnifiedLoginRequest request) {
         UserDTO user;
         if ("email".equalsIgnoreCase(request.getLoginType())) {
-            user = userClient.getUserByEmail(request.getIdentifier());
+            user = userGrpcClient.getUserByEmail(request.getIdentifier());
         } else if ("username".equalsIgnoreCase(request.getLoginType())) {
-            user = userClient.getUserByUsername(request.getIdentifier());
+            user = userGrpcClient.getUserByUsername(request.getIdentifier());
         } else {
             throw new IllegalArgumentException("Invalid loginType: " + request.getLoginType());
         }
@@ -49,7 +49,7 @@ public class AuthService {
         }
 
         UUID userId = jwtUtil.extractUserId(token);
-        UserDTO userDTO = userClient.getUserById(userId);
+        UserDTO userDTO = userGrpcClient.getUserById(String.valueOf(userId));
         if (userDTO == null) {
             throw new UserNotFoundException("User not found for ID: " + userId);
         }
