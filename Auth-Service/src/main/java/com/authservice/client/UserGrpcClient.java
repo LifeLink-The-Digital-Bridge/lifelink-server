@@ -2,7 +2,10 @@ package com.authservice.client;
 
 import com.authservice.dto.ChangePasswordRequest;
 import com.authservice.dto.UserDTO;
+import com.authservice.exception.UserNotFoundException;
 import com.userservice.grpc.*;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import net.devh.boot.grpc.client.inject.GrpcClient;
 import org.springframework.stereotype.Component;
 
@@ -17,22 +20,41 @@ public class UserGrpcClient {
 
     public UserDTO getUserById(String id) {
         GetUserByIdRequest request = GetUserByIdRequest.newBuilder().setId(id).build();
-        UserResponse response = userServiceStub.getUserById(request);
-        return mapToUserDTO(response);
+        try {
+            UserResponse response = userServiceStub.getUserById(request);
+            return mapToUserDTO(response);
+        } catch (StatusRuntimeException ex) {
+            if (ex.getStatus().getCode() == Status.NOT_FOUND.getCode()) {
+                throw new UserNotFoundException("User not found for ID: " + id);
+            }
+            throw new RuntimeException("gRPC error: " + ex.getStatus().getDescription(), ex);
+        }
     }
 
     public UserDTO getUserByEmail(String email) {
         GetUserByEmailRequest request = GetUserByEmailRequest.newBuilder().setEmail(email).build();
-        System.out.println("In email"+request.getEmail());
-        UserResponse response = userServiceStub.getUserByEmail(request);
-        return mapToUserDTO(response);
+        try {
+            UserResponse response = userServiceStub.getUserByEmail(request);
+            return mapToUserDTO(response);
+        } catch (StatusRuntimeException ex) {
+            if (ex.getStatus().getCode() == Status.NOT_FOUND.getCode()) {
+                throw new UserNotFoundException("User not found for email: " + email);
+            }
+            throw new RuntimeException("gRPC error: " + ex.getStatus().getDescription(), ex);
+        }
     }
 
     public UserDTO getUserByUsername(String username) {
         GetUserByUsernameRequest request = GetUserByUsernameRequest.newBuilder().setUsername(username).build();
-        System.out.println("In User name :"+request.getUsername());
-        UserResponse response = userServiceStub.getUserByUsername(request);
-        return mapToUserDTO(response);
+        try {
+            UserResponse response = userServiceStub.getUserByUsername(request);
+            return mapToUserDTO(response);
+        } catch (StatusRuntimeException ex) {
+            if (ex.getStatus().getCode() == Status.NOT_FOUND.getCode()) {
+                throw new UserNotFoundException("User not found for username: " + username);
+            }
+            throw new RuntimeException("gRPC error: " + ex.getStatus().getDescription(), ex);
+        }
     }
 
     public boolean updatePassword(ChangePasswordRequest request) {
@@ -41,12 +63,14 @@ public class UserGrpcClient {
                 .setNewPassword(request.getNewPassword())
                 .setRepeatPassword(request.getRepeatPassword())
                 .build();
-
-        UpdatePasswordResponse grpcResponse = userServiceStub.updatePassword(grpcRequest);
-        return grpcResponse.getSuccess();
+        try {
+            UpdatePasswordResponse grpcResponse = userServiceStub.updatePassword(grpcRequest);
+            return grpcResponse.getSuccess();
+        } catch (StatusRuntimeException ex) {
+            // Handle specific error codes as needed
+            throw new RuntimeException("gRPC error: " + ex.getStatus().getDescription(), ex);
+        }
     }
-
-
 
     private UserDTO mapToUserDTO(UserResponse userResponse) {
         if (userResponse == null || userResponse.getId().isEmpty()) {

@@ -16,4 +16,6 @@ public interface UserService {
     UserDTOPassword getUserByUsername(String username);
 
     boolean updatePassword(ChangePasswordRequest changePasswordRequest);
+
+    UserDTO getUserProfile(String username);
 }

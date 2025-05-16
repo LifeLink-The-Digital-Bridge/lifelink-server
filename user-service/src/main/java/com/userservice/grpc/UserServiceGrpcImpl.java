@@ -2,7 +2,9 @@ package com.userservice.grpc;
 
 import com.userservice.dto.ChangePasswordRequest;
 import com.userservice.dto.UserDTOPassword;
+import com.userservice.exception.UserNotFoundException;
 import com.userservice.service.UserService;
+import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import org.springframework.grpc.server.service.GrpcService;
 
@@ -21,52 +23,68 @@ public class UserServiceGrpcImpl extends UserServiceGrpc.UserServiceImplBase {
 
     @Override
     public void getUserByEmail(GetUserByEmailRequest request, StreamObserver<UserResponse> responseObserver) {
-        UserDTOPassword user = userService.getUserByEmail(request.getEmail());
-        System.out.println("In getUserByEmail");
-        System.out.println(user.toString());
-        UserResponse response = mapToGrpcUser(user);
-        responseObserver.onNext(response);
-        responseObserver.onCompleted();
+        try {
+            UserDTOPassword user = userService.getUserByEmail(request.getEmail());
+            UserResponse response = mapToGrpcUser(user);
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        } catch (UserNotFoundException ex) {
+            responseObserver.onError(Status.NOT_FOUND.withDescription(ex.getMessage()).asRuntimeException());
+        } catch (Exception ex) {
+            responseObserver.onError(Status.INTERNAL.withDescription("Internal server error: " + ex.getMessage()).asRuntimeException());
+        }
     }
 
     @Override
     public void getUserByUsername(GetUserByUsernameRequest request, StreamObserver<UserResponse> responseObserver) {
-        UserDTOPassword user = userService.getUserByUsername(request.getUsername());
-        System.out.println("In getUserByUsername");
-        System.out.println(user.toString());
-        UserResponse response = mapToGrpcUser(user);
-        responseObserver.onNext(response);
-        responseObserver.onCompleted();
+        try {
+            UserDTOPassword user = userService.getUserByUsername(request.getUsername());
+            UserResponse response = mapToGrpcUser(user);
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        } catch (UserNotFoundException ex) {
+            responseObserver.onError(Status.NOT_FOUND.withDescription(ex.getMessage()).asRuntimeException());
+        } catch (Exception ex) {
+            responseObserver.onError(Status.INTERNAL.withDescription("Internal server error: " + ex.getMessage()).asRuntimeException());
+        }
     }
 
     @Override
     public void getUserById(GetUserByIdRequest request, StreamObserver<UserResponse> responseObserver) {
-        UserDTOPassword user = userService.getUserById(UUID.fromString(request.getId()));
-        System.out.println("In getUserById");
-        System.out.println(user.toString());
-        UserResponse response = mapToGrpcUser(user);
-        responseObserver.onNext(response);
-        responseObserver.onCompleted();
+        try {
+            UserDTOPassword user = userService.getUserById(UUID.fromString(request.getId()));
+            UserResponse response = mapToGrpcUser(user);
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        } catch (UserNotFoundException ex) {
+            responseObserver.onError(Status.NOT_FOUND.withDescription(ex.getMessage()).asRuntimeException());
+        } catch (Exception ex) {
+            responseObserver.onError(Status.INTERNAL.withDescription("Internal server error: " + ex.getMessage()).asRuntimeException());
+        }
     }
 
     @Override
     public void updatePassword(UpdatePasswordRequest request, StreamObserver<UpdatePasswordResponse> responseObserver) {
-        boolean result = userService.updatePassword(
-                new ChangePasswordRequest(
-                        request.getEmail(),
-                        request.getNewPassword(),
-                        request.getRepeatPassword()
-                )
-        );
-        UpdatePasswordResponse response = UpdatePasswordResponse.newBuilder()
-                .setSuccess(result)
-                .setMessage(result ? "Password updated successfully" : "Password mismatch or user not found")
-                .build();
-        responseObserver.onNext(response);
-        responseObserver.onCompleted();
+        try {
+            boolean result = userService.updatePassword(
+                    new ChangePasswordRequest(
+                            request.getEmail(),
+                            request.getNewPassword(),
+                            request.getRepeatPassword()
+                    )
+            );
+            UpdatePasswordResponse response = UpdatePasswordResponse.newBuilder()
+                    .setSuccess(result)
+                    .setMessage(result ? "Password updated successfully" : "Password mismatch or user not found")
+                    .build();
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        } catch (UserNotFoundException ex) {
+            responseObserver.onError(Status.NOT_FOUND.withDescription(ex.getMessage()).asRuntimeException());
+        } catch (Exception ex) {
+            responseObserver.onError(Status.INTERNAL.withDescription("Internal server error: " + ex.getMessage()).asRuntimeException());
+        }
     }
-
-
 
     private UserResponse mapToGrpcUser(UserDTOPassword user) {
         return UserResponse.newBuilder()

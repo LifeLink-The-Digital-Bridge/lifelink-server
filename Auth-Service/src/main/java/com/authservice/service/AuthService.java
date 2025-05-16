@@ -5,11 +5,13 @@ import com.authservice.dto.*;
 import com.authservice.exception.InvalidCredentialsException;
 import com.authservice.exception.TokenInvalidException;
 import com.authservice.exception.UserNotFoundException;
+import com.authservice.model.RefreshToken;
 import com.authservice.util.JwtUtil;
 import org.springframework.beans.BeanUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Service
@@ -18,12 +20,15 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final UserGrpcClient userGrpcClient;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenService refreshTokenService;
 
-    public AuthService(JwtUtil jwtUtil, UserGrpcClient  userClient, PasswordEncoder passwordEncoder) {
+    public AuthService(JwtUtil jwtUtil, UserGrpcClient userClient, PasswordEncoder passwordEncoder, RefreshTokenService refreshTokenService) {
         this.jwtUtil = jwtUtil;
         this.userGrpcClient = userClient;
         this.passwordEncoder = passwordEncoder;
+        this.refreshTokenService = refreshTokenService;
     }
+
 
     public AuthResponse login(UnifiedLoginRequest request) {
         UserDTO user;
@@ -39,9 +44,41 @@ public class AuthService {
             throw new InvalidCredentialsException("Invalid credentials");
         }
 
-        String token = jwtUtil.generateToken(user);
-        return new AuthResponse(token, user.getId(), user.getEmail(), user.getUsername(), user.getRoles());
+        String accessToken = jwtUtil.generateToken(user);
+        String refreshToken = jwtUtil.generateRefreshToken(user);
+        refreshTokenService.createRefreshToken(user.getId(), refreshToken, jwtUtil.extractExpiration(refreshToken).toInstant());
+
+        return new AuthResponse(accessToken, refreshToken, user.getId(), user.getEmail(), user.getUsername(), user.getRoles());
     }
+
+    public AuthResponse refreshToken(String token) {
+        RefreshToken refreshToken = refreshTokenService.findByToken(token)
+                .orElseThrow(() -> new TokenInvalidException("Refresh token not found"));
+
+        if (refreshToken.getExpiryDate().isBefore(Instant.now())) {
+            refreshTokenService.deleteByToken(token);
+            throw new TokenInvalidException("Refresh token expired");
+        }
+
+        UUID userId = jwtUtil.extractUserId(token);
+        UserDTO userDTO = userGrpcClient.getUserById(userId.toString());
+
+        String newAccessToken = jwtUtil.generateToken(userDTO);
+        String newRefreshToken = jwtUtil.generateRefreshToken(userDTO);
+
+        refreshTokenService.deleteByToken(token);
+        refreshTokenService.createRefreshToken(userId, newRefreshToken, jwtUtil.extractExpiration(newRefreshToken).toInstant());
+
+        return new AuthResponse(
+                newAccessToken,
+                newRefreshToken,
+                userDTO.getId(),
+                userDTO.getEmail(),
+                userDTO.getUsername(),
+                userDTO.getRoles()
+        );
+    }
+
 
     public ValidationUserResponse validateTokenAndUser(String token) {
         if (!jwtUtil.isTokenValid(token)) {

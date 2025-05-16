@@ -134,4 +134,15 @@ public class UserServiceImpl implements UserService {
         System.out.println("Failed to update password for user: " + updatedUser.getUsername());
         return false;
     }
+
+    @Override
+    public UserDTO getUserProfile(String username) {
+        User user = userRepository.findByUsernameWithRoles(username)
+                .orElseThrow(() -> new UserNotFoundException("User not found with username: " + username));
+        UserDTO responseDTO = new UserDTO();
+        BeanUtils.copyProperties(user, responseDTO);
+        responseDTO.setRoles(user.getUserRoles().stream()
+                .map(role -> role.getRole().getName().name())
+                .collect(Collectors.toSet()));
+        return responseDTO;    }
 }

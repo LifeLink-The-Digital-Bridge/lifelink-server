@@ -49,6 +49,11 @@ public class UserController {
         return ResponseEntity.ok(userService.getUserById(id));
     }
 
+    @GetMapping("/profile")
+    public ResponseEntity<UserDTO> getUserProfile(@PathVariable String username) {
+        return ResponseEntity.ok(userService.getUserProfile(username));
+    }
+
     @Value("${internal.access-token}")
     private String expectedSecret;
 
@@ -73,5 +78,11 @@ public class UserController {
         System.out.println("Email: " + email);
         System.out.println("Roles: " + roles);
         return ResponseEntity.ok("Test endpoint is working");
+    }
+
+    @GetMapping("/sample")
+    public ResponseEntity<String> sample() {
+        System.out.println("Sample endpoint called");
+        return ResponseEntity.ok("Sample endpoint is working");
     }
 }

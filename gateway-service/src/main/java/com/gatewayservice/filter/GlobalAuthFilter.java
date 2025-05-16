@@ -24,6 +24,7 @@ public class GlobalAuthFilter implements GlobalFilter, Ordered {
 
     private static final List<String> PUBLIC_ENDPOINTS = List.of(
             "/auth/login",
+            "/auth/refresh",
             "/auth/password-recovery",
             "/users/register"
     );

@@ -26,6 +26,20 @@ public class JwtUtil {
                 .compact();
     }
 
+    public String generateRefreshToken(UserDTO user) {
+        return Jwts.builder()
+                .claim("userId", user.getId().toString())
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + 7 * 24 * 60 * 60 * 1000))
+                .signWith(key, SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    public Date extractExpiration(String token) {
+        return extractAllClaims(token).getExpiration();
+    }
+
+
     public String extractEmail(String token) {
         Claims claims = extractAllClaims(token);
         return claims.get("email", String.class);

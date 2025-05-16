@@ -20,6 +20,10 @@ public class AuthController {
     public ResponseEntity<AuthResponse> login(@Valid  @RequestBody UnifiedLoginRequest request) {
         return ResponseEntity.ok(authService.login(request));
     }
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthResponse> refreshToken(@RequestParam String refreshToken) {
+        return ResponseEntity.ok(authService.refreshToken(refreshToken));
+    }
 
     @GetMapping("/validate")
     public ResponseEntity<ValidationUserResponse> validateToken(@RequestParam String token) {
