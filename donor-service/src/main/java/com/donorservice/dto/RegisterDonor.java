@@ -9,7 +9,6 @@ import java.util.UUID;
 
 @Data
 public class RegisterDonor {
-    private UUID userId;
     private LocalDate registrationDate;
     private DonorStatus status;
     private MedicalDetailsDTO medicalDetails;

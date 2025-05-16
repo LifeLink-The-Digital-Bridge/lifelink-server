@@ -145,4 +145,32 @@ public class UserServiceImpl implements UserService {
                 .map(role -> role.getRole().getName().name())
                 .collect(Collectors.toSet()));
         return responseDTO;    }
+
+    @Override
+    public boolean addRole(UUID id, String roleName) {
+        User user = userRepository.findByIdWithRoles(id)
+                .orElseThrow(() -> new UserNotFoundException("User not found with id: " + id));
+        System.out.println("After Exception Handel user: "+user);
+        RoleType roleType = RoleType.valueOf(roleName.toUpperCase());
+        Role role = roleRepository.findByName(roleType)
+                .orElseGet(() -> {
+                    Role newRole = new Role();
+                    newRole.setName(roleType);
+                    return roleRepository.save(newRole);
+                });
+
+        boolean alreadyAssigned = user.getUserRoles().stream()
+                .anyMatch(userRole -> userRole.getRole().getName().equals(roleType));
+
+        if (alreadyAssigned) return true;
+
+        UserRole userRole = new UserRole();
+        userRole.setUser(user);
+        userRole.setRole(role);
+        user.getUserRoles().add(userRole);
+        System.out.println("Role added successfully");
+        System.out.println(user.getUserRoles());
+        userRepository.save(user);
+        return true;
+    }
 }

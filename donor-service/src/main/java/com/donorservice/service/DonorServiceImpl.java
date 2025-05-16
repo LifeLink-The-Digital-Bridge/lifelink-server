@@ -7,7 +7,6 @@ import com.donorservice.dto.UserDTO;
 import com.donorservice.exception.ResourceNotFoundException;
 import com.donorservice.model.Donor;
 import com.donorservice.repository.DonorRepository;
-import com.donorservice.service.DonorService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
@@ -26,20 +25,20 @@ public class DonorServiceImpl implements DonorService {
     }
 
     @Override
-    public DonorDTO createDonor(RegisterDonor donorDTO) {
+    public DonorDTO createDonor(UUID userId, RegisterDonor donorDTO) {
         UserDTO userDTO;
         try {
-            userDTO = userClient.getUserById(donorDTO.getUserId());
+            userDTO = userClient.getUserById(userId);
             if (userDTO == null) {
-                throw new ResourceNotFoundException("User not found with ID: " + donorDTO.getUserId());
+                throw new ResourceNotFoundException("User not found with ID: " + userId);
             }
         } catch (Exception e) {
-            throw new ResourceNotFoundException("User not found with ID: " + donorDTO.getUserId());
+            System.err.println("Error fetching user by ID: " + userId + ", error: " + e.getMessage());
+            throw new ResourceNotFoundException("User not found with ID: " + userId);
         }
-
         Donor donor = new Donor();
         BeanUtils.copyProperties(donorDTO, donor);
-        donor.setUserId(donorDTO.getUserId());
+        donor.setUserId(userId);
 
         Donor savedDonor = donorRepository.save(donor);
 
@@ -47,6 +46,7 @@ public class DonorServiceImpl implements DonorService {
         BeanUtils.copyProperties(savedDonor, responseDTO);
         return responseDTO;
     }
+
 
     @Override
     public DonorDTO getDonorById(UUID id) {

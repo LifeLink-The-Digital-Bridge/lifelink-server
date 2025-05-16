@@ -18,4 +18,6 @@ public interface UserService {
     boolean updatePassword(ChangePasswordRequest changePasswordRequest);
 
     UserDTO getUserProfile(String username);
+
+    boolean addRole(UUID id, String role);
 }

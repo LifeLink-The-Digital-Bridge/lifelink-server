@@ -49,7 +49,7 @@ public class UserController {
         return ResponseEntity.ok(userService.getUserById(id));
     }
 
-    @GetMapping("/profile")
+    @GetMapping("/profile/{username}")
     public ResponseEntity<UserDTO> getUserProfile(@PathVariable String username) {
         return ResponseEntity.ok(userService.getUserProfile(username));
     }
@@ -66,6 +66,23 @@ public class UserController {
         }
         return ResponseEntity.ok("Password updated successfully");
     }
+
+    @InternalOnly
+    @PutMapping("/{id}/add-role")
+    public ResponseEntity<String> addRoleToUser(@PathVariable UUID id, @RequestParam String role) {
+
+        System.out.println("In addRoleToUser method");
+        System.out.println("Id :"+ id);
+        System.out.println("Role :"+ role);
+        boolean val = userService.addRole(id, role);
+
+        if (val) {
+            return ResponseEntity.ok("Role added successfully");
+        }
+        return ResponseEntity.status(HttpStatus.CONFLICT).body("User Role not added");
+    }
+
+
 
     @GetMapping("/test")
     public ResponseEntity<String> test(@RequestHeader("id") String id,
