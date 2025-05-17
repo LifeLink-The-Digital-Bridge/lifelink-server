@@ -12,7 +12,6 @@ service UserService {
   rpc UpdatePassword(UpdatePasswordRequest) returns (UpdatePasswordResponse);
 }
 
-
 message GetUserByEmailRequest {
   string email = 1;
 }
@@ -31,6 +30,7 @@ message UserResponse {
   string email = 3;
   string password = 4;
   repeated string roles = 5;
+  string gender = 6;
 }
 
 message UpdatePasswordRequest {

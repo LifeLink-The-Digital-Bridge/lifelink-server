@@ -93,6 +93,8 @@ public class UserServiceGrpcImpl extends UserServiceGrpc.UserServiceImplBase {
                 .setEmail(user.getEmail())
                 .setPassword(user.getPassword())
                 .addAllRoles(user.getRoles())
+                .setGender(user.getGender())
                 .build();
     }
+
 }

@@ -59,6 +59,8 @@ public class GlobalAuthFilter implements GlobalFilter, Ordered {
                                     .header("id", String.valueOf(user.getId()))
                                     .header("username", user.getUsername())
                                     .header("email", user.getEmail())
+                                    .header("dob", String.valueOf(user.getDob()))
+                                    .header("gender", String.valueOf(user.getGender()))
                                     .header("roles", String.join(",", user.getRoles()))
                             )
                             .build();

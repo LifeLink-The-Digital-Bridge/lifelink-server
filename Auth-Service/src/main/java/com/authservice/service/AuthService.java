@@ -34,8 +34,10 @@ public class AuthService {
         UserDTO user;
         if ("email".equalsIgnoreCase(request.getLoginType())) {
             user = userGrpcClient.getUserByEmail(request.getIdentifier());
+            System.out.println("Fetched user gender: " + user.getGender());
         } else if ("username".equalsIgnoreCase(request.getLoginType())) {
             user = userGrpcClient.getUserByUsername(request.getIdentifier());
+            System.out.println("Fetched user gender: " + user.getGender());
         } else {
             throw new IllegalArgumentException("Invalid loginType: " + request.getLoginType());
         }
@@ -48,7 +50,7 @@ public class AuthService {
         String refreshToken = jwtUtil.generateRefreshToken(user);
         refreshTokenService.createRefreshToken(user.getId(), refreshToken, jwtUtil.extractExpiration(refreshToken).toInstant());
 
-        return new AuthResponse(accessToken, refreshToken, user.getId(), user.getEmail(), user.getUsername(), user.getRoles());
+        return new AuthResponse(accessToken, refreshToken, user.getId(), user.getEmail(), user.getGender(), user.getUsername(), user.getRoles());
     }
 
     public AuthResponse refreshToken(String token) {
@@ -74,6 +76,7 @@ public class AuthService {
                 newRefreshToken,
                 userDTO.getId(),
                 userDTO.getEmail(),
+                userDTO.getGender(),
                 userDTO.getUsername(),
                 userDTO.getRoles()
         );
