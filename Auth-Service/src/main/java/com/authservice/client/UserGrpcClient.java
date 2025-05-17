@@ -82,6 +82,7 @@ public class UserGrpcClient {
         dto.setEmail(userResponse.getEmail());
         dto.setPassword(userResponse.getPassword());
         dto.setRoles(new HashSet<>(userResponse.getRolesList()));
+        dto.setGender(userResponse.getGender());
         return dto;
     }
 }
