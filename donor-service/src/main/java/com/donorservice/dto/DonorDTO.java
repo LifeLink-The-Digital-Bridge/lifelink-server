@@ -14,5 +14,5 @@ public class DonorDTO {
     private MedicalDetailsDTO medicalDetails;
     private EligibilityCriteriaDTO eligibilityCriteria;
     private ConsentFormDTO consentForm;
-
+    private LocationDTO location;
 }

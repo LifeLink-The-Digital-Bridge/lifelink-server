@@ -2,7 +2,6 @@ package com.donorservice.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
-
 import java.time.LocalDate;
 
 @Data
@@ -27,5 +26,5 @@ public abstract class Donation {
     private LocalDate donationDate;
 
     @Column(nullable = false)
-    private String status; // PENDING, COMPLETED, FAILED
+    private String status;
 }

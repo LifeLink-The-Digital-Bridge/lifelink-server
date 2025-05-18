@@ -2,8 +2,7 @@ package com.donorservice.controller;
 
 import com.donorservice.aop.RequireRole;
 import com.donorservice.client.UserClient;
-import com.donorservice.dto.DonorDTO;
-import com.donorservice.dto.RegisterDonor;
+import com.donorservice.dto.*;
 import com.donorservice.service.DonorService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -14,31 +13,35 @@ import java.util.UUID;
 @RequestMapping("/donors")
 public class DonorController {
 
-    private final DonorService donorService;
     private final UserClient userClient;
+    private final DonorService donorService;
 
-
-    public DonorController(DonorService donorService, UserClient userClient) {
-        this.donorService = donorService;
+    public DonorController(UserClient userClient, DonorService donorService) {
         this.userClient = userClient;
+        this.donorService = donorService;
     }
-
-    @PostMapping("/addRole")
-    public ResponseEntity<String> addRole(@RequestHeader("id") String userId) {
+    @PutMapping("/addRole")
+    public ResponseEntity<String> addRoleToUser(@RequestHeader("id") String userId) {
         userClient.addRole(UUID.fromString(userId), "DONOR");
         return ResponseEntity.ok("Role added");
     }
 
     @RequireRole("DONOR")
     @PostMapping("/register")
-    public ResponseEntity<DonorDTO> createDonor(@RequestHeader("id") String userId, @RequestBody RegisterDonor registerDonor) {
-        DonorDTO createdDonor = donorService.createDonor(UUID.fromString(userId), registerDonor);
-        return ResponseEntity.ok(createdDonor);
+    public ResponseEntity<DonorDTO> registerDonor(@RequestHeader("id") UUID userId, @RequestBody RegisterDonor donorDTO) {
+        return ResponseEntity.ok(donorService.createDonor(userId, donorDTO));
     }
 
+    @RequireRole("DONOR")
+    @PostMapping("/donate")
+    public ResponseEntity<DonationDTO> registerDonation(@RequestBody DonationRequestDTO donationDTO) {
+        DonationDTO response = donorService.registerDonation(donationDTO);
+        return ResponseEntity.ok(response);
+    }
+
+    @RequireRole("DONOR")
     @GetMapping("/{id}")
-    public ResponseEntity<DonorDTO> getDonor(@PathVariable UUID id) {
-        DonorDTO donorDTO = donorService.getDonorById(id);
-        return ResponseEntity.ok(donorDTO);
+    public DonorDTO getDonor(@PathVariable UUID id) {
+        return donorService.getDonorById(id);
     }
 }

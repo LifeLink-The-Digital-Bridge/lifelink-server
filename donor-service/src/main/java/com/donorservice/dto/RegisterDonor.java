@@ -14,6 +14,7 @@ public class RegisterDonor {
     private MedicalDetailsDTO medicalDetails;
     private EligibilityCriteriaDTO eligibilityCriteria;
     private ConsentFormDTO consentForm;
+    private LocationDTO location;
 
     @PrePersist
     public void setRegistrationDate() {

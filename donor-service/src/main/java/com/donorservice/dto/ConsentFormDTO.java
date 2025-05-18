@@ -1,6 +1,8 @@
 package com.donorservice.dto;
 
 import lombok.Data;
+
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -10,4 +12,6 @@ public class ConsentFormDTO {
     private UUID userId;
     private Boolean isConsented;
     private LocalDateTime consentedAt;
+    private String consentType;
 }
+

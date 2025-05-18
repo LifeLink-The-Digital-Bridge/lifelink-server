@@ -3,6 +3,8 @@ package com.donorservice.model;
 import jakarta.persistence.*;
 import lombok.Data;
 
+import java.time.LocalDate;
+
 @Data
 @Entity
 @Table(name = "eligibility_criteria")
@@ -28,6 +30,21 @@ public class EligibilityCriteria {
     @Column(nullable = false)
     private Boolean recentTattooOrPiercing;
 
-    @Column(nullable = false)
-    private Boolean recentTravel;
+    @Column
+    private String recentTravelDetails;
+
+    @Column
+    private Boolean recentVaccination;
+
+    @Column
+    private Boolean recentSurgery;
+
+    @Column
+    private String chronicDiseases;
+
+    @Column
+    private String allergies;
+
+    @Column
+    private LocalDate lastDonationDate;
 }

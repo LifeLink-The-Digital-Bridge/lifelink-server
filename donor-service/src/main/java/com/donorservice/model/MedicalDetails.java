@@ -20,7 +20,7 @@ public class MedicalDetails {
     private Double hemoglobinLevel;
 
     @Column(nullable = false)
-    private Double bloodPressure;
+    private String bloodPressure;
 
     @Column(nullable = false)
     private Boolean hasDiseases;
