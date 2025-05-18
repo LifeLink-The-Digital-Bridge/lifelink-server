@@ -50,7 +50,7 @@ public class AuthService {
         String refreshToken = jwtUtil.generateRefreshToken(user);
         refreshTokenService.createRefreshToken(user.getId(), refreshToken, jwtUtil.extractExpiration(refreshToken).toInstant());
 
-        return new AuthResponse(accessToken, refreshToken, user.getId(), user.getEmail(), user.getGender(), user.getUsername(), user.getRoles());
+        return new AuthResponse(accessToken, refreshToken, user.getId(), user.getEmail(), user.getGender(), user.getUsername(), user.getRoles(), user.getDob());
     }
 
     public AuthResponse refreshToken(String token) {
@@ -78,7 +78,8 @@ public class AuthService {
                 userDTO.getEmail(),
                 userDTO.getGender(),
                 userDTO.getUsername(),
-                userDTO.getRoles()
+                userDTO.getRoles(),
+                userDTO.getDob()
         );
     }
 

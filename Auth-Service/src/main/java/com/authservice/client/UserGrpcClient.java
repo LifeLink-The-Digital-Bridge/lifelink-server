@@ -9,6 +9,7 @@ import io.grpc.StatusRuntimeException;
 import net.devh.boot.grpc.client.inject.GrpcClient;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.UUID;
 
@@ -83,6 +84,7 @@ public class UserGrpcClient {
         dto.setPassword(userResponse.getPassword());
         dto.setRoles(new HashSet<>(userResponse.getRolesList()));
         dto.setGender(userResponse.getGender());
+        dto.setDob(LocalDate.parse(userResponse.getDob()));
         return dto;
     }
 }

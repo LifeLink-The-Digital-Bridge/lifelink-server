@@ -43,6 +43,7 @@ public class User {
     @Column(name = "gender")
     private String gender;
 
+    @Lob
     @Column(name = "profile_image_url")
     private String profileImageUrl;
 

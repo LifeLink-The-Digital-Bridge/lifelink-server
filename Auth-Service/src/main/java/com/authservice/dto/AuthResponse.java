@@ -2,6 +2,7 @@ package com.authservice.dto;
 
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.util.Set;
 import java.util.UUID;
 
@@ -14,8 +15,9 @@ public class AuthResponse {
     private String gender;
     private String username;
     private Set<String> roles;
+    private LocalDate dob;
 
-    public AuthResponse(String accessToken, String refreshToken, UUID id, String email, String gender, String username, Set<String> roles) {
+    public AuthResponse(String accessToken, String refreshToken, UUID id, String email, String gender, String username, Set<String> roles, LocalDate dob) {
         this.accessToken = accessToken;
         this.refreshToken = refreshToken;
         this.id = id;
@@ -23,6 +25,7 @@ public class AuthResponse {
         this.gender = gender;
         this.username = username;
         this.roles = roles;
+        this.dob = dob;
     }
 
     public String getAccessToken() {
@@ -79,6 +82,14 @@ public class AuthResponse {
 
     public void setRoles(Set<String> roles) {
         this.roles = roles;
+    }
+
+    public LocalDate getDob() {
+        return dob;
+    }
+
+    public void setDob(LocalDate dob) {
+        this.dob = dob;
     }
 }
 
