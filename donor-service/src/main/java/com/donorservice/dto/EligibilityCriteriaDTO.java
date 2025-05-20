@@ -14,7 +14,7 @@ public class EligibilityCriteriaDTO {
     private Double weight;
     private Boolean medicalClearance;
     private Boolean recentTattooOrPiercing;
-    private String recentTravelDetails; // changed from Boolean to String
+    private String recentTravelDetails;
     private Boolean recentVaccination;
     private Boolean recentSurgery;
     private String chronicDiseases;

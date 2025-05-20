@@ -2,14 +2,17 @@ package com.donorservice.service;
 
 import com.donorservice.client.UserClient;
 import com.donorservice.dto.*;
+import com.donorservice.enums.DonationType;
 import com.donorservice.exception.ResourceNotFoundException;
 import com.donorservice.model.*;
 import com.donorservice.repository.*;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class DonorServiceImpl implements DonorService {
@@ -202,11 +205,13 @@ public class DonorServiceImpl implements DonorService {
             default:
                 throw new IllegalArgumentException("Unsupported donation type");
         }
+        donation.setBloodType(donationDTO.getBloodType());
         donationRepository.save(donation);
 
         DonationDTO dto = new DonationDTO();
         dto.setId(donation.getId());
         dto.setDonorId(donor.getId());
+        dto.setBloodType(donation.getBloodType());
         dto.setLocationId(location != null ? location.getId() : null);
         dto.setDonationType(donationDTO.getDonationType());
         dto.setDonationDate(donation.getDonationDate());
@@ -238,6 +243,46 @@ public class DonorServiceImpl implements DonorService {
         }
         return dto;
     }
+
+    @Override
+    public List<DonationDTO> getDonationsByDonorId(UUID donorId) {
+        List<Donation> donations = donationRepository.findByDonorId(donorId);
+        return donations.stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    private DonationDTO convertToDTO(Donation donation) {
+        DonationDTO dto = new DonationDTO();
+        dto.setId(donation.getId());
+        dto.setDonorId(donation.getDonor().getId());
+        dto.setLocationId(donation.getLocation() != null ? donation.getLocation().getId() : null);
+        dto.setDonationDate(donation.getDonationDate());
+        dto.setStatus(donation.getStatus());
+        dto.setBloodType(donation.getBloodType());
+
+        if (donation instanceof BloodDonation) {
+            dto.setDonationType(DonationType.BLOOD);
+            dto.setQuantity(((BloodDonation) donation).getQuantity());
+        } else if (donation instanceof OrganDonation) {
+            dto.setDonationType(DonationType.ORGAN);
+            dto.setOrganType(((OrganDonation) donation).getOrganType());
+            dto.setIsCompatible(((OrganDonation) donation).getIsCompatible());
+        } else if (donation instanceof TissueDonation) {
+            dto.setDonationType(DonationType.TISSUE);
+            dto.setTissueType(((TissueDonation) donation).getTissueType());
+            dto.setQuantity(((TissueDonation) donation).getQuantity());
+        } else if (donation instanceof StemCellDonation) {
+            dto.setDonationType(DonationType.STEM_CELL);
+            dto.setStemCellType(((StemCellDonation) donation).getStemCellType());
+            dto.setQuantity(((StemCellDonation) donation).getQuantity());
+        } else {
+            dto.setDonationType(null);
+        }
+
+        return dto;
+    }
+
     private void validateDonorProfileComplete(Donor donor) {
         if (donor.getMedicalDetails() == null ||
                 donor.getEligibilityCriteria() == null ||

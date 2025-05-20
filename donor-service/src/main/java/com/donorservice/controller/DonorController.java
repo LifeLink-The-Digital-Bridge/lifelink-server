@@ -7,6 +7,7 @@ import com.donorservice.service.DonorService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -43,5 +44,11 @@ public class DonorController {
     @GetMapping("/{id}")
     public DonorDTO getDonor(@PathVariable UUID id) {
         return donorService.getDonorById(id);
+    }
+
+    @RequireRole("DONOR")
+    @GetMapping("/{donorId}/donations")
+    public ResponseEntity<List<DonationDTO>> getDonations(@PathVariable UUID donorId) {
+        return ResponseEntity.ok(donorService.getDonationsByDonorId(donorId));
     }
 }

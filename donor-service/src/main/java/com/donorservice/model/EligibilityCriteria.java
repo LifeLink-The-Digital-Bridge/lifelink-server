@@ -21,8 +21,17 @@ public class EligibilityCriteria {
     @Column(nullable = false)
     private Boolean ageEligible;
 
+    @Column
+    private Integer age;
+
+    @Column
+    private LocalDate dob;
+
     @Column(nullable = false)
     private Boolean weightEligible;
+
+    @Column
+    private Double weight;
 
     @Column(nullable = false)
     private Boolean medicalClearance;
@@ -48,3 +57,4 @@ public class EligibilityCriteria {
     @Column
     private LocalDate lastDonationDate;
 }
+
