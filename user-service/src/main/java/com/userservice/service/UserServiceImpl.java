@@ -11,6 +11,7 @@ import com.userservice.enums.RoleType;
 import com.userservice.model.UserRole;
 import com.userservice.repository.RoleRepository;
 import com.userservice.repository.UserRepository;
+import com.userservice.service.follow.FollowService;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.BeanUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -26,11 +27,13 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final FollowService followService;
 
-    public UserServiceImpl(UserRepository userRepository, RoleRepository roleRepository, PasswordEncoder passwordEncoder) {
+    public UserServiceImpl(UserRepository userRepository, RoleRepository roleRepository, PasswordEncoder passwordEncoder, FollowService followService) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
+        this.followService = followService;
     }
 
     @Override
@@ -134,7 +137,7 @@ public class UserServiceImpl implements UserService {
         UserDTO responseDTO = new UserDTO();
         BeanUtils.copyProperties(profileUser, responseDTO);
 
-        if (shouldShowFullProfile(profileUser, requesterId)) {
+        if (canViewProfile(profileUser, requesterId)) {
             responseDTO.setRoles(profileUser.getUserRoles().stream()
                     .map(ur -> ur.getRole().getName().name())
                     .collect(Collectors.toSet()));
@@ -149,14 +152,13 @@ public class UserServiceImpl implements UserService {
         return responseDTO;
     }
 
-    private boolean shouldShowFullProfile(User profileUser, UUID requesterId) {
+    private boolean canViewProfile(User profileUser, UUID requesterId) {
         if (profileUser.getProfileVisibility() == Visibility.PUBLIC) return true;
-        if (profileUser.getProfileVisibility() == Visibility.PRIVATE) return false;
-        if (requesterId == null) return false;
-
-        return false;
+        if (profileUser.getProfileVisibility() == Visibility.PRIVATE) {
+            return profileUser.getId().equals(requesterId);
+        }
+        return requesterId != null && followService.isFollowing(requesterId, profileUser.getId());
     }
-
 
     @Override
     @Transactional
