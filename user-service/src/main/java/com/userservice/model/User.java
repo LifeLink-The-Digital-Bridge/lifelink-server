@@ -2,6 +2,7 @@ package com.userservice.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.userservice.enums.Visibility;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.ToString;
@@ -60,6 +61,10 @@ public class User {
     @JsonManagedReference
     @ToString.Exclude
     private Set<UserRole> userRoles = new HashSet<>();
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Visibility profileVisibility = Visibility.PUBLIC;
 
     @PreUpdate
     protected void onUpdate() {

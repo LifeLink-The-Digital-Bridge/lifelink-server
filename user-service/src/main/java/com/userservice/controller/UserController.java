@@ -1,10 +1,7 @@
 package com.userservice.controller;
 
 import com.userservice.aop.InternalOnly;
-import com.userservice.dto.ChangePasswordRequest;
-import com.userservice.dto.SignUpRequest;
-import com.userservice.dto.UserDTO;
-import com.userservice.dto.UserDTOPassword;
+import com.userservice.dto.*;
 import com.userservice.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
@@ -49,10 +46,27 @@ public class UserController {
         return ResponseEntity.ok(userService.getUserById(id));
     }
 
-    @GetMapping("/profile/{username}")
-    public ResponseEntity<UserDTO> getUserProfile(@PathVariable String username) {
-        return ResponseEntity.ok(userService.getUserProfile(username));
+    @PutMapping("/update/{id}")
+    public ResponseEntity<UserDTO> updateUser(@PathVariable UUID id, @Valid @RequestBody UserUpdateRequest updateRequest,
+            @RequestHeader("id") String userIdHeader) {
+
+        if (!id.toString().equals(userIdHeader)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only update your own profile");
+        }
+
+        UserDTO responseUser = userService.updateUser(id, updateRequest);
+        return ResponseEntity.ok(responseUser);
     }
+
+    @GetMapping("/profile/{username}")
+    public ResponseEntity<UserDTO> getUserProfile(
+            @PathVariable String username,
+            @RequestHeader(value = "id", required = false) String requesterId) {
+
+        UserDTO profile = userService.getUserProfile(username, requesterId != null ? UUID.fromString(requesterId) : null);
+        return ResponseEntity.ok(profile);
+    }
+
 
     @Value("${internal.access-token}")
     private String expectedSecret;

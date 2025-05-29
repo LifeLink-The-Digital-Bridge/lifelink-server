@@ -2,6 +2,7 @@ package com.authservice.client;
 
 import com.authservice.dto.ChangePasswordRequest;
 import com.authservice.dto.UserDTO;
+import com.authservice.dto.Visibility;
 import com.authservice.exception.UserNotFoundException;
 import com.userservice.grpc.*;
 import io.grpc.Status;
@@ -85,6 +86,7 @@ public class UserGrpcClient {
         dto.setRoles(new HashSet<>(userResponse.getRolesList()));
         dto.setGender(userResponse.getGender());
         dto.setDob(LocalDate.parse(userResponse.getDob()));
+        dto.setProfileVisibility(Visibility.valueOf(userResponse.getProfileVisibility()));
         return dto;
     }
 }

@@ -1,9 +1,8 @@
 package com.userservice.service;
 
-import com.userservice.dto.ChangePasswordRequest;
-import com.userservice.dto.SignUpRequest;
-import com.userservice.dto.UserDTO;
-import com.userservice.dto.UserDTOPassword;
+import com.userservice.dto.*;
+import jakarta.transaction.Transactional;
+import jakarta.validation.Valid;
 
 import java.util.UUID;
 
@@ -17,7 +16,10 @@ public interface UserService {
 
     boolean updatePassword(ChangePasswordRequest changePasswordRequest);
 
-    UserDTO getUserProfile(String username);
 
     boolean addRole(UUID id, String role);
+
+    UserDTO updateUser(UUID userId, UserUpdateRequest updateRequest);
+
+    UserDTO getUserProfile(String username, UUID uuid);
 }

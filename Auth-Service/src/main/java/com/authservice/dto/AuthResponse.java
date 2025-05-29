@@ -16,8 +16,10 @@ public class AuthResponse {
     private String username;
     private Set<String> roles;
     private LocalDate dob;
+    private Visibility profileVisibility;
 
-    public AuthResponse(String accessToken, String refreshToken, UUID id, String email, String gender, String username, Set<String> roles, LocalDate dob) {
+
+    public AuthResponse(String accessToken, String refreshToken, UUID id, String email, String gender, String username, Set<String> roles, LocalDate dob, Visibility profileVisibility) {
         this.accessToken = accessToken;
         this.refreshToken = refreshToken;
         this.id = id;
@@ -26,6 +28,14 @@ public class AuthResponse {
         this.username = username;
         this.roles = roles;
         this.dob = dob;
+    }
+
+    public Visibility getProfileVisibility() {
+        return profileVisibility;
+    }
+
+    public void setProfileVisibility(Visibility profileVisibility) {
+        this.profileVisibility = profileVisibility;
     }
 
     public String getAccessToken() {

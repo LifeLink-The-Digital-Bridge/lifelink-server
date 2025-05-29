@@ -18,6 +18,15 @@ public class UserDTO {
     private String gender;
     private String profileImageUrl;
     private Set<String> roles;
+    private Visibility profileVisibility;
+
+    public Visibility getProfileVisibility() {
+        return profileVisibility;
+    }
+
+    public void setProfileVisibility(Visibility profileVisibility) {
+        this.profileVisibility = profileVisibility;
+    }
 
     public UUID getId() {
         return id;

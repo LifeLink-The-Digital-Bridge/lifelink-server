@@ -95,6 +95,7 @@ public class UserServiceGrpcImpl extends UserServiceGrpc.UserServiceImplBase {
                 .addAllRoles(user.getRoles())
                 .setGender(user.getGender())
                 .setDob(user.getDob().toString())
+                .setProfileVisibility(user.getProfileVisibility().toString())
                 .build();
     }
 

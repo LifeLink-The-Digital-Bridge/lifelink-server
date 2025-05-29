@@ -1,9 +1,7 @@
 package com.userservice.service;
 
-import com.userservice.dto.ChangePasswordRequest;
-import com.userservice.dto.SignUpRequest;
-import com.userservice.dto.UserDTO;
-import com.userservice.dto.UserDTOPassword;
+import com.userservice.dto.*;
+import com.userservice.enums.Visibility;
 import com.userservice.exception.ProvideNewPasswordException;
 import com.userservice.exception.UserAlreadyExistsException;
 import com.userservice.exception.UserNotFoundException;
@@ -13,10 +11,12 @@ import com.userservice.enums.RoleType;
 import com.userservice.model.UserRole;
 import com.userservice.repository.RoleRepository;
 import com.userservice.repository.UserRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.beans.BeanUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -64,15 +64,7 @@ public class UserServiceImpl implements UserService {
 
         user.getUserRoles().add(userRole);
 
-        User savedUser = userRepository.save(user);
-
-        UserDTO responseDTO = new UserDTO();
-        BeanUtils.copyProperties(savedUser, responseDTO);
-        responseDTO.setRoles(savedUser.getUserRoles().stream()
-                .map(ur -> ur.getRole().getName().name())
-                .collect(Collectors.toSet()));
-
-        return responseDTO;
+        return getUserDTO(user);
     }
 
     @Override
@@ -135,16 +127,63 @@ public class UserServiceImpl implements UserService {
         return false;
     }
 
-    @Override
-    public UserDTO getUserProfile(String username) {
-        User user = userRepository.findByUsernameWithRoles(username)
-                .orElseThrow(() -> new UserNotFoundException("User not found with username: " + username));
+    public UserDTO getUserProfile(String username, UUID requesterId) {
+        User profileUser = userRepository.findByUsernameWithRoles(username)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+
         UserDTO responseDTO = new UserDTO();
-        BeanUtils.copyProperties(user, responseDTO);
-        responseDTO.setRoles(user.getUserRoles().stream()
+        BeanUtils.copyProperties(profileUser, responseDTO);
+
+        if (shouldShowFullProfile(profileUser, requesterId)) {
+            responseDTO.setRoles(profileUser.getUserRoles().stream()
+                    .map(ur -> ur.getRole().getName().name())
+                    .collect(Collectors.toSet()));
+        } else {
+            responseDTO.setRoles(Set.of());
+            responseDTO.setEmail(null);
+            responseDTO.setPhone(null);
+            responseDTO.setDob(null);
+        }
+
+        responseDTO.setProfileVisibility(profileUser.getProfileVisibility());
+        return responseDTO;
+    }
+
+    private boolean shouldShowFullProfile(User profileUser, UUID requesterId) {
+        if (profileUser.getProfileVisibility() == Visibility.PUBLIC) return true;
+        if (profileUser.getProfileVisibility() == Visibility.PRIVATE) return false;
+        if (requesterId == null) return false;
+
+        return false;
+    }
+
+
+    @Override
+    @Transactional
+    public UserDTO updateUser(UUID userId, UserUpdateRequest updateRequest) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        if (updateRequest.getName() != null) user.setName(updateRequest.getName());
+        if (updateRequest.getPhone() != null) user.setPhone(updateRequest.getPhone());
+        if (updateRequest.getDob() != null) user.setDob(updateRequest.getDob());
+        if (updateRequest.getGender() != null) user.setGender(updateRequest.getGender());
+        if (updateRequest.getProfileImageUrl() != null) user.setProfileImageUrl(updateRequest.getProfileImageUrl());
+        if (updateRequest.getProfileVisibility() != null) user.setProfileVisibility(updateRequest.getProfileVisibility());
+
+        return getUserDTO(user);
+    }
+
+    private UserDTO getUserDTO(User user) {
+        User userDB = userRepository.save(user);
+        UserDTO responseDTO = new UserDTO();
+        BeanUtils.copyProperties(userDB, responseDTO);
+        responseDTO.setRoles(userDB.getUserRoles().stream()
                 .map(role -> role.getRole().getName().name())
                 .collect(Collectors.toSet()));
-        return responseDTO;    }
+        return responseDTO;
+    }
+
 
     @Override
     public boolean addRole(UUID id, String roleName) {

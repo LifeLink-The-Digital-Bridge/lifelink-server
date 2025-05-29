@@ -1,5 +1,6 @@
 package com.userservice.dto;
 
+import com.userservice.enums.Visibility;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -18,4 +19,5 @@ public class UserDTOPassword {
     private String gender;
     private String profileImageUrl;
     private Set<String> roles;
+    private Visibility profileVisibility;
 }

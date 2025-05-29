@@ -32,6 +32,7 @@ message UserResponse {
   repeated string roles = 5;
   string gender = 6;
   string dob = 7;
+  string ProfileVisibility = 8;
 }
 
 message UpdatePasswordRequest {
