@@ -10,9 +10,12 @@ import java.util.UUID;
 
 public interface DonorService {
     DonorDTO createDonor(UUID userId, RegisterDonor donorDTO);
+
     DonorDTO getDonorById(UUID id);
 
     DonationDTO registerDonation(DonationRequestDTO donationDTO);
 
     List<DonationDTO> getDonationsByDonorId(UUID donorId);
+
+    DonorDTO getDonorByUserId(UUID userId);
 }

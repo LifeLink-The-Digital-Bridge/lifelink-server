@@ -41,6 +41,17 @@ public class DonorController {
     }
 
     @RequireRole("DONOR")
+    @GetMapping("/by-userId")
+    public ResponseEntity<DonorDTO> getDonorByUserId(@RequestHeader("id") UUID userId) {
+        DonorDTO donor = donorService.getDonorByUserId(userId);
+        if (donor == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(donor);
+    }
+
+
+    @RequireRole("DONOR")
     @GetMapping("/{id}")
     public DonorDTO getDonor(@PathVariable UUID id) {
         return donorService.getDonorById(id);

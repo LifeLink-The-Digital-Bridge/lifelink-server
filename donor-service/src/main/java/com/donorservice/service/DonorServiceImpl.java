@@ -100,7 +100,12 @@ public class DonorServiceImpl implements DonorService {
         Donor savedDonor = donorRepository.findById(id)
                 .orElseThrow(()-> new ResourceNotFoundException("Donor with id " + id + " not found!"));
         return getDonorDTO(savedDonor);
+    }
 
+    @Override
+    public DonorDTO getDonorByUserId(UUID userId) {
+        Donor donor = donorRepository.findByUserId(userId);
+        return getDonorDTO(donor);
     }
 
     private DonorDTO getDonorDTO(Donor savedDonor) {
@@ -137,6 +142,11 @@ public class DonorServiceImpl implements DonorService {
                 .orElseThrow(() -> new ResourceNotFoundException("Donor not found"));
 
         validateDonorProfileComplete(donor);
+
+        if (donationDTO.getBloodType() == null) {
+            throw new IllegalArgumentException("Blood type is required for all donation types.");
+        }
+
         Location location = null;
         if (donationDTO.getLocationId() != null) {
             location = locationRepository.findById(donationDTO.getLocationId())
@@ -151,8 +161,8 @@ public class DonorServiceImpl implements DonorService {
                 bloodDonation.setLocation(location);
                 bloodDonation.setDonationDate(donationDTO.getDonationDate());
                 bloodDonation.setQuantity(donationDTO.getQuantity());
-                bloodDonation.setBloodType(donationDTO.getBloodType());
                 bloodDonation.setStatus(donationDTO.getStatus() != null ? donationDTO.getStatus() : "PENDING");
+                bloodDonation.setBloodType(donationDTO.getBloodType());
                 donation = bloodDonation;
                 break;
             case ORGAN:
@@ -163,6 +173,7 @@ public class DonorServiceImpl implements DonorService {
                 organDonation.setOrganType(donationDTO.getOrganType());
                 organDonation.setIsCompatible(donationDTO.getIsCompatible() != null ? donationDTO.getIsCompatible() : false);
                 organDonation.setStatus(donationDTO.getStatus() != null ? donationDTO.getStatus() : "PENDING");
+                organDonation.setBloodType(donationDTO.getBloodType());
                 donation = organDonation;
                 break;
             case TISSUE:
@@ -173,6 +184,7 @@ public class DonorServiceImpl implements DonorService {
                 tissueDonation.setTissueType(donationDTO.getTissueType());
                 tissueDonation.setQuantity(donationDTO.getQuantity());
                 tissueDonation.setStatus(donationDTO.getStatus() != null ? donationDTO.getStatus() : "PENDING");
+                tissueDonation.setBloodType(donationDTO.getBloodType());
                 donation = tissueDonation;
                 break;
             case STEM_CELL:
@@ -183,41 +195,46 @@ public class DonorServiceImpl implements DonorService {
                 stemCellDonation.setStemCellType(donationDTO.getStemCellType());
                 stemCellDonation.setQuantity(donationDTO.getQuantity());
                 stemCellDonation.setStatus(donationDTO.getStatus() != null ? donationDTO.getStatus() : "PENDING");
+                stemCellDonation.setBloodType(donationDTO.getBloodType());
                 donation = stemCellDonation;
                 break;
             default:
                 throw new IllegalArgumentException("Unsupported donation type");
         }
-        donation.setBloodType(donationDTO.getBloodType());
-        donationRepository.save(donation);
+
+        Donation savedDonation = donationRepository.save(donation);
+
+        System.out.println(savedDonation);
+        System.out.println(savedDonation.getBloodType());
 
         DonationDTO dto = new DonationDTO();
-        dto.setId(donation.getId());
-        dto.setDonorId(donor.getId());
-        dto.setBloodType(donation.getBloodType());
-        dto.setLocationId(location != null ? location.getId() : null);
+        dto.setId(savedDonation.getId());
+        dto.setDonorId(savedDonation.getDonor().getId());
+        dto.setBloodType(savedDonation.getBloodType());
+        System.out.println(dto.getBloodType());
+        dto.setLocationId(savedDonation.getLocation() != null ? savedDonation.getLocation().getId() : null);
         dto.setDonationType(donationDTO.getDonationType());
-        dto.setDonationDate(donation.getDonationDate());
-        dto.setStatus(donation.getStatus());
+        dto.setDonationDate(savedDonation.getDonationDate());
+        dto.setStatus(savedDonation.getStatus());
 
         switch (donationDTO.getDonationType()) {
             case BLOOD:
-                BloodDonation bd = (BloodDonation) donation;
+                BloodDonation bd = (BloodDonation) savedDonation;
                 dto.setBloodType(bd.getBloodType());
                 dto.setQuantity(bd.getQuantity());
                 break;
             case ORGAN:
-                OrganDonation od = (OrganDonation) donation;
+                OrganDonation od = (OrganDonation) savedDonation;
                 dto.setOrganType(od.getOrganType());
                 dto.setIsCompatible(od.getIsCompatible());
                 break;
             case TISSUE:
-                TissueDonation td = (TissueDonation) donation;
+                TissueDonation td = (TissueDonation) savedDonation;
                 dto.setTissueType(td.getTissueType());
                 dto.setQuantity(td.getQuantity());
                 break;
             case STEM_CELL:
-                StemCellDonation sd = (StemCellDonation) donation;
+                StemCellDonation sd = (StemCellDonation) savedDonation;
                 dto.setStemCellType(sd.getStemCellType());
                 dto.setQuantity(sd.getQuantity());
                 break;
@@ -226,6 +243,7 @@ public class DonorServiceImpl implements DonorService {
         }
         return dto;
     }
+
 
     @Override
     public List<DonationDTO> getDonationsByDonorId(UUID donorId) {
