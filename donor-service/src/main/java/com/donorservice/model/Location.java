@@ -13,7 +13,19 @@ public class Location {
     private Long id;
 
     @Column(nullable = false)
+    private String addressLine;
+
+    @Column(nullable = false)
+    private String landmark;
+
+    @Column(nullable = false)
+    private String area;
+
+    @Column(nullable = false)
     private String city;
+
+    @Column(nullable = false)
+    private String district;
 
     @Column(nullable = false)
     private String state;
@@ -23,4 +35,10 @@ public class Location {
 
     @Column(nullable = false)
     private String pincode;
+
+    @Column(columnDefinition = "double precision", nullable = false)
+    private Double latitude;
+
+    @Column(columnDefinition = "double precision", nullable = false)
+    private Double longitude;
 }

@@ -10,7 +10,6 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -29,86 +28,82 @@ public class DonorServiceImpl implements DonorService {
 
     @Override
     public DonorDTO createDonor(UUID userId, RegisterDonor donorDTO) {
-        Optional<Donor> existingDonorOpt = donorRepository.findByUserId(userId);
-
-        Donor donor;
-        if (existingDonorOpt.isPresent()) {
-            donor = existingDonorOpt.get();
-
+        Donor donor = donorRepository.findByUserId(userId);
+        if (donor == null) {
+            donor = new Donor();
+            donor.setUserId(userId);
+            BeanUtils.copyProperties(donorDTO, donor);
+        } else {
             donor.setRegistrationDate(donorDTO.getRegistrationDate());
             donor.setStatus(donorDTO.getStatus());
-
-            MedicalDetails medicalDetails = donor.getMedicalDetails();
-            if (medicalDetails == null) {
-                medicalDetails = new MedicalDetails();
-                medicalDetails.setDonor(donor);
-            } else {
-                donorDTO.getMedicalDetails().setId(medicalDetails.getId());
-            }
-            BeanUtils.copyProperties(donorDTO.getMedicalDetails(), medicalDetails);
-            donor.setMedicalDetails(medicalDetails);
-
-            EligibilityCriteria eligibilityCriteria = donor.getEligibilityCriteria();
-            if (eligibilityCriteria == null) {
-                eligibilityCriteria = new EligibilityCriteria();
-                eligibilityCriteria.setDonor(donor);
-            } else {
-                donorDTO.getEligibilityCriteria().setId(eligibilityCriteria.getId());
-            }
-            BeanUtils.copyProperties(donorDTO.getEligibilityCriteria(), eligibilityCriteria);
-            donor.setEligibilityCriteria(eligibilityCriteria);
-
-            ConsentForm consentForm = donor.getConsentForm();
-            if (consentForm == null) {
-                consentForm = new ConsentForm();
-                consentForm.setDonor(donor);
-            } else {
-                donorDTO.getConsentForm().setId(consentForm.getId());
-            }
-            BeanUtils.copyProperties(donorDTO.getConsentForm(), consentForm);
-            donor.setConsentForm(consentForm);
-
-            if (donorDTO.getLocation() != null) {
-                Location location = donor.getLocation();
-                if (location == null) {
-                    location = new Location();
-                } else {
-                    donorDTO.getLocation().setId(location.getId());
-                }
-                BeanUtils.copyProperties(donorDTO.getLocation(), location);
-                location = locationRepository.save(location);
-                donor.setLocation(location);
-            }
-        } else {
-            donor = new Donor();
-            BeanUtils.copyProperties(donorDTO, donor);
-
-            MedicalDetails medicalDetails = new MedicalDetails();
-            BeanUtils.copyProperties(donorDTO.getMedicalDetails(), medicalDetails);
-            medicalDetails.setDonor(donor);
-            donor.setMedicalDetails(medicalDetails);
-
-            EligibilityCriteria eligibilityCriteria = new EligibilityCriteria();
-            BeanUtils.copyProperties(donorDTO.getEligibilityCriteria(), eligibilityCriteria);
-            eligibilityCriteria.setDonor(donor);
-            donor.setEligibilityCriteria(eligibilityCriteria);
-
-            ConsentForm consentForm = new ConsentForm();
-            BeanUtils.copyProperties(donorDTO.getConsentForm(), consentForm);
-            consentForm.setDonor(donor);
-            donor.setConsentForm(consentForm);
-
-            if (donorDTO.getLocation() != null) {
-                Location location = new Location();
-                BeanUtils.copyProperties(donorDTO.getLocation(), location);
-                location = locationRepository.save(location);
-                donor.setLocation(location);
-            }
-            donor.setUserId(userId);
         }
 
-        Donor savedDonor = donorRepository.save(donor);
+        MedicalDetails medicalDetails = donor.getMedicalDetails();
+        if (medicalDetails == null) {
+            medicalDetails = new MedicalDetails();
+            medicalDetails.setDonor(donor);
+        } else {
+            donorDTO.getMedicalDetails().setId(medicalDetails.getId());
+        }
+        BeanUtils.copyProperties(donorDTO.getMedicalDetails(), medicalDetails);
+        donor.setMedicalDetails(medicalDetails);
 
+        EligibilityCriteria eligibilityCriteria = donor.getEligibilityCriteria();
+        if (eligibilityCriteria == null) {
+            eligibilityCriteria = new EligibilityCriteria();
+            eligibilityCriteria.setDonor(donor);
+        } else {
+            donorDTO.getEligibilityCriteria().setId(eligibilityCriteria.getId());
+        }
+        BeanUtils.copyProperties(donorDTO.getEligibilityCriteria(), eligibilityCriteria);
+        donor.setEligibilityCriteria(eligibilityCriteria);
+
+        ConsentForm consentForm = donor.getConsentForm();
+        if (consentForm == null) {
+            consentForm = new ConsentForm();
+            consentForm.setDonor(donor);
+        } else {
+            donorDTO.getConsentForm().setId(consentForm.getId());
+        }
+        BeanUtils.copyProperties(donorDTO.getConsentForm(), consentForm);
+        donor.setConsentForm(consentForm);
+
+        if (donorDTO.getLocation() != null) {
+            Location location = donor.getLocation();
+            if (location == null) {
+                location = new Location();
+            } else {
+                donorDTO.getLocation().setId(location.getId());
+            }
+
+            LocationDTO locDTO = donorDTO.getLocation();
+            if (locDTO.getAddressLine() == null || locDTO.getLandmark() == null || locDTO.getArea() == null ||
+                    locDTO.getCity() == null || locDTO.getDistrict() == null || locDTO.getState() == null ||
+                    locDTO.getCountry() == null || locDTO.getPincode() == null ||
+                    locDTO.getLatitude() == null || locDTO.getLongitude() == null) {
+                throw new IllegalArgumentException("Location fields cannot be null");
+            }
+
+            BeanUtils.copyProperties(locDTO, location);
+            location = locationRepository.save(location);
+            donor.setLocation(location);
+        }
+
+
+        Donor savedDonor = donorRepository.save(donor);
+        return getDonorDTO(savedDonor);
+    }
+
+
+    @Override
+    public DonorDTO getDonorById(UUID id) {
+        Donor savedDonor = donorRepository.findById(id)
+                .orElseThrow(()-> new ResourceNotFoundException("Donor with id " + id + " not found!"));
+        return getDonorDTO(savedDonor);
+
+    }
+
+    private DonorDTO getDonorDTO(Donor savedDonor) {
         DonorDTO responseDTO = new DonorDTO();
         BeanUtils.copyProperties(savedDonor, responseDTO);
 
@@ -134,18 +129,6 @@ public class DonorServiceImpl implements DonorService {
         }
 
         return responseDTO;
-    }
-
-
-    @Override
-    public DonorDTO getDonorById(UUID id) {
-        Optional<Donor> donor = donorRepository.findById(id);
-        if (donor.isPresent()) {
-            DonorDTO donorDTO = new DonorDTO();
-            BeanUtils.copyProperties(donor.get(), donorDTO);
-            return donorDTO;
-        }
-        throw new ResourceNotFoundException("Donor not found with ID: " + id);
     }
 
     @Override
@@ -261,23 +244,27 @@ public class DonorServiceImpl implements DonorService {
         dto.setStatus(donation.getStatus());
         dto.setBloodType(donation.getBloodType());
 
-        if (donation instanceof BloodDonation) {
-            dto.setDonationType(DonationType.BLOOD);
-            dto.setQuantity(((BloodDonation) donation).getQuantity());
-        } else if (donation instanceof OrganDonation) {
-            dto.setDonationType(DonationType.ORGAN);
-            dto.setOrganType(((OrganDonation) donation).getOrganType());
-            dto.setIsCompatible(((OrganDonation) donation).getIsCompatible());
-        } else if (donation instanceof TissueDonation) {
-            dto.setDonationType(DonationType.TISSUE);
-            dto.setTissueType(((TissueDonation) donation).getTissueType());
-            dto.setQuantity(((TissueDonation) donation).getQuantity());
-        } else if (donation instanceof StemCellDonation) {
-            dto.setDonationType(DonationType.STEM_CELL);
-            dto.setStemCellType(((StemCellDonation) donation).getStemCellType());
-            dto.setQuantity(((StemCellDonation) donation).getQuantity());
-        } else {
-            dto.setDonationType(null);
+        switch (donation) {
+            case BloodDonation bloodDonation -> {
+                dto.setDonationType(DonationType.BLOOD);
+                dto.setQuantity(bloodDonation.getQuantity());
+            }
+            case OrganDonation organDonation -> {
+                dto.setDonationType(DonationType.ORGAN);
+                dto.setOrganType(organDonation.getOrganType());
+                dto.setIsCompatible(organDonation.getIsCompatible());
+            }
+            case TissueDonation tissueDonation -> {
+                dto.setDonationType(DonationType.TISSUE);
+                dto.setTissueType(tissueDonation.getTissueType());
+                dto.setQuantity(tissueDonation.getQuantity());
+            }
+            case StemCellDonation stemCellDonation -> {
+                dto.setDonationType(DonationType.STEM_CELL);
+                dto.setStemCellType(stemCellDonation.getStemCellType());
+                dto.setQuantity(stemCellDonation.getQuantity());
+            }
+            default -> dto.setDonationType(null);
         }
 
         return dto;
