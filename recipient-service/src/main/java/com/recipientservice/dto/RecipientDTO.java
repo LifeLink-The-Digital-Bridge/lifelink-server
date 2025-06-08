@@ -14,5 +14,6 @@ public class RecipientDTO {
     private MedicalDetailsDTO medicalDetails;
     private EligibilityCriteriaDTO eligibilityCriteria;
     private ConsentFormDTO consentForm;
+
 }
 
