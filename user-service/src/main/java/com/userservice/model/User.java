@@ -44,8 +44,7 @@ public class User {
     @Column(name = "gender")
     private String gender;
 
-    @Lob
-    @Column(name = "profile_image_url")
+    @Column(name = "profile_image_url", columnDefinition = "text")
     private String profileImageUrl;
 
     @Column(name = "created_at", updatable = false)
