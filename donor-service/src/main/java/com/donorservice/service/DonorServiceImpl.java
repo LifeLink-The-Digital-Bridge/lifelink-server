@@ -3,7 +3,10 @@ package com.donorservice.service;
 import com.donorservice.client.UserClient;
 import com.donorservice.dto.*;
 import com.donorservice.enums.DonationType;
+import com.donorservice.exception.InvalidDonorProfileException;
+import com.donorservice.exception.InvalidLocationException;
 import com.donorservice.exception.ResourceNotFoundException;
+import com.donorservice.exception.UnsupportedDonationTypeException;
 import com.donorservice.model.*;
 import com.donorservice.repository.*;
 import org.springframework.beans.BeanUtils;
@@ -81,7 +84,7 @@ public class DonorServiceImpl implements DonorService {
                     locDTO.getCity() == null || locDTO.getDistrict() == null || locDTO.getState() == null ||
                     locDTO.getCountry() == null || locDTO.getPincode() == null ||
                     locDTO.getLatitude() == null || locDTO.getLongitude() == null) {
-                throw new IllegalArgumentException("Location fields cannot be null");
+                throw new InvalidLocationException("All location fields must be provided and non-null.");
             }
 
             BeanUtils.copyProperties(locDTO, location);
@@ -144,7 +147,7 @@ public class DonorServiceImpl implements DonorService {
         validateDonorProfileComplete(donor);
 
         if (donationDTO.getBloodType() == null) {
-            throw new IllegalArgumentException("Blood type is required for all donation types.");
+            throw new UnsupportedDonationTypeException("Blood type is required for all donation types.");
         }
 
         Location location = null;
@@ -199,7 +202,7 @@ public class DonorServiceImpl implements DonorService {
                 donation = stemCellDonation;
                 break;
             default:
-                throw new IllegalArgumentException("Unsupported donation type");
+                throw new UnsupportedDonationTypeException("Donation type " + donationDTO.getDonationType() + " is not supported.");
         }
 
         Donation savedDonation = donationRepository.save(donation);
@@ -293,7 +296,7 @@ public class DonorServiceImpl implements DonorService {
                 donor.getEligibilityCriteria() == null ||
                 donor.getConsentForm() == null ||
                 !Boolean.TRUE.equals(donor.getConsentForm().getIsConsented())) {
-            throw new IllegalStateException("Donor profile is incomplete. Please complete all details before donating.");
+            throw new InvalidDonorProfileException("Donor profile is incomplete. Please complete all details including medical details, eligibility criteria, and consent form before donating.");
         }
     }
 
