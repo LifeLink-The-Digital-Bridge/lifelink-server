@@ -1,6 +1,8 @@
 package com.recipientservice.service;
 
 import com.recipientservice.dto.*;
+import com.recipientservice.exceptions.InvalidLocationException;
+import com.recipientservice.exceptions.RecipientNotFoundException;
 import com.recipientservice.model.*;
 import com.recipientservice.repository.*;
 import org.springframework.beans.BeanUtils;
@@ -35,9 +37,14 @@ public class RecipientServiceImpl implements RecipientService {
         recipient.setAvailability(recipientDTO.getAvailability());
 
         if (recipientDTO.getLocation() != null) {
-            Location location = mapLocationDTOToEntity(recipientDTO.getLocation());
+            LocationDTO locDTO = recipientDTO.getLocation();
+            if (locDTO.getAddressLine() == null || locDTO.getCity() == null || locDTO.getState() == null) {
+                throw new InvalidLocationException("Location fields cannot be null");
+            }
+            Location location = mapLocationDTOToEntity(locDTO);
             recipient.setLocation(location);
         }
+
 
         if (recipientDTO.getMedicalDetails() != null) {
             MedicalDetails md = recipient.getMedicalDetails();
@@ -71,7 +78,7 @@ public class RecipientServiceImpl implements RecipientService {
     public ReceiveRequestDTO createReceiveRequest(UUID userId, ReceiveRequestDTO requestDTO) {
         Recipient recipient = recipientRepository.findByUserId(userId);
         if (recipient == null) {
-            throw new IllegalArgumentException("Recipient not found for userId: " + userId);
+            throw new RecipientNotFoundException("Recipient not found for userId: " + userId);
         }
         ReceiveRequest request = new ReceiveRequest();
         request.setRecipient(recipient);
