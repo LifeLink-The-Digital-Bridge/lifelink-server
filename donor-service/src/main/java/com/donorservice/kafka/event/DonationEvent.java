@@ -1,22 +1,23 @@
-package com.donorservice.dto;
+package com.donorservice.kafka.event;
 
-import com.donorservice.enums.*;
-import com.fasterxml.jackson.annotation.JsonInclude;
+import com.donorservice.enums.DonationType;
+import com.donorservice.enums.OrganType;
+import com.donorservice.enums.StemCellType;
+import com.donorservice.enums.TissueType;
 import lombok.Data;
 
 import java.time.LocalDate;
 import java.util.UUID;
 
 @Data
-@JsonInclude(JsonInclude.Include.NON_NULL)
-public class DonationDTO {
-    private UUID id;
+public class DonationEvent {
+    private UUID donationId;
     private UUID donorId;
     private Long locationId;
     private DonationType donationType;
+    private String bloodType;
     private LocalDate donationDate;
-    private String status;
-    private BloodType bloodType;
+
     private Double quantity;
     private OrganType organType;
     private Boolean isCompatible;

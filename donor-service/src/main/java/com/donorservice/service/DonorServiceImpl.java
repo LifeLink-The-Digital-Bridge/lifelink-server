@@ -7,6 +7,10 @@ import com.donorservice.exception.InvalidDonorProfileException;
 import com.donorservice.exception.InvalidLocationException;
 import com.donorservice.exception.ResourceNotFoundException;
 import com.donorservice.exception.UnsupportedDonationTypeException;
+import com.donorservice.kafka.EventPublisher;
+import com.donorservice.kafka.event.DonationEvent;
+import com.donorservice.kafka.event.DonorEvent;
+import com.donorservice.kafka.event.LocationEvent;
 import com.donorservice.model.*;
 import com.donorservice.repository.*;
 import org.springframework.beans.BeanUtils;
@@ -22,11 +26,13 @@ public class DonorServiceImpl implements DonorService {
     private final DonorRepository donorRepository;
     private final DonationRepository donationRepository;
     private final LocationRepository locationRepository;
+    private final EventPublisher eventPublisher;
 
-    public DonorServiceImpl(DonorRepository donorRepository, DonationRepository donationRepository, UserClient userClient, LocationRepository locationRepository) {
+    public DonorServiceImpl(DonorRepository donorRepository, DonationRepository donationRepository, UserClient userClient, LocationRepository locationRepository, EventPublisher eventPublisher) {
         this.donorRepository = donorRepository;
         this.donationRepository = donationRepository;
         this.locationRepository = locationRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -140,69 +146,69 @@ public class DonorServiceImpl implements DonorService {
     }
 
     @Override
-    public DonationDTO registerDonation(DonationRequestDTO donationDTO) {
-        Donor donor = donorRepository.findById(donationDTO.getDonorId())
+    public DonationDTO registerDonation(DonationRequestDTO donationRequestDTO) {
+        Donor donor = donorRepository.findById(donationRequestDTO.getDonorId())
                 .orElseThrow(() -> new ResourceNotFoundException("Donor not found"));
 
         validateDonorProfileComplete(donor);
 
-        if (donationDTO.getBloodType() == null) {
+        if (donationRequestDTO.getBloodType() == null) {
             throw new UnsupportedDonationTypeException("Blood type is required for all donation types.");
         }
 
         Location location = null;
-        if (donationDTO.getLocationId() != null) {
-            location = locationRepository.findById(donationDTO.getLocationId())
+        if (donationRequestDTO.getLocationId() != null) {
+            location = locationRepository.findById(donationRequestDTO.getLocationId())
                     .orElse(null);
         }
 
         Donation donation;
-        switch (donationDTO.getDonationType()) {
+        switch (donationRequestDTO.getDonationType()) {
             case BLOOD:
                 BloodDonation bloodDonation = new BloodDonation();
                 bloodDonation.setDonor(donor);
                 bloodDonation.setLocation(location);
-                bloodDonation.setDonationDate(donationDTO.getDonationDate());
-                bloodDonation.setQuantity(donationDTO.getQuantity());
-                bloodDonation.setStatus(donationDTO.getStatus() != null ? donationDTO.getStatus() : "PENDING");
-                bloodDonation.setBloodType(donationDTO.getBloodType());
+                bloodDonation.setDonationDate(donationRequestDTO.getDonationDate());
+                bloodDonation.setQuantity(donationRequestDTO.getQuantity());
+                bloodDonation.setStatus(donationRequestDTO.getStatus() != null ? donationRequestDTO.getStatus() : "PENDING");
+                bloodDonation.setBloodType(donationRequestDTO.getBloodType());
                 donation = bloodDonation;
                 break;
             case ORGAN:
                 OrganDonation organDonation = new OrganDonation();
                 organDonation.setDonor(donor);
                 organDonation.setLocation(location);
-                organDonation.setDonationDate(donationDTO.getDonationDate());
-                organDonation.setOrganType(donationDTO.getOrganType());
-                organDonation.setIsCompatible(donationDTO.getIsCompatible() != null ? donationDTO.getIsCompatible() : false);
-                organDonation.setStatus(donationDTO.getStatus() != null ? donationDTO.getStatus() : "PENDING");
-                organDonation.setBloodType(donationDTO.getBloodType());
+                organDonation.setDonationDate(donationRequestDTO.getDonationDate());
+                organDonation.setOrganType(donationRequestDTO.getOrganType());
+                organDonation.setIsCompatible(donationRequestDTO.getIsCompatible() != null ? donationRequestDTO.getIsCompatible() : false);
+                organDonation.setStatus(donationRequestDTO.getStatus() != null ? donationRequestDTO.getStatus() : "PENDING");
+                organDonation.setBloodType(donationRequestDTO.getBloodType());
                 donation = organDonation;
                 break;
             case TISSUE:
                 TissueDonation tissueDonation = new TissueDonation();
                 tissueDonation.setDonor(donor);
                 tissueDonation.setLocation(location);
-                tissueDonation.setDonationDate(donationDTO.getDonationDate());
-                tissueDonation.setTissueType(donationDTO.getTissueType());
-                tissueDonation.setQuantity(donationDTO.getQuantity());
-                tissueDonation.setStatus(donationDTO.getStatus() != null ? donationDTO.getStatus() : "PENDING");
-                tissueDonation.setBloodType(donationDTO.getBloodType());
+                tissueDonation.setDonationDate(donationRequestDTO.getDonationDate());
+                tissueDonation.setTissueType(donationRequestDTO.getTissueType());
+                tissueDonation.setQuantity(donationRequestDTO.getQuantity());
+                tissueDonation.setStatus(donationRequestDTO.getStatus() != null ? donationRequestDTO.getStatus() : "PENDING");
+                tissueDonation.setBloodType(donationRequestDTO.getBloodType());
                 donation = tissueDonation;
                 break;
             case STEM_CELL:
                 StemCellDonation stemCellDonation = new StemCellDonation();
                 stemCellDonation.setDonor(donor);
                 stemCellDonation.setLocation(location);
-                stemCellDonation.setDonationDate(donationDTO.getDonationDate());
-                stemCellDonation.setStemCellType(donationDTO.getStemCellType());
-                stemCellDonation.setQuantity(donationDTO.getQuantity());
-                stemCellDonation.setStatus(donationDTO.getStatus() != null ? donationDTO.getStatus() : "PENDING");
-                stemCellDonation.setBloodType(donationDTO.getBloodType());
+                stemCellDonation.setDonationDate(donationRequestDTO.getDonationDate());
+                stemCellDonation.setStemCellType(donationRequestDTO.getStemCellType());
+                stemCellDonation.setQuantity(donationRequestDTO.getQuantity());
+                stemCellDonation.setStatus(donationRequestDTO.getStatus() != null ? donationRequestDTO.getStatus() : "PENDING");
+                stemCellDonation.setBloodType(donationRequestDTO.getBloodType());
                 donation = stemCellDonation;
                 break;
             default:
-                throw new UnsupportedDonationTypeException("Donation type " + donationDTO.getDonationType() + " is not supported.");
+                throw new UnsupportedDonationTypeException("Donation type " + donationRequestDTO.getDonationType() + " is not supported.");
         }
 
         Donation savedDonation = donationRepository.save(donation);
@@ -210,41 +216,115 @@ public class DonorServiceImpl implements DonorService {
         System.out.println(savedDonation);
         System.out.println(savedDonation.getBloodType());
 
-        DonationDTO dto = new DonationDTO();
-        dto.setId(savedDonation.getId());
-        dto.setDonorId(savedDonation.getDonor().getId());
-        dto.setBloodType(savedDonation.getBloodType());
-        System.out.println(dto.getBloodType());
-        dto.setLocationId(savedDonation.getLocation() != null ? savedDonation.getLocation().getId() : null);
-        dto.setDonationType(donationDTO.getDonationType());
-        dto.setDonationDate(savedDonation.getDonationDate());
-        dto.setStatus(savedDonation.getStatus());
+        DonationDTO donationDTO = new DonationDTO();
+        donationDTO.setId(savedDonation.getId());
+        donationDTO.setDonorId(savedDonation.getDonor().getId());
+        donationDTO.setBloodType(savedDonation.getBloodType());
+        System.out.println(donationDTO.getBloodType());
+        donationDTO.setLocationId(savedDonation.getLocation() != null ? savedDonation.getLocation().getId() : null);
+        donationDTO.setDonationType(donationRequestDTO.getDonationType());
+        donationDTO.setDonationDate(savedDonation.getDonationDate());
+        donationDTO.setStatus(savedDonation.getStatus());
 
-        switch (donationDTO.getDonationType()) {
+        switch (donationRequestDTO.getDonationType()) {
             case BLOOD:
                 BloodDonation bd = (BloodDonation) savedDonation;
-                dto.setBloodType(bd.getBloodType());
-                dto.setQuantity(bd.getQuantity());
+                donationDTO.setBloodType(bd.getBloodType());
+                donationDTO.setQuantity(bd.getQuantity());
                 break;
             case ORGAN:
                 OrganDonation od = (OrganDonation) savedDonation;
-                dto.setOrganType(od.getOrganType());
-                dto.setIsCompatible(od.getIsCompatible());
+                donationDTO.setOrganType(od.getOrganType());
+                donationDTO.setIsCompatible(od.getIsCompatible());
                 break;
             case TISSUE:
                 TissueDonation td = (TissueDonation) savedDonation;
-                dto.setTissueType(td.getTissueType());
-                dto.setQuantity(td.getQuantity());
+                donationDTO.setTissueType(td.getTissueType());
+                donationDTO.setQuantity(td.getQuantity());
                 break;
             case STEM_CELL:
                 StemCellDonation sd = (StemCellDonation) savedDonation;
-                dto.setStemCellType(sd.getStemCellType());
-                dto.setQuantity(sd.getQuantity());
+                donationDTO.setStemCellType(sd.getStemCellType());
+                donationDTO.setQuantity(sd.getQuantity());
                 break;
             default:
                 break;
         }
-        return dto;
+        eventPublisher.publishDonationEvent(getDonationEvent(donationDTO));
+        eventPublisher.publishDonorEvent(getDonorEvent(donor));
+        eventPublisher.publishLocationEvent(getLocationEvent(donor.getLocation(), donor.getId()));
+        return donationDTO;
+    }
+
+    private LocationEvent getLocationEvent(Location location, UUID id) {
+        if (location == null) {
+            return null;
+        }
+        LocationEvent event = new LocationEvent();
+        BeanUtils.copyProperties(location, event);
+        event.setLocationId(location.getId());
+        if (id != null) {
+            event.setDonorId(id);
+        }
+        return event;
+    }
+
+    private DonorEvent getDonorEvent(Donor donor) {
+        if (donor == null) {
+            return null;
+        }
+        DonorEvent donorEvent = new DonorEvent();
+
+        BeanUtils.copyProperties(donor, donorEvent);
+
+        donorEvent.setDonorId(donor.getId());
+        if (donor.getStatus() != null) {
+            donorEvent.setStatus(donor.getStatus().name());
+        }
+
+        if (donor.getMedicalDetails() != null) {
+            donorEvent.setHemoglobinLevel(donor.getMedicalDetails().getHemoglobinLevel());
+            donorEvent.setBloodPressure(donor.getMedicalDetails().getBloodPressure());
+            donorEvent.setHasDiseases(donor.getMedicalDetails().getHasDiseases());
+            donorEvent.setTakingMedication(donor.getMedicalDetails().getTakingMedication());
+            donorEvent.setDiseaseDescription(donor.getMedicalDetails().getDiseaseDescription());
+        }
+
+        if (donor.getEligibilityCriteria() != null) {
+            donorEvent.setMedicalClearance(donor.getEligibilityCriteria().getMedicalClearance());
+            donorEvent.setRecentSurgery(donor.getEligibilityCriteria().getRecentSurgery());
+            donorEvent.setChronicDiseases(donor.getEligibilityCriteria().getChronicDiseases());
+            donorEvent.setAllergies(donor.getEligibilityCriteria().getAllergies());
+            donorEvent.setLastDonationDate(donor.getEligibilityCriteria().getLastDonationDate());
+            donorEvent.setAge(donor.getEligibilityCriteria().getAge());
+            donorEvent.setWeight(donor.getEligibilityCriteria().getWeight());
+        }
+
+        return donorEvent;
+    }
+
+    public static DonationEvent getDonationEvent(DonationDTO donationDTO) {
+        if (donationDTO == null) {
+            return null;
+        }
+
+        DonationEvent event = new DonationEvent();
+
+        event.setDonationId(donationDTO.getId());
+        event.setDonorId(donationDTO.getDonorId());
+        event.setLocationId(donationDTO.getLocationId());
+        event.setDonationType(donationDTO.getDonationType());
+
+        event.setBloodType(donationDTO.getBloodType() != null ? donationDTO.getBloodType().name() : null);
+
+        event.setDonationDate(donationDTO.getDonationDate());
+        event.setQuantity(donationDTO.getQuantity());
+        event.setOrganType(donationDTO.getOrganType());
+        event.setIsCompatible(donationDTO.getIsCompatible());
+        event.setTissueType(donationDTO.getTissueType());
+        event.setStemCellType(donationDTO.getStemCellType());
+
+        return event;
     }
 
 

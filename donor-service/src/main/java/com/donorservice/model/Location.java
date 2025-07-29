@@ -41,4 +41,5 @@ public class Location {
 
     @Column(columnDefinition = "double precision", nullable = false)
     private Double longitude;
+
 }

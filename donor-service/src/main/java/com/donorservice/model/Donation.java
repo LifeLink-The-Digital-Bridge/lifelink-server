@@ -4,6 +4,7 @@ import com.donorservice.enums.BloodType;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDate;
+import java.util.UUID;
 
 @Data
 @Entity
@@ -12,8 +13,8 @@ import java.time.LocalDate;
 public abstract class Donation {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private UUID id;
 
     @ManyToOne
     @JoinColumn(name = "donor_id", referencedColumnName = "id")
