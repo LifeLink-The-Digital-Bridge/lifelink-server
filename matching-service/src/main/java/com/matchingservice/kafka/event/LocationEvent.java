@@ -1,20 +1,13 @@
-package com.matchingservice.model;
+package com.matchingservice.kafka.event;
 
-import jakarta.persistence.*;
 import lombok.Data;
 
-@Entity
-@Table(name = "locations")
+import java.util.UUID;
+
 @Data
-public class Location {
-
-    @Id
-    private Long id;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "donor_id", nullable = false)
-    private Donor donor;
-
+public class LocationEvent {
+    private Long locationId;
+    private UUID donorId;
     private String addressLine;
     private String landmark;
     private String area;
@@ -23,7 +16,6 @@ public class Location {
     private String state;
     private String country;
     private String pincode;
-
     private Double latitude;
     private Double longitude;
 }

@@ -9,6 +9,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "donations")
+@Inheritance(strategy = InheritanceType.JOINED)
 @Data
 public class Donation {
 

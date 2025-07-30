@@ -1,0 +1,27 @@
+package com.matchingservice.kafka.event;
+
+
+import com.matchingservice.enums.DonationType;
+import com.matchingservice.enums.OrganType;
+import com.matchingservice.enums.StemCellType;
+import com.matchingservice.enums.TissueType;
+import lombok.Data;
+
+import java.time.LocalDate;
+import java.util.UUID;
+
+@Data
+public class DonationEvent {
+    private UUID donationId;
+    private UUID donorId;
+    private Long locationId;
+    private DonationType donationType;
+    private String bloodType;
+    private LocalDate donationDate;
+
+    private Double quantity;
+    private OrganType organType;
+    private Boolean isCompatible;
+    private TissueType tissueType;
+    private StemCellType stemCellType;
+}
