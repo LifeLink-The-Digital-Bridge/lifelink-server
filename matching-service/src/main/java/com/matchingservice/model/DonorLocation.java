@@ -6,7 +6,7 @@ import lombok.Data;
 @Entity
 @Table(name = "locations")
 @Data
-public class Location {
+public class DonorLocation {
 
     @Id
     private Long id;

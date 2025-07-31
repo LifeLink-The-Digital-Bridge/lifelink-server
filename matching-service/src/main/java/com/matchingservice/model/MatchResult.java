@@ -26,10 +26,10 @@ public class MatchResult {
 
     @ManyToOne
     @JoinColumn(name = "donor_location_id")
-    private Location donorLocation;
+    private DonorLocation donorLocation;
 
     @ManyToOne
     @JoinColumn(name = "recipient_location_id")
-    private Location recipientLocation;
+    private DonorLocation recipientLocation;
 }
 

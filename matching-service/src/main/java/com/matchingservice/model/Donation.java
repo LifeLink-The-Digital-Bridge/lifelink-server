@@ -22,7 +22,7 @@ public class Donation {
 
     @ManyToOne
     @JoinColumn(name = "location_id", referencedColumnName = "id")
-    private Location location;
+    private DonorLocation location;
 
     @Enumerated(EnumType.STRING)
     private DonationType donationType;

@@ -44,6 +44,6 @@ public class Donor {
     private List<Donation> donations = new ArrayList<>();
 
     @OneToMany(mappedBy = "donor", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Location> locations = new ArrayList<>();
+    private List<DonorLocation> locations = new ArrayList<>();
 }
 
