@@ -3,10 +3,13 @@ package com.recipientservice.service;
 import com.recipientservice.dto.*;
 import com.recipientservice.exceptions.InvalidLocationException;
 import com.recipientservice.exceptions.RecipientNotFoundException;
+import com.recipientservice.kafka.EventPublisher;
+import com.recipientservice.kafka.events.LocationEvent;
+import com.recipientservice.kafka.events.ReceiveRequestEvent;
+import com.recipientservice.kafka.events.RecipientEvent;
 import com.recipientservice.model.*;
 import com.recipientservice.repository.*;
 import org.springframework.beans.BeanUtils;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -19,59 +22,47 @@ public class RecipientServiceImpl implements RecipientService {
     private final RecipientRepository recipientRepository;
     private final LocationRepository locationRepository;
     private final ReceiveRequestRepository receiveRequestRepository;
+    private final EventPublisher eventPublisher;
 
-    public RecipientServiceImpl(RecipientRepository recipientRepository, LocationRepository locationRepository, ReceiveRequestRepository receiveRequestRepository) {
+    public RecipientServiceImpl(
+            RecipientRepository recipientRepository,
+            LocationRepository locationRepository,
+            ReceiveRequestRepository receiveRequestRepository, EventPublisher eventPublisher
+    ) {
         this.recipientRepository = recipientRepository;
         this.locationRepository = locationRepository;
         this.receiveRequestRepository = receiveRequestRepository;
+        this.eventPublisher = eventPublisher;
     }
 
-
     @Override
-    public RecipientDTO createRecipient(UUID userId, RegisterRecipientDTO recipientDTO) {
+    public RecipientDTO createRecipient(UUID userId, RegisterRecipientDTO dto) {
         Recipient recipient = recipientRepository.findByUserId(userId);
         if (recipient == null) {
             recipient = new Recipient();
             recipient.setUserId(userId);
         }
-        recipient.setAvailability(recipientDTO.getAvailability());
 
-        if (recipientDTO.getLocation() != null) {
-            LocationDTO locDTO = recipientDTO.getLocation();
-            if (locDTO.getAddressLine() == null || locDTO.getCity() == null || locDTO.getState() == null) {
-                throw new InvalidLocationException("Location fields cannot be null");
-            }
-            Location location = mapLocationDTOToEntity(locDTO);
-            recipient.setLocation(location);
+        recipient.setAvailability(dto.getAvailability());
+
+        if (dto.getLocation() != null) {
+            validateLocationFields(dto.getLocation());
+            recipient.setLocation(saveLocation(dto.getLocation()));
         }
 
-
-        if (recipientDTO.getMedicalDetails() != null) {
-            MedicalDetails md = recipient.getMedicalDetails();
-            if (md == null) md = new MedicalDetails();
-            BeanUtils.copyProperties(recipientDTO.getMedicalDetails(), md);
-            md.setRecipient(recipient);
-            recipient.setMedicalDetails(md);
+        if (dto.getMedicalDetails() != null) {
+            recipient.setMedicalDetails(copyMedicalDetails(dto.getMedicalDetails(), recipient.getMedicalDetails(), recipient));
         }
 
-        if (recipientDTO.getEligibilityCriteria() != null) {
-            EligibilityCriteria ec = recipient.getEligibilityCriteria();
-            if (ec == null) ec = new EligibilityCriteria();
-            BeanUtils.copyProperties(recipientDTO.getEligibilityCriteria(), ec);
-            ec.setRecipient(recipient);
-            recipient.setEligibilityCriteria(ec);
+        if (dto.getEligibilityCriteria() != null) {
+            recipient.setEligibilityCriteria(copyEligibility(dto.getEligibilityCriteria(), recipient.getEligibilityCriteria(), recipient));
         }
 
-        if (recipientDTO.getConsentForm() != null) {
-            ConsentForm cf = recipient.getConsentForm();
-            if (cf == null) cf = new ConsentForm();
-            BeanUtils.copyProperties(recipientDTO.getConsentForm(), cf);
-            cf.setRecipient(recipient);
-            recipient.setConsentForm(cf);
+        if (dto.getConsentForm() != null) {
+            recipient.setConsentForm(copyConsentForm(dto.getConsentForm(), recipient.getConsentForm(), recipient));
         }
 
-        Recipient saved = recipientRepository.save(recipient);
-        return mapRecipientToDTO(saved);
+        return mapRecipientToDTO(recipientRepository.save(recipient));
     }
 
     @Override
@@ -80,59 +71,159 @@ public class RecipientServiceImpl implements RecipientService {
         if (recipient == null) {
             throw new RecipientNotFoundException("Recipient not found for userId: " + userId);
         }
+
         ReceiveRequest request = new ReceiveRequest();
+        BeanUtils.copyProperties(requestDTO, request);
         request.setRecipient(recipient);
-        request.setRequestedBloodType(requestDTO.getRequestedBloodType());
-        request.setRequestedOrgan(requestDTO.getRequestedOrgan());
-        request.setUrgencyLevel(requestDTO.getUrgencyLevel());
-        request.setQuantity(requestDTO.getQuantity());
-        request.setRequestDate(requestDTO.getRequestDate());
-        request.setStatus(requestDTO.getStatus());
-        request.setNotes(requestDTO.getNotes());
         ReceiveRequest saved = receiveRequestRepository.save(request);
+
+        eventPublisher.publishReceiveRequestEvent(toReceiveRequestEvent(saved));
+        eventPublisher.publishRecipientEvent(toRecipientEvent(recipient));
+
+        if (recipient.getLocation() != null) {
+            eventPublisher.publishRecipientLocationEvent(toLocationEvent(recipient));
+        }
+
         return mapReceiveRequestToDTO(saved);
     }
 
+    private ReceiveRequestEvent toReceiveRequestEvent(ReceiveRequest request) {
+        ReceiveRequestEvent event = new ReceiveRequestEvent();
+        event.setReceiveRequestId(request.getId());
+        event.setRecipientId(request.getRecipient().getId());
+        event.setRequestedBloodType(request.getRequestedBloodType());
+        event.setRequestedOrgan(request.getRequestedOrgan());
+        event.setUrgencyLevel(request.getUrgencyLevel());
+        event.setQuantity(request.getQuantity());
+        event.setRequestDate(request.getRequestDate());
+        event.setStatus(request.getStatus());
+        event.setNotes(request.getNotes());
+        return event;
+    }
+
+    private RecipientEvent toRecipientEvent(Recipient recipient) {
+        RecipientEvent event = new RecipientEvent();
+        event.setRecipientId(recipient.getId());
+        event.setUserId(recipient.getUserId());
+        event.setAvailability(recipient.getAvailability());
+
+        if (recipient.getMedicalDetails() != null) {
+            event.setMedicalDetailsId(recipient.getMedicalDetails().getId());
+            event.setDiagnosis(recipient.getMedicalDetails().getDiagnosis());
+            event.setAllergies(recipient.getMedicalDetails().getAllergies());
+            event.setCurrentMedications(recipient.getMedicalDetails().getCurrentMedications());
+            event.setAdditionalNotes(recipient.getMedicalDetails().getAdditionalNotes());
+        }
+
+        if (recipient.getEligibilityCriteria() != null) {
+            event.setEligibilityCriteriaId(recipient.getEligibilityCriteria().getId());
+            event.setMedicallyEligible(recipient.getEligibilityCriteria().getMedicallyEligible());
+            event.setLegalClearance(recipient.getEligibilityCriteria().getLegalClearance());
+            event.setEligibilityNotes(recipient.getEligibilityCriteria().getNotes());
+            event.setLastReviewed(recipient.getEligibilityCriteria().getLastReviewed());
+        }
+
+        return event;
+    }
+
+    private LocationEvent toLocationEvent(Recipient recipient) {
+        Location location = recipient.getLocation();
+        if (location == null) return null;
+
+        LocationEvent event = new LocationEvent();
+        event.setLocationId(location.getId());
+        event.setRecipientId(recipient.getId());
+        event.setAddressLine(location.getAddressLine());
+        event.setLandmark(location.getLandmark());
+        event.setArea(location.getArea());
+        event.setCity(location.getCity());
+        event.setDistrict(location.getDistrict());
+        event.setState(location.getState());
+        event.setCountry(location.getCountry());
+        event.setPincode(location.getPincode());
+        event.setLatitude(location.getLatitude());
+        event.setLongitude(location.getLongitude());
+
+        return event;
+    }
+
+
     @Override
     public RecipientDTO getRecipientByUserId(UUID userId) {
-        Recipient recipient = recipientRepository.findByUserId(userId);
-        return recipient != null ? mapRecipientToDTO(recipient) : null;
+        return mapRecipientToDTO(recipientRepository.findByUserId(userId));
     }
 
     @Override
     public RecipientDTO getRecipientById(UUID id) {
-        Recipient recipient = recipientRepository.findById(id).orElse(null);
-        return recipient != null ? mapRecipientToDTO(recipient) : null;
+        return mapRecipientToDTO(recipientRepository.findById(id).orElse(null));
     }
 
     @Override
     public List<ReceiveRequestDTO> getReceiveRequestsByRecipientId(UUID recipientId) {
-        List<ReceiveRequest> requests = receiveRequestRepository.findAllByRecipientId(recipientId);
-        return requests.stream().map(this::mapReceiveRequestToDTO).collect(Collectors.toList());
+        return receiveRequestRepository.findAllByRecipientId(recipientId)
+                .stream()
+                .map(this::mapReceiveRequestToDTO)
+                .collect(Collectors.toList());
+    }
+
+    private void validateLocationFields(LocationDTO locationDTO) {
+        if (locationDTO.getAddressLine() == null || locationDTO.getCity() == null || locationDTO.getState() == null) {
+            throw new InvalidLocationException("Location fields cannot be null");
+        }
+    }
+
+    private Location saveLocation(LocationDTO dto) {
+        Location location = new Location();
+        BeanUtils.copyProperties(dto, location);
+        return locationRepository.save(location);
+    }
+
+    private MedicalDetails copyMedicalDetails(MedicalDetailsDTO dto, MedicalDetails existing, Recipient recipient) {
+        if (existing == null) existing = new MedicalDetails();
+        BeanUtils.copyProperties(dto, existing);
+        existing.setRecipient(recipient);
+        return existing;
+    }
+
+    private EligibilityCriteria copyEligibility(EligibilityCriteriaDTO dto, EligibilityCriteria existing, Recipient recipient) {
+        if (existing == null) existing = new EligibilityCriteria();
+        BeanUtils.copyProperties(dto, existing);
+        existing.setRecipient(recipient);
+        return existing;
+    }
+
+    private ConsentForm copyConsentForm(ConsentFormDTO dto, ConsentForm existing, Recipient recipient) {
+        if (existing == null) existing = new ConsentForm();
+        BeanUtils.copyProperties(dto, existing);
+        existing.setRecipient(recipient);
+        return existing;
     }
 
     private RecipientDTO mapRecipientToDTO(Recipient recipient) {
         if (recipient == null) return null;
+
         RecipientDTO dto = new RecipientDTO();
-        dto.setId(recipient.getId());
-        dto.setUserId(recipient.getUserId());
-        dto.setAvailability(recipient.getAvailability());
+        BeanUtils.copyProperties(recipient, dto);
         dto.setLocation(mapLocationToDTO(recipient.getLocation()));
+
         if (recipient.getMedicalDetails() != null) {
             MedicalDetailsDTO mdDTO = new MedicalDetailsDTO();
             BeanUtils.copyProperties(recipient.getMedicalDetails(), mdDTO);
             dto.setMedicalDetails(mdDTO);
         }
+
         if (recipient.getEligibilityCriteria() != null) {
             EligibilityCriteriaDTO ecDTO = new EligibilityCriteriaDTO();
             BeanUtils.copyProperties(recipient.getEligibilityCriteria(), ecDTO);
             dto.setEligibilityCriteria(ecDTO);
         }
+
         if (recipient.getConsentForm() != null) {
             ConsentFormDTO cfDTO = new ConsentFormDTO();
             BeanUtils.copyProperties(recipient.getConsentForm(), cfDTO);
             dto.setConsentForm(cfDTO);
         }
+
         return dto;
     }
 
@@ -143,25 +234,12 @@ public class RecipientServiceImpl implements RecipientService {
         return dto;
     }
 
-    private Location mapLocationDTOToEntity(LocationDTO dto) {
-        if (dto == null) return null;
-        Location location = new Location();
-        BeanUtils.copyProperties(dto, location);
-        return locationRepository.save(location);
-    }
-
     private ReceiveRequestDTO mapReceiveRequestToDTO(ReceiveRequest request) {
         if (request == null) return null;
+
         ReceiveRequestDTO dto = new ReceiveRequestDTO();
-        dto.setId(request.getId());
+        BeanUtils.copyProperties(request, dto);
         dto.setRecipientId(request.getRecipient().getId());
-        dto.setRequestedBloodType(request.getRequestedBloodType());
-        dto.setRequestedOrgan(request.getRequestedOrgan());
-        dto.setUrgencyLevel(request.getUrgencyLevel());
-        dto.setQuantity(request.getQuantity());
-        dto.setRequestDate(request.getRequestDate());
-        dto.setStatus(request.getStatus());
-        dto.setNotes(request.getNotes());
         return dto;
     }
 }

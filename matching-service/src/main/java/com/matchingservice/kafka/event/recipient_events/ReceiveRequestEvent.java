@@ -1,17 +1,17 @@
-package com.recipientservice.dto;
+package com.matchingservice.kafka.event.recipient_events;
 
-import com.recipientservice.enums.BloodType;
-import com.recipientservice.enums.OrganType;
-import com.recipientservice.enums.UrgencyLevel;
-import com.recipientservice.enums.RequestStatus;
+import com.matchingservice.enums.BloodType;
+import com.matchingservice.enums.OrganType;
+import com.matchingservice.enums.RequestStatus;
+import com.matchingservice.enums.UrgencyLevel;
 import lombok.Data;
 
 import java.time.LocalDate;
 import java.util.UUID;
 
 @Data
-public class ReceiveRequestDTO {
-    private UUID id;
+public class ReceiveRequestEvent {
+    private UUID receiveRequestId;
     private UUID recipientId;
     private BloodType requestedBloodType;
     private OrganType requestedOrgan;

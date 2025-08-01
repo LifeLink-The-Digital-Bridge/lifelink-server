@@ -1,4 +1,4 @@
-package com.matchingservice.kafka.event;
+package com.recipientservice.kafka.events;
 
 import lombok.Data;
 
@@ -7,7 +7,7 @@ import java.util.UUID;
 @Data
 public class LocationEvent {
     private Long locationId;
-    private UUID donorId;
+    private UUID recipientId;
     private String addressLine;
     private String landmark;
     private String area;

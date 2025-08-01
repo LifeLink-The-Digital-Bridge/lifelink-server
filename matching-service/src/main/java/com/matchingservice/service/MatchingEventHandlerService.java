@@ -1,9 +1,9 @@
 package com.matchingservice.service;
 
 import com.matchingservice.enums.DonorStatus;
-import com.matchingservice.kafka.event.DonationEvent;
-import com.matchingservice.kafka.event.DonorEvent;
-import com.matchingservice.kafka.event.LocationEvent;
+import com.matchingservice.kafka.event.donor_events.DonationEvent;
+import com.matchingservice.kafka.event.donor_events.DonorEvent;
+import com.matchingservice.kafka.event.donor_events.DonorLocationEvent;
 import com.matchingservice.model.*;
 import com.matchingservice.repository.DonationRepository;
 import com.matchingservice.repository.DonorLocationRepository;
@@ -41,7 +41,7 @@ public class MatchingEventHandlerService {
         donorRepository.save(donor);
     }
 
-    public void handleLocationEvent(LocationEvent event) {
+    public void handleLocationEvent(DonorLocationEvent event) {
         Donor donor = donorRepository.findById(event.getDonorId())
                 .orElseThrow(() -> new RuntimeException("Donor not found"));
 

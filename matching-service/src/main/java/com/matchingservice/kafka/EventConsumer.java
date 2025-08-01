@@ -1,8 +1,11 @@
 package com.matchingservice.kafka;
 
-import com.matchingservice.kafka.event.DonorEvent;
-import com.matchingservice.kafka.event.DonationEvent;
-import com.matchingservice.kafka.event.LocationEvent;
+import com.matchingservice.kafka.event.donor_events.DonorEvent;
+import com.matchingservice.kafka.event.donor_events.DonationEvent;
+import com.matchingservice.kafka.event.donor_events.DonorLocationEvent;
+import com.matchingservice.kafka.event.recipient_events.RecipientEvent;
+import com.matchingservice.kafka.event.recipient_events.ReceiveRequestEvent;
+import com.matchingservice.kafka.event.recipient_events.RecipientLocationEvent;
 import com.matchingservice.service.MatchingEventHandlerService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -26,9 +29,24 @@ public class EventConsumer {
         handler.handleDonationEvent(event);
     }
 
-    @KafkaListener(topics = "location-events", groupId = "matching-service-group", containerFactory = "locationKafkaListenerFactory")
-    public void consumeLocationEvent(LocationEvent event) {
-        System.out.println("Received LocationEvent: " + event);
-        handler.handleLocationEvent(event);
+    @KafkaListener(topics = "donor-location-events", groupId = "matching-service-group", containerFactory = "donorLocationKafkaListenerFactory")
+    public void consumeDonorLocationEvent(DonorLocationEvent event) {
+        System.out.println("Received DonorLocationEvent: " + event);
+         handler.handleLocationEvent(event);
+    }
+
+    @KafkaListener(topics = "recipient-events", groupId = "matching-service-group", containerFactory = "recipientKafkaListenerFactory")
+    public void consumeRecipientEvent(RecipientEvent event) {
+        System.out.println("Received RecipientEvent: " + event);
+    }
+
+    @KafkaListener(topics = "receive-request-events", groupId = "matching-service-group", containerFactory = "receiveRequestKafkaListenerFactory")
+    public void consumeReceiveRequestEvent(ReceiveRequestEvent event) {
+        System.out.println("Received ReceiveRequestEvent: " + event);
+    }
+
+    @KafkaListener(topics = "recipient-location-events", groupId = "matching-service-group", containerFactory = "recipientLocationKafkaListenerFactory")
+    public void consumeRecipientLocationEvent(RecipientLocationEvent event) {
+        System.out.println("Received RecipientLocationEvent: " + event);
     }
 }

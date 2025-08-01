@@ -1,4 +1,4 @@
-package com.recipientservice.dto;
+package com.recipientservice.kafka.events;
 
 import com.recipientservice.enums.BloodType;
 import com.recipientservice.enums.OrganType;
@@ -10,8 +10,8 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 @Data
-public class ReceiveRequestDTO {
-    private UUID id;
+public class ReceiveRequestEvent {
+    private UUID receiveRequestId;
     private UUID recipientId;
     private BloodType requestedBloodType;
     private OrganType requestedOrgan;

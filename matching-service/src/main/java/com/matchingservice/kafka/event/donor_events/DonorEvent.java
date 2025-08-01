@@ -1,4 +1,4 @@
-package com.matchingservice.kafka.event;
+package com.matchingservice.kafka.event.donor_events;
 
 import lombok.Data;
 
