@@ -1,21 +1,13 @@
-package com.matchingservice.model;
+package com.matchingservice.kafka.event.donor_events;
 
-import jakarta.persistence.*;
 import lombok.Data;
 
 import java.util.UUID;
 
-@Entity
-@Table(name = "donor_locations")
 @Data
-public class DonorLocation {
-
-    @Id
-    private Long id;
-
-    @Column(nullable = false)
+public class DonorLocationEvent {
+    private Long locationId;
     private UUID donorId;
-
     private String addressLine;
     private String landmark;
     private String area;
@@ -24,7 +16,6 @@ public class DonorLocation {
     private String state;
     private String country;
     private String pincode;
-
     private Double latitude;
     private Double longitude;
 }

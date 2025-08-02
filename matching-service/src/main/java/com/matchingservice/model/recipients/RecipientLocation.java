@@ -1,4 +1,4 @@
-package com.matchingservice.model;
+package com.matchingservice.model.recipients;
 
 import jakarta.persistence.*;
 import lombok.Data;
@@ -6,15 +6,15 @@ import lombok.Data;
 import java.util.UUID;
 
 @Entity
-@Table(name = "donor_locations")
+@Table(name = "recipient_locations")
 @Data
-public class DonorLocation {
+public class RecipientLocation {
 
     @Id
     private Long id;
 
     @Column(nullable = false)
-    private UUID donorId;
+    private UUID recipientId;
 
     private String addressLine;
     private String landmark;
