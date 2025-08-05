@@ -13,7 +13,8 @@ import java.util.UUID;
 public class Recipient {
 
     @Id
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private UUID id;
 
     @Column(nullable = false)
     private UUID recipientId;

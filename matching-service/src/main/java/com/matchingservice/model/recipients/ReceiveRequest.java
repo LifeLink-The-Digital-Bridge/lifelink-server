@@ -16,8 +16,8 @@ import java.util.UUID;
 public class ReceiveRequest {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private UUID id;
 
     @Column(nullable = false)
     private UUID receiveRequestId;

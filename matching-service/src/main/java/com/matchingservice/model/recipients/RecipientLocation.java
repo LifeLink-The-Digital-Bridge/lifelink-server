@@ -14,6 +14,9 @@ public class RecipientLocation {
     private Long id;
 
     @Column(nullable = false)
+    private Long locationId;
+
+    @Column(nullable = false)
     private UUID recipientId;
 
     private String addressLine;
