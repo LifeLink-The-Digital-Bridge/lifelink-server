@@ -20,10 +20,10 @@ public class EventPublisher {
     }
 
     public void publishDonationEvent(DonationEvent event) {
-        donationKafkaTemplate.send("donation-events", event.getDonationId().toString(), event);
+        donationKafkaTemplate.send("donation-events", event.getDonorId().toString(), event);
     }
 
     public void publishLocationEvent(LocationEvent event) {
-        locationKafkaTemplate.send("location-events", event.getLocationId().toString(), event);
+        locationKafkaTemplate.send("donor-location-events", event.getDonorId().toString(), event);
     }
 }
