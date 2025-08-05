@@ -1,5 +1,6 @@
 package com.matchingservice.model;
 
+import com.matchingservice.model.recipients.RecipientLocation;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -12,8 +13,8 @@ import java.util.UUID;
 public class MatchResult {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private UUID id;
 
     private UUID donorId;
     private UUID recipientId;
@@ -30,6 +31,6 @@ public class MatchResult {
 
     @ManyToOne
     @JoinColumn(name = "recipient_location_id")
-    private DonorLocation recipientLocation;
+    private RecipientLocation recipientLocation;
 }
 

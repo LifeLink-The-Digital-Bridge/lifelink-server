@@ -14,6 +14,10 @@ import java.util.UUID;
 public class Donation {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private UUID id;
+
+    @Column(nullable = false, unique = true)
     private UUID donationId;
 
     @ManyToOne(fetch = FetchType.LAZY)

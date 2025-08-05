@@ -11,7 +11,11 @@ import java.util.UUID;
 public class DonorLocation {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(nullable = false, unique = true)
+    private Long locationId;
 
     @Column(nullable = false)
     private UUID donorId;

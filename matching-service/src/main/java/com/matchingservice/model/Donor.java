@@ -15,8 +15,13 @@ import java.util.UUID;
 public class Donor {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private UUID id;
+
+    @Column(nullable = false, unique = true)
     private UUID donorId;
 
+    @Column(nullable = false)
     private UUID userId;
 
     private LocalDate registrationDate;
@@ -43,7 +48,8 @@ public class Donor {
     @OneToMany(mappedBy = "donor", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Donation> donations = new ArrayList<>();
 
-    @OneToMany(mappedBy = "donor", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<DonorLocation> locations = new ArrayList<>();
+    @ManyToOne
+    @JoinColumn(name = "location_id", referencedColumnName = "id")
+    private DonorLocation donorLocation;
 }
 
