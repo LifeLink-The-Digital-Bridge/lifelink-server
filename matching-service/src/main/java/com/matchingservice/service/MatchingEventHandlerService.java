@@ -8,6 +8,8 @@ import com.matchingservice.model.*;
 import com.matchingservice.repository.DonationRepository;
 import com.matchingservice.repository.DonorLocationRepository;
 import com.matchingservice.repository.DonorRepository;
+import com.matchingservice.utils.DonationEventBuffer;
+import com.matchingservice.utils.DonorEventBuffer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -18,6 +20,8 @@ public class MatchingEventHandlerService {
     private final DonorRepository donorRepository;
     private final DonorLocationRepository donorLocationRepository;
     private final DonationRepository donationRepository;
+    private final DonorEventBuffer donorEventBuffer;
+    private final DonationEventBuffer donationEventBuffer;
 
     public void handleDonorEvent(DonorEvent event) {
         Donor donor = new Donor();
@@ -38,16 +42,28 @@ public class MatchingEventHandlerService {
         donor.setTakingMedication(event.getTakingMedication());
         donor.setDiseaseDescription(event.getDiseaseDescription());
 
+        System.out.println("Inside handleDonorEvent");
         donorRepository.save(donor);
+
+        var pending = donorEventBuffer.drain(donor.getDonorId());
+        if (pending != null) {
+            pending.forEach(this::safeRun);
+        }
     }
 
     public void handleLocationEvent(DonorLocationEvent event) {
-        Donor donor = donorRepository.findById(event.getDonorId())
-                .orElseThrow(() -> new RuntimeException("Donor not found"));
-
+        Donor donor = donorRepository.findByDonorId(event.getDonorId()).orElse(null);
+        if (donor == null) {
+            donorEventBuffer.buffer(event.getDonorId(), () -> {
+                System.out.println("Re-running buffered location event for donorId: " + event.getDonorId());
+                handleLocationEvent(event);
+            });
+            System.out.println("Donor not found - buffering location event for donorId: " + event.getDonorId());
+            return;
+        }
         DonorLocation location = new DonorLocation();
-        location.setId(event.getLocationId());
-        location.setDonor(donor);
+        location.setLocationId(event.getLocationId());
+        location.setDonorId(donor.getDonorId());
         location.setAddressLine(event.getAddressLine());
         location.setLandmark(event.getLandmark());
         location.setArea(event.getArea());
@@ -60,13 +76,33 @@ public class MatchingEventHandlerService {
         location.setLongitude(event.getLongitude());
 
         donorLocationRepository.save(location);
+        System.out.println("Location created: " + location);
+
+        var donationPending = donationEventBuffer.drain(donor.getDonorId(), location.getId());
+        if (donationPending != null) {
+            donationPending.forEach(this::safeRun);
+        }
     }
 
     public void handleDonationEvent(DonationEvent event) {
-        Donor donor = donorRepository.findById(event.getDonorId())
-                .orElseThrow(() -> new RuntimeException("Donor not found"));
-        DonorLocation location = donorLocationRepository.findById(event.getLocationId())
-                .orElseThrow(() -> new RuntimeException("Location not found"));
+        Donor donor = donorRepository.findByDonorId(event.getDonorId()).orElse(null);
+        if (donor == null) {
+            donorEventBuffer.buffer(event.getDonorId(), () -> {
+                System.out.println("Re-running buffered donation event after donor created for donorId: " + event.getDonorId());
+                handleDonationEvent(event);
+            });
+            System.out.println("Donor not found - buffering donation event for donorId: " + event.getDonorId());
+            return;
+        }
+        DonorLocation location = donorLocationRepository.findByLocationId(event.getLocationId()).orElse(null);
+        if (location == null) {
+            donationEventBuffer.buffer(event.getDonorId(), event.getLocationId(), () -> {
+                System.out.println("Re-running buffered donation event after location created for donorId: " + event.getDonorId() + ", locationId: " + event.getLocationId());
+                handleDonationEvent(event);
+            });
+            System.out.println("Location not found - buffering donation event for donorId: " + event.getDonorId() + ", locationId: " + event.getLocationId());
+            return;
+        }
 
         Donation donation = switch (event.getDonationType()) {
             case BLOOD -> {
@@ -108,7 +144,16 @@ public class MatchingEventHandlerService {
         summary.setLongitude(location.getLongitude());
 
         donation.setLocationSummary(summary);
+
         donationRepository.save(donation);
+        System.out.println("Donation created: " + donation);
+    }
+
+    private void safeRun(Runnable r) {
+        try {
+            r.run();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }
-
