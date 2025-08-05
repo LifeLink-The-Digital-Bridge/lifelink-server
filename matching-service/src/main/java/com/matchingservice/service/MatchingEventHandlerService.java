@@ -24,8 +24,11 @@ public class MatchingEventHandlerService {
     private final DonationEventBuffer donationEventBuffer;
 
     public void handleDonorEvent(DonorEvent event) {
-        Donor donor = new Donor();
-        donor.setDonorId(event.getDonorId());
+        Donor donor = donorRepository.findByDonorId(event.getDonorId()).orElse(null);
+        if (donor == null) {
+            donor = new Donor();
+            donor.setDonorId(event.getDonorId());
+        }
         donor.setUserId(event.getUserId());
         donor.setRegistrationDate(event.getRegistrationDate());
         donor.setStatus(DonorStatus.valueOf(event.getStatus()));
@@ -42,7 +45,7 @@ public class MatchingEventHandlerService {
         donor.setTakingMedication(event.getTakingMedication());
         donor.setDiseaseDescription(event.getDiseaseDescription());
 
-        System.out.println("Inside handleDonorEvent");
+        System.out.println("Inside handleDonorEvent: " + donor.getDonorId());
         donorRepository.save(donor);
 
         var pending = donorEventBuffer.drain(donor.getDonorId());
@@ -61,8 +64,11 @@ public class MatchingEventHandlerService {
             System.out.println("Donor not found - buffering location event for donorId: " + event.getDonorId());
             return;
         }
-        DonorLocation location = new DonorLocation();
-        location.setLocationId(event.getLocationId());
+        DonorLocation location = donorLocationRepository.findByLocationId(event.getLocationId()).orElse(null);
+        if (location == null) {
+            location = new DonorLocation();
+            location.setLocationId(event.getLocationId());
+        }
         location.setDonorId(donor.getDonorId());
         location.setAddressLine(event.getAddressLine());
         location.setLandmark(event.getLandmark());
@@ -76,9 +82,9 @@ public class MatchingEventHandlerService {
         location.setLongitude(event.getLongitude());
 
         donorLocationRepository.save(location);
-        System.out.println("Location created: " + location);
+        System.out.println("Location created/updated: " + location.getLocationId());
 
-        var donationPending = donationEventBuffer.drain(donor.getDonorId(), location.getId());
+        var donationPending = donationEventBuffer.drain(donor.getDonorId(), location.getLocationId());
         if (donationPending != null) {
             donationPending.forEach(this::safeRun);
         }
@@ -101,6 +107,10 @@ public class MatchingEventHandlerService {
                 handleDonationEvent(event);
             });
             System.out.println("Location not found - buffering donation event for donorId: " + event.getDonorId() + ", locationId: " + event.getLocationId());
+            return;
+        }
+        if (donationRepository.findByDonationId(event.getDonationId()).isPresent()) {
+            System.out.println("Donation already exists for donationId: " + event.getDonationId());
             return;
         }
 
@@ -146,7 +156,7 @@ public class MatchingEventHandlerService {
         donation.setLocationSummary(summary);
 
         donationRepository.save(donation);
-        System.out.println("Donation created: " + donation);
+        System.out.println("Donation created: " + donation.getDonationId());
     }
 
     private void safeRun(Runnable r) {
