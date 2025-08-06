@@ -13,7 +13,7 @@ import java.util.UUID;
 public class DonationEvent {
     private UUID donationId;
     private UUID donorId;
-    private Long locationId;
+    private UUID locationId;
     private DonationType donationType;
     private String bloodType;
     private LocalDate donationDate;

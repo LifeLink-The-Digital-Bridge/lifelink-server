@@ -6,7 +6,7 @@ import java.util.UUID;
 
 @Data
 public class DonorLocationEvent {
-    private Long locationId;
+    private UUID locationId;
     private UUID donorId;
     private String addressLine;
     private String landmark;
@@ -19,3 +19,4 @@ public class DonorLocationEvent {
     private Double latitude;
     private Double longitude;
 }
+

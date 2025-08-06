@@ -32,17 +32,19 @@ public class EventConsumer {
     @KafkaListener(topics = "donor-location-events", groupId = "matching-service-group", containerFactory = "donorLocationKafkaListenerFactory")
     public void consumeDonorLocationEvent(DonorLocationEvent event) {
         System.out.println("Received DonorLocationEvent: " + event);
-         handler.handleLocationEvent(event);
+         handler.handleDonorLocationEvent(event);
     }
 
     @KafkaListener(topics = "recipient-events", groupId = "matching-service-group", containerFactory = "recipientKafkaListenerFactory")
     public void consumeRecipientEvent(RecipientEvent event) {
         System.out.println("Received RecipientEvent: " + event);
+        handler.handleRecipientEvent(event);
     }
 
     @KafkaListener(topics = "receive-request-events", groupId = "matching-service-group", containerFactory = "receiveRequestKafkaListenerFactory")
     public void consumeReceiveRequestEvent(ReceiveRequestEvent event) {
         System.out.println("Received ReceiveRequestEvent: " + event);
+        handler.handleReceiveRequestEvent(event);
     }
 
     @KafkaListener(topics = "recipient-location-events", groupId = "matching-service-group", containerFactory = "recipientLocationKafkaListenerFactory")

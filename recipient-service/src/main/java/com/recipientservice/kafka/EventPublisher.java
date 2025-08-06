@@ -20,10 +20,10 @@ public class EventPublisher {
     }
 
     public void publishReceiveRequestEvent(ReceiveRequestEvent event) {
-        receiveRequestKafkaTemplate.send("receive-request-events", event.getReceiveRequestId().toString(), event);
+        receiveRequestKafkaTemplate.send("receive-request-events", event.getRecipientId().toString(), event);
     }
 
     public void publishRecipientLocationEvent(LocationEvent event) {
-        recipientLocationKafkaTemplate.send("recipient-location-events", event.getLocationId().toString(), event);
+        recipientLocationKafkaTemplate.send("recipient-location-events", event.getRecipientId().toString(), event);
     }
 }
