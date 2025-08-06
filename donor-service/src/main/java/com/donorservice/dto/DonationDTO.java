@@ -12,7 +12,7 @@ import java.util.UUID;
 public class DonationDTO {
     private UUID id;
     private UUID donorId;
-    private Long locationId;
+    private UUID locationId;
     private DonationType donationType;
     private LocalDate donationDate;
     private String status;

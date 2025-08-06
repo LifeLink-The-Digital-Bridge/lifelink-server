@@ -22,9 +22,9 @@ public class Donor {
     @Column(nullable = false)
     private LocalDate registrationDate;
 
-    @ManyToOne
-    @JoinColumn(name = "location_id", referencedColumnName = "id")
-    private Location location;
+    @OneToMany(mappedBy = "donor", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<Location> addresses;
+
 
     @Column(nullable = false)
     private DonorStatus status;

@@ -13,7 +13,7 @@ public class DonationRequestDTO {
     private LocalDate donationDate;
     private Double quantity;
     private String status;
-    private Long locationId;
+    private UUID locationId;
     private BloodType bloodType;
     private OrganType organType;
     private Boolean isCompatible;

@@ -16,8 +16,7 @@ import com.donorservice.repository.*;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -28,7 +27,11 @@ public class DonorServiceImpl implements DonorService {
     private final LocationRepository locationRepository;
     private final EventPublisher eventPublisher;
 
-    public DonorServiceImpl(DonorRepository donorRepository, DonationRepository donationRepository, UserClient userClient, LocationRepository locationRepository, EventPublisher eventPublisher) {
+    public DonorServiceImpl(DonorRepository donorRepository,
+                            DonationRepository donationRepository,
+                            UserClient userClient,
+                            LocationRepository locationRepository,
+                            EventPublisher eventPublisher) {
         this.donorRepository = donorRepository;
         this.donationRepository = donationRepository;
         this.locationRepository = locationRepository;
@@ -38,14 +41,13 @@ public class DonorServiceImpl implements DonorService {
     @Override
     public DonorDTO createDonor(UUID userId, RegisterDonor donorDTO) {
         Donor donor = donorRepository.findByUserId(userId);
+
         if (donor == null) {
             donor = new Donor();
             donor.setUserId(userId);
-            BeanUtils.copyProperties(donorDTO, donor);
-        } else {
-            donor.setRegistrationDate(donorDTO.getRegistrationDate());
-            donor.setStatus(donorDTO.getStatus());
         }
+        donor.setRegistrationDate(donorDTO.getRegistrationDate());
+        donor.setStatus(donorDTO.getStatus());
 
         MedicalDetails medicalDetails = donor.getMedicalDetails();
         if (medicalDetails == null) {
@@ -77,49 +79,58 @@ public class DonorServiceImpl implements DonorService {
         BeanUtils.copyProperties(donorDTO.getConsentForm(), consentForm);
         donor.setConsentForm(consentForm);
 
-        if (donorDTO.getLocation() != null) {
-            Location location = donor.getLocation();
-            if (location == null) {
-                location = new Location();
-            } else {
-                donorDTO.getLocation().setId(location.getId());
-            }
+        List<Location> donorAddresses = new ArrayList<>();
+        if (donorDTO.getAddresses() != null && !donorDTO.getAddresses().isEmpty()) {
+            for (LocationDTO locDTO : donorDTO.getAddresses()) {
+                validateLocationDTO(locDTO);
+                Location location = new Location();
 
-            LocationDTO locDTO = donorDTO.getLocation();
-            if (locDTO.getAddressLine() == null || locDTO.getLandmark() == null || locDTO.getArea() == null ||
-                    locDTO.getCity() == null || locDTO.getDistrict() == null || locDTO.getState() == null ||
-                    locDTO.getCountry() == null || locDTO.getPincode() == null ||
-                    locDTO.getLatitude() == null || locDTO.getLongitude() == null) {
-                throw new InvalidLocationException("All location fields must be provided and non-null.");
+                if (locDTO.getId() != null) {
+                    Optional<Location> existing = locationRepository.findById(locDTO.getId());
+                    if (existing.isPresent()) {
+                        location = existing.get();
+                        BeanUtils.copyProperties(locDTO, location);
+                    } else {
+                        BeanUtils.copyProperties(locDTO, location);
+                        location.setId(locDTO.getId());
+                    }
+                } else {
+                    BeanUtils.copyProperties(locDTO, location);
+                    location.setId(UUID.randomUUID());
+                }
+                location.setDonor(donor);
+                donorAddresses.add(location);
             }
-
-            BeanUtils.copyProperties(locDTO, location);
-            location = locationRepository.save(location);
-            donor.setLocation(location);
         }
-
+        donor.setAddresses(donorAddresses);
 
         Donor savedDonor = donorRepository.save(donor);
+        if (!donorAddresses.isEmpty()) {
+            locationRepository.saveAll(donorAddresses);
+        }
         return getDonorDTO(savedDonor);
     }
-
 
     @Override
     public DonorDTO getDonorById(UUID id) {
         Donor savedDonor = donorRepository.findById(id)
-                .orElseThrow(()-> new ResourceNotFoundException("Donor with id " + id + " not found!"));
+                .orElseThrow(() -> new ResourceNotFoundException("Donor with id " + id + " not found!"));
         return getDonorDTO(savedDonor);
     }
 
     @Override
     public DonorDTO getDonorByUserId(UUID userId) {
         Donor donor = donorRepository.findByUserId(userId);
+        if (donor == null) throw new ResourceNotFoundException("Donor not found");
         return getDonorDTO(donor);
     }
 
     private DonorDTO getDonorDTO(Donor savedDonor) {
         DonorDTO responseDTO = new DonorDTO();
-        BeanUtils.copyProperties(savedDonor, responseDTO);
+        responseDTO.setId(savedDonor.getId());
+        responseDTO.setUserId(savedDonor.getUserId());
+        responseDTO.setRegistrationDate(savedDonor.getRegistrationDate());
+        responseDTO.setStatus(savedDonor.getStatus());
 
         if (savedDonor.getMedicalDetails() != null) {
             MedicalDetailsDTO mdDTO = new MedicalDetailsDTO();
@@ -136,10 +147,16 @@ public class DonorServiceImpl implements DonorService {
             BeanUtils.copyProperties(savedDonor.getConsentForm(), cfDTO);
             responseDTO.setConsentForm(cfDTO);
         }
-        if (savedDonor.getLocation() != null) {
-            LocationDTO locDTO = new LocationDTO();
-            BeanUtils.copyProperties(savedDonor.getLocation(), locDTO);
-            responseDTO.setLocation(locDTO);
+
+        if (savedDonor.getAddresses() != null && !savedDonor.getAddresses().isEmpty()) {
+            List<LocationDTO> locDTOList = savedDonor.getAddresses().stream().map(location -> {
+                LocationDTO locDTO = new LocationDTO();
+                BeanUtils.copyProperties(location, locDTO);
+                return locDTO;
+            }).collect(Collectors.toList());
+            responseDTO.setAddresses(locDTOList);
+        } else {
+            responseDTO.setAddresses(new ArrayList<>());
         }
 
         return responseDTO;
@@ -159,128 +176,95 @@ public class DonorServiceImpl implements DonorService {
         Location location = null;
         if (donationRequestDTO.getLocationId() != null) {
             location = locationRepository.findById(donationRequestDTO.getLocationId())
-                    .orElse(null);
+                    .orElseThrow(() -> new InvalidLocationException("Invalid location ID"));
         }
 
         Donation donation;
         switch (donationRequestDTO.getDonationType()) {
-            case BLOOD:
+            case BLOOD -> {
                 BloodDonation bloodDonation = new BloodDonation();
                 bloodDonation.setDonor(donor);
                 bloodDonation.setLocation(location);
                 bloodDonation.setDonationDate(donationRequestDTO.getDonationDate());
                 bloodDonation.setQuantity(donationRequestDTO.getQuantity());
-                bloodDonation.setStatus(donationRequestDTO.getStatus() != null ? donationRequestDTO.getStatus() : "PENDING");
+                bloodDonation.setStatus(Optional.ofNullable(donationRequestDTO.getStatus()).orElse("PENDING"));
                 bloodDonation.setBloodType(donationRequestDTO.getBloodType());
                 donation = bloodDonation;
-                break;
-            case ORGAN:
+            }
+            case ORGAN -> {
                 OrganDonation organDonation = new OrganDonation();
                 organDonation.setDonor(donor);
                 organDonation.setLocation(location);
                 organDonation.setDonationDate(donationRequestDTO.getDonationDate());
                 organDonation.setOrganType(donationRequestDTO.getOrganType());
-                organDonation.setIsCompatible(donationRequestDTO.getIsCompatible() != null ? donationRequestDTO.getIsCompatible() : false);
-                organDonation.setStatus(donationRequestDTO.getStatus() != null ? donationRequestDTO.getStatus() : "PENDING");
+                organDonation.setIsCompatible(Optional.ofNullable(donationRequestDTO.getIsCompatible()).orElse(false));
+                organDonation.setStatus(Optional.ofNullable(donationRequestDTO.getStatus()).orElse("PENDING"));
                 organDonation.setBloodType(donationRequestDTO.getBloodType());
                 donation = organDonation;
-                break;
-            case TISSUE:
+            }
+            case TISSUE -> {
                 TissueDonation tissueDonation = new TissueDonation();
                 tissueDonation.setDonor(donor);
                 tissueDonation.setLocation(location);
                 tissueDonation.setDonationDate(donationRequestDTO.getDonationDate());
                 tissueDonation.setTissueType(donationRequestDTO.getTissueType());
                 tissueDonation.setQuantity(donationRequestDTO.getQuantity());
-                tissueDonation.setStatus(donationRequestDTO.getStatus() != null ? donationRequestDTO.getStatus() : "PENDING");
+                tissueDonation.setStatus(Optional.ofNullable(donationRequestDTO.getStatus()).orElse("PENDING"));
                 tissueDonation.setBloodType(donationRequestDTO.getBloodType());
                 donation = tissueDonation;
-                break;
-            case STEM_CELL:
+            }
+            case STEM_CELL -> {
                 StemCellDonation stemCellDonation = new StemCellDonation();
                 stemCellDonation.setDonor(donor);
                 stemCellDonation.setLocation(location);
                 stemCellDonation.setDonationDate(donationRequestDTO.getDonationDate());
                 stemCellDonation.setStemCellType(donationRequestDTO.getStemCellType());
                 stemCellDonation.setQuantity(donationRequestDTO.getQuantity());
-                stemCellDonation.setStatus(donationRequestDTO.getStatus() != null ? donationRequestDTO.getStatus() : "PENDING");
+                stemCellDonation.setStatus(Optional.ofNullable(donationRequestDTO.getStatus()).orElse("PENDING"));
                 stemCellDonation.setBloodType(donationRequestDTO.getBloodType());
                 donation = stemCellDonation;
-                break;
-            default:
-                throw new UnsupportedDonationTypeException("Donation type " + donationRequestDTO.getDonationType() + " is not supported.");
+            }
+            default -> throw new UnsupportedDonationTypeException(
+                    "Donation type " + donationRequestDTO.getDonationType() + " is not supported.");
         }
 
         Donation savedDonation = donationRepository.save(donation);
 
-        System.out.println(savedDonation);
-        System.out.println(savedDonation.getBloodType());
+        DonationDTO donationDTO = convertToDTO(savedDonation);
 
-        DonationDTO donationDTO = new DonationDTO();
-        donationDTO.setId(savedDonation.getId());
-        donationDTO.setDonorId(savedDonation.getDonor().getId());
-        donationDTO.setBloodType(savedDonation.getBloodType());
-        System.out.println(donationDTO.getBloodType());
-        donationDTO.setLocationId(savedDonation.getLocation() != null ? savedDonation.getLocation().getId() : null);
-        donationDTO.setDonationType(donationRequestDTO.getDonationType());
-        donationDTO.setDonationDate(savedDonation.getDonationDate());
-        donationDTO.setStatus(savedDonation.getStatus());
-
-        switch (donationRequestDTO.getDonationType()) {
-            case BLOOD:
-                BloodDonation bd = (BloodDonation) savedDonation;
-                donationDTO.setBloodType(bd.getBloodType());
-                donationDTO.setQuantity(bd.getQuantity());
-                break;
-            case ORGAN:
-                OrganDonation od = (OrganDonation) savedDonation;
-                donationDTO.setOrganType(od.getOrganType());
-                donationDTO.setIsCompatible(od.getIsCompatible());
-                break;
-            case TISSUE:
-                TissueDonation td = (TissueDonation) savedDonation;
-                donationDTO.setTissueType(td.getTissueType());
-                donationDTO.setQuantity(td.getQuantity());
-                break;
-            case STEM_CELL:
-                StemCellDonation sd = (StemCellDonation) savedDonation;
-                donationDTO.setStemCellType(sd.getStemCellType());
-                donationDTO.setQuantity(sd.getQuantity());
-                break;
-            default:
-                break;
-        }
         eventPublisher.publishDonationEvent(getDonationEvent(donationDTO));
         eventPublisher.publishDonorEvent(getDonorEvent(donor));
-        eventPublisher.publishLocationEvent(getLocationEvent(donor.getLocation(), donor.getId()));
+        if (location != null) {
+            eventPublisher.publishLocationEvent(getLocationEvent(location, donor.getId()));
+        }
         return donationDTO;
     }
 
-    private LocationEvent getLocationEvent(Location location, UUID id) {
-        if (location == null) {
-            return null;
+    private void validateLocationDTO(LocationDTO locDTO) {
+        if (locDTO.getAddressLine() == null || locDTO.getLandmark() == null ||
+                locDTO.getArea() == null || locDTO.getCity() == null ||
+                locDTO.getDistrict() == null || locDTO.getState() == null ||
+                locDTO.getCountry() == null || locDTO.getPincode() == null ||
+                locDTO.getLatitude() == null || locDTO.getLongitude() == null) {
+            throw new InvalidLocationException("All location fields must be provided and non-null.");
         }
+    }
+
+    private LocationEvent getLocationEvent(Location location, UUID id) {
+        if (location == null) return null;
         LocationEvent event = new LocationEvent();
         BeanUtils.copyProperties(location, event);
         event.setLocationId(location.getId());
-        if (id != null) {
-            event.setDonorId(id);
-        }
+        if (id != null) event.setDonorId(id);
         return event;
     }
 
     private DonorEvent getDonorEvent(Donor donor) {
-        if (donor == null) {
-            return null;
-        }
+        if (donor == null) return null;
         DonorEvent donorEvent = new DonorEvent();
-
         BeanUtils.copyProperties(donor, donorEvent);
-
         donorEvent.setDonorId(donor.getId());
-        if (donor.getStatus() != null) {
-            donorEvent.setStatus(donor.getStatus().name());
-        }
+        if (donor.getStatus() != null) donorEvent.setStatus(donor.getStatus().name());
 
         if (donor.getMedicalDetails() != null) {
             donorEvent.setHemoglobinLevel(donor.getMedicalDetails().getHemoglobinLevel());
@@ -304,29 +288,21 @@ public class DonorServiceImpl implements DonorService {
     }
 
     public static DonationEvent getDonationEvent(DonationDTO donationDTO) {
-        if (donationDTO == null) {
-            return null;
-        }
-
+        if (donationDTO == null) return null;
         DonationEvent event = new DonationEvent();
-
         event.setDonationId(donationDTO.getId());
         event.setDonorId(donationDTO.getDonorId());
         event.setLocationId(donationDTO.getLocationId());
         event.setDonationType(donationDTO.getDonationType());
-
         event.setBloodType(donationDTO.getBloodType() != null ? donationDTO.getBloodType().name() : null);
-
         event.setDonationDate(donationDTO.getDonationDate());
         event.setQuantity(donationDTO.getQuantity());
         event.setOrganType(donationDTO.getOrganType());
         event.setIsCompatible(donationDTO.getIsCompatible());
         event.setTissueType(donationDTO.getTissueType());
         event.setStemCellType(donationDTO.getStemCellType());
-
         return event;
     }
-
 
     @Override
     public List<DonationDTO> getDonationsByDonorId(UUID donorId) {
@@ -367,7 +343,6 @@ public class DonorServiceImpl implements DonorService {
             }
             default -> dto.setDonationType(null);
         }
-
         return dto;
     }
 
@@ -376,8 +351,9 @@ public class DonorServiceImpl implements DonorService {
                 donor.getEligibilityCriteria() == null ||
                 donor.getConsentForm() == null ||
                 !Boolean.TRUE.equals(donor.getConsentForm().getIsConsented())) {
-            throw new InvalidDonorProfileException("Donor profile is incomplete. Please complete all details including medical details, eligibility criteria, and consent form before donating.");
+            throw new InvalidDonorProfileException(
+                    "Donor profile is incomplete. Please complete all details including medical details, eligibility criteria, and consent form before donating."
+            );
         }
     }
-
 }

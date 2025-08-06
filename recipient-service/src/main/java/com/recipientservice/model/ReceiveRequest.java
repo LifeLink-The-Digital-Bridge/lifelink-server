@@ -14,6 +14,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "receive_requests")
 public class ReceiveRequest {
+
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
@@ -43,4 +44,8 @@ public class ReceiveRequest {
 
     @Column
     private String notes;
+
+    @ManyToOne
+    @JoinColumn(name = "location_id", referencedColumnName = "id")
+    private Location location;
 }

@@ -5,6 +5,7 @@ import jakarta.persistence.PrePersist;
 import lombok.Data;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -14,7 +15,7 @@ public class RegisterDonor {
     private MedicalDetailsDTO medicalDetails;
     private EligibilityCriteriaDTO eligibilityCriteria;
     private ConsentFormDTO consentForm;
-    private LocationDTO location;
+    private List<LocationDTO> addresses;
 
     @PrePersist
     public void setRegistrationDate() {
