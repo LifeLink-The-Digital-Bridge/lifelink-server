@@ -45,6 +45,7 @@ public class DonorServiceImpl implements DonorService {
         if (donor == null) {
             donor = new Donor();
             donor.setUserId(userId);
+            donor.setAddresses(new ArrayList<>());
         }
         donor.setRegistrationDate(donorDTO.getRegistrationDate());
         donor.setStatus(donorDTO.getStatus());
@@ -77,39 +78,35 @@ public class DonorServiceImpl implements DonorService {
             donorDTO.getConsentForm().setId(consentForm.getId());
         }
         BeanUtils.copyProperties(donorDTO.getConsentForm(), consentForm);
+        consentForm.setUserId(userId);
         donor.setConsentForm(consentForm);
 
-        List<Location> donorAddresses = new ArrayList<>();
+
+        List<Location> freshAddresses = new ArrayList<>();
         if (donorDTO.getAddresses() != null && !donorDTO.getAddresses().isEmpty()) {
             for (LocationDTO locDTO : donorDTO.getAddresses()) {
                 validateLocationDTO(locDTO);
-                Location location = new Location();
 
                 if (locDTO.getId() != null) {
-                    Optional<Location> existing = locationRepository.findById(locDTO.getId());
-                    if (existing.isPresent()) {
-                        location = existing.get();
-                        BeanUtils.copyProperties(locDTO, location);
-                    } else {
-                        BeanUtils.copyProperties(locDTO, location);
-                        location.setId(locDTO.getId());
-                    }
+                    Location existing = locationRepository.findById(locDTO.getId())
+                            .orElseThrow(() -> new InvalidLocationException("Address not found"));
+                    BeanUtils.copyProperties(locDTO, existing, "id", "donor");
+                    existing.setDonor(donor);
+                    freshAddresses.add(existing);
                 } else {
+                    Location location = new Location();
                     BeanUtils.copyProperties(locDTO, location);
-                    location.setId(UUID.randomUUID());
+                    location.setDonor(donor);
+                    freshAddresses.add(location);
                 }
-                location.setDonor(donor);
-                donorAddresses.add(location);
             }
         }
-        donor.setAddresses(donorAddresses);
+        donor.setAddresses(freshAddresses);
 
         Donor savedDonor = donorRepository.save(donor);
-        if (!donorAddresses.isEmpty()) {
-            locationRepository.saveAll(donorAddresses);
-        }
         return getDonorDTO(savedDonor);
     }
+
 
     @Override
     public DonorDTO getDonorById(UUID id) {

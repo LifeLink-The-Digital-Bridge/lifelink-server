@@ -4,6 +4,8 @@ import com.matchingservice.enums.DonorStatus;
 import com.matchingservice.kafka.event.donor_events.DonationEvent;
 import com.matchingservice.kafka.event.donor_events.DonorEvent;
 import com.matchingservice.kafka.event.donor_events.DonorLocationEvent;
+import com.matchingservice.kafka.event.recipient_events.ReceiveRequestEvent;
+import com.matchingservice.kafka.event.recipient_events.RecipientEvent;
 import com.matchingservice.model.*;
 import com.matchingservice.repository.DonationRepository;
 import com.matchingservice.repository.DonorLocationRepository;
@@ -54,40 +56,8 @@ public class MatchingEventHandlerService {
         }
     }
 
-    public void handleLocationEvent(DonorLocationEvent event) {
-        Donor donor = donorRepository.findByDonorId(event.getDonorId()).orElse(null);
-        if (donor == null) {
-            donorEventBuffer.buffer(event.getDonorId(), () -> {
-                System.out.println("Re-running buffered location event for donorId: " + event.getDonorId());
-                handleLocationEvent(event);
-            });
-            System.out.println("Donor not found - buffering location event for donorId: " + event.getDonorId());
-            return;
-        }
-        DonorLocation location = donorLocationRepository.findByLocationId(event.getLocationId()).orElse(null);
-        if (location == null) {
-            location = new DonorLocation();
-            location.setLocationId(event.getLocationId());
-        }
-        location.setDonorId(donor.getDonorId());
-        location.setAddressLine(event.getAddressLine());
-        location.setLandmark(event.getLandmark());
-        location.setArea(event.getArea());
-        location.setCity(event.getCity());
-        location.setDistrict(event.getDistrict());
-        location.setState(event.getState());
-        location.setCountry(event.getCountry());
-        location.setPincode(event.getPincode());
-        location.setLatitude(event.getLatitude());
-        location.setLongitude(event.getLongitude());
+    public void handleDonorLocationEvent(DonorLocationEvent event) {
 
-        donorLocationRepository.save(location);
-        System.out.println("Location created/updated: " + location.getLocationId());
-
-        var donationPending = donationEventBuffer.drain(donor.getDonorId(), location.getLocationId());
-        if (donationPending != null) {
-            donationPending.forEach(this::safeRun);
-        }
     }
 
     public void handleDonationEvent(DonationEvent event) {
@@ -165,5 +135,11 @@ public class MatchingEventHandlerService {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    public void handleRecipientEvent(RecipientEvent event) {
+    }
+
+    public void handleReceiveRequestEvent(ReceiveRequestEvent event) {
     }
 }

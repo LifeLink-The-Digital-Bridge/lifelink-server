@@ -4,6 +4,7 @@ import com.donorservice.enums.DonorStatus;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -23,8 +24,7 @@ public class Donor {
     private LocalDate registrationDate;
 
     @OneToMany(mappedBy = "donor", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<Location> addresses;
-
+    private List<Location> addresses = new ArrayList<>();
 
     @Column(nullable = false)
     private DonorStatus status;
