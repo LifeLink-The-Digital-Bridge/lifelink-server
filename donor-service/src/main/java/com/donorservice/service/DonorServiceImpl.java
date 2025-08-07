@@ -175,6 +175,8 @@ public class DonorServiceImpl implements DonorService {
             location = locationRepository.findById(donationRequestDTO.getLocationId())
                     .orElseThrow(() -> new InvalidLocationException("Invalid location ID"));
         }
+        System.out.println("DonationRequestDTO: " + donationRequestDTO);
+        System.out.println("Location: " + location);
 
         Donation donation;
         switch (donationRequestDTO.getDonationType()) {
@@ -234,6 +236,7 @@ public class DonorServiceImpl implements DonorService {
         if (location != null) {
             eventPublisher.publishLocationEvent(getLocationEvent(location, donor.getId()));
         }
+        System.out.println("Event published successfully.");
         return donationDTO;
     }
 

@@ -1,7 +1,9 @@
 package com.donorservice.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
 
 import java.util.UUID;
 
@@ -16,6 +18,8 @@ public class Location {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "donor_id")
+    @JsonBackReference
+    @ToString.Exclude
     private Donor donor;
 
     @Column(nullable = false)

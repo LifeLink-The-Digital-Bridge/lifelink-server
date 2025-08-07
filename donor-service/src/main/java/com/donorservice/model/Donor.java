@@ -1,8 +1,11 @@
 package com.donorservice.model;
 
 import com.donorservice.enums.DonorStatus;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
+
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,6 +27,8 @@ public class Donor {
     private LocalDate registrationDate;
 
     @OneToMany(mappedBy = "donor", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonManagedReference
+    @ToString.Exclude
     private List<Location> addresses = new ArrayList<>();
 
     @Column(nullable = false)

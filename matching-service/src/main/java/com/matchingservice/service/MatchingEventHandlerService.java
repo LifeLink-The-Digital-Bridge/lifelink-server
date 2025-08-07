@@ -57,8 +57,31 @@ public class MatchingEventHandlerService {
     }
 
     public void handleDonorLocationEvent(DonorLocationEvent event) {
+        DonorLocation location = donorLocationRepository.findByLocationId(event.getLocationId()).orElse(null);
+        if (location == null) {
+            location = new DonorLocation();
+            location.setLocationId(event.getLocationId());
+        }
+        location.setDonorId(event.getDonorId());
+        location.setAddressLine(event.getAddressLine());
+        location.setLandmark(event.getLandmark());
+        location.setArea(event.getArea());
+        location.setCity(event.getCity());
+        location.setDistrict(event.getDistrict());
+        location.setState(event.getState());
+        location.setCountry(event.getCountry());
+        location.setPincode(event.getPincode());
+        location.setLatitude(event.getLatitude());
+        location.setLongitude(event.getLongitude());
 
+        donorLocationRepository.save(location);
+
+        var pending = donationEventBuffer.drain(location.getDonorId(), location.getLocationId());
+        if (pending != null) {
+            pending.forEach(this::safeRun);
+        }
     }
+
 
     public void handleDonationEvent(DonationEvent event) {
         Donor donor = donorRepository.findByDonorId(event.getDonorId()).orElse(null);
