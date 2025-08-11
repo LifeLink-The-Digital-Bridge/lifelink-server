@@ -1,6 +1,7 @@
 package com.recipientservice.model;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.ToString;
@@ -19,6 +20,7 @@ public class Location {
     @JoinColumn(name = "recipient_id")
     @JsonBackReference
     @ToString.Exclude
+    @JsonIgnore
     private Recipient recipient;
 
     @Column(nullable = false)
