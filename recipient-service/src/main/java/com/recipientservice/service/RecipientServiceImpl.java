@@ -48,9 +48,7 @@ public class RecipientServiceImpl implements RecipientService {
 
         recipient.setAvailability(dto.getAvailability());
 
-        // Handle multiple addresses
         if (dto.getAddresses() != null && !dto.getAddresses().isEmpty()) {
-            // Clear existing addresses
             recipient.getAddresses().clear();
 
             for (LocationDTO locationDTO : dto.getAddresses()) {
@@ -88,7 +86,6 @@ public class RecipientServiceImpl implements RecipientService {
         BeanUtils.copyProperties(requestDTO, request);
         request.setRecipient(recipient);
 
-        // Set location if provided
         if (requestDTO.getLocationId() != null) {
             Location location = locationRepository.findById(requestDTO.getLocationId())
                     .orElseThrow(() -> new InvalidLocationException("Location not found: " + requestDTO.getLocationId()));
@@ -100,7 +97,6 @@ public class RecipientServiceImpl implements RecipientService {
         eventPublisher.publishReceiveRequestEvent(toReceiveRequestEvent(saved));
         eventPublisher.publishRecipientEvent(toRecipientEvent(recipient));
 
-        // Publish location events for all addresses
         if (!recipient.getAddresses().isEmpty()) {
             for (Location address : recipient.getAddresses()) {
                 eventPublisher.publishRecipientLocationEvent(toLocationEvent(address, recipient));
@@ -223,7 +219,6 @@ public class RecipientServiceImpl implements RecipientService {
         RecipientDTO dto = new RecipientDTO();
         BeanUtils.copyProperties(recipient, dto);
 
-        // Map addresses list
         if (recipient.getAddresses() != null) {
             dto.setAddresses(recipient.getAddresses().stream()
                     .map(this::mapLocationToDTO)

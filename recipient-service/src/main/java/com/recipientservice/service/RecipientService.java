@@ -3,8 +3,7 @@ package com.recipientservice.service;
 import com.recipientservice.dto.ReceiveRequestDTO;
 import com.recipientservice.dto.RecipientDTO;
 import com.recipientservice.dto.RegisterRecipientDTO;
-import com.recipientservice.model.Recipient;
-import org.springframework.http.ResponseEntity;
+
 
 import java.util.List;
 import java.util.UUID;
