@@ -11,10 +11,11 @@ import java.util.UUID;
 public class RecipientLocation {
 
     @Id
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private UUID id;
 
     @Column(nullable = false)
-    private Long locationId;
+    private UUID locationId;
 
     @Column(nullable = false)
     private UUID recipientId;

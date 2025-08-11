@@ -6,12 +6,13 @@ import com.matchingservice.kafka.event.donor_events.DonorEvent;
 import com.matchingservice.kafka.event.donor_events.DonorLocationEvent;
 import com.matchingservice.kafka.event.recipient_events.ReceiveRequestEvent;
 import com.matchingservice.kafka.event.recipient_events.RecipientEvent;
+import com.matchingservice.kafka.event.recipient_events.RecipientLocationEvent;
 import com.matchingservice.model.*;
-import com.matchingservice.repository.DonationRepository;
-import com.matchingservice.repository.DonorLocationRepository;
-import com.matchingservice.repository.DonorRepository;
-import com.matchingservice.utils.DonationEventBuffer;
-import com.matchingservice.utils.DonorEventBuffer;
+import com.matchingservice.model.recipients.Recipient;
+import com.matchingservice.model.recipients.RecipientLocation;
+import com.matchingservice.model.recipients.ReceiveRequest;
+import com.matchingservice.repository.*;
+import com.matchingservice.utils.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -22,8 +23,15 @@ public class MatchingEventHandlerService {
     private final DonorRepository donorRepository;
     private final DonorLocationRepository donorLocationRepository;
     private final DonationRepository donationRepository;
+
+    private final RecipientRepository recipientRepository;
+    private final RecipientLocationRepository recipientLocationRepository;
+    private final ReceiveRequestRepository receiveRequestRepository;
+
     private final DonorEventBuffer donorEventBuffer;
     private final DonationEventBuffer donationEventBuffer;
+    private final RecipientEventBuffer recipientEventBuffer;
+    private final ReceiveRequestEventBuffer receiveRequestEventBuffer;
 
     public void handleDonorEvent(DonorEvent event) {
         Donor donor = donorRepository.findByDonorId(event.getDonorId()).orElse(null);
@@ -81,7 +89,6 @@ public class MatchingEventHandlerService {
             pending.forEach(this::safeRun);
         }
     }
-
 
     public void handleDonationEvent(DonationEvent event) {
         Donor donor = donorRepository.findByDonorId(event.getDonorId()).orElse(null);
@@ -152,17 +159,111 @@ public class MatchingEventHandlerService {
         System.out.println("Donation created: " + donation.getDonationId());
     }
 
+    public void handleRecipientEvent(RecipientEvent event) {
+        Recipient recipient = recipientRepository.findByRecipientId(event.getRecipientId()).orElse(null);
+        if (recipient == null) {
+            recipient = new Recipient();
+            recipient.setRecipientId(event.getRecipientId());
+        }
+
+        recipient.setUserId(event.getUserId());
+        recipient.setAvailability(event.getAvailability());
+        recipient.setMedicalDetailsId(event.getMedicalDetailsId());
+        recipient.setDiagnosis(event.getDiagnosis());
+        recipient.setAllergies(event.getAllergies());
+        recipient.setCurrentMedications(event.getCurrentMedications());
+        recipient.setAdditionalNotes(event.getAdditionalNotes());
+        recipient.setEligibilityCriteriaId(event.getEligibilityCriteriaId());
+        recipient.setMedicallyEligible(event.getMedicallyEligible());
+        recipient.setLegalClearance(event.getLegalClearance());
+        recipient.setEligibilityNotes(event.getEligibilityNotes());
+        recipient.setLastReviewed(event.getLastReviewed());
+
+        System.out.println("Inside handleRecipientEvent: " + recipient.getRecipientId());
+        recipientRepository.save(recipient);
+
+        var pending = recipientEventBuffer.drain(recipient.getRecipientId());
+        if (pending != null) {
+            pending.forEach(this::safeRun);
+        }
+    }
+
+    public void handleRecipientLocationEvent(RecipientLocationEvent event) {
+        RecipientLocation location = recipientLocationRepository.findByLocationId(event.getLocationId()).orElse(null);
+        if (location == null) {
+            location = new RecipientLocation();
+            location.setLocationId(event.getLocationId());
+        }
+
+        location.setRecipientId(event.getRecipientId());
+        location.setAddressLine(event.getAddressLine());
+        location.setLandmark(event.getLandmark());
+        location.setArea(event.getArea());
+        location.setCity(event.getCity());
+        location.setDistrict(event.getDistrict());
+        location.setState(event.getState());
+        location.setCountry(event.getCountry());
+        location.setPincode(event.getPincode());
+        location.setLatitude(event.getLatitude());
+        location.setLongitude(event.getLongitude());
+
+        recipientLocationRepository.save(location);
+
+        var pending = receiveRequestEventBuffer.drain(location.getRecipientId(), location.getLocationId());
+        if (pending != null) {
+            pending.forEach(this::safeRun);
+        }
+    }
+
+    public void handleReceiveRequestEvent(ReceiveRequestEvent event) {
+        Recipient recipient = recipientRepository.findByRecipientId(event.getRecipientId()).orElse(null);
+        if (recipient == null) {
+            recipientEventBuffer.buffer(event.getRecipientId(), () -> {
+                System.out.println("Re-running buffered receive request event after recipient created for recipientId: " + event.getRecipientId());
+                handleReceiveRequestEvent(event);
+            });
+            System.out.println("Recipient not found - buffering receive request event for recipientId: " + event.getRecipientId());
+            return;
+        }
+
+        RecipientLocation location = null;
+        if (event.getLocationId() != null) {
+            location = recipientLocationRepository.findByLocationId(event.getLocationId()).orElse(null);
+            if (location == null) {
+                receiveRequestEventBuffer.buffer(event.getRecipientId(), event.getLocationId(), () -> {
+                    System.out.println("Re-running buffered receive request event after location created for recipientId: " + event.getRecipientId() + ", locationId: " + event.getLocationId());
+                    handleReceiveRequestEvent(event);
+                });
+                System.out.println("Location not found - buffering receive request event for recipientId: " + event.getRecipientId() + ", locationId: " + event.getLocationId());
+                return;
+            }
+        }
+
+        if (receiveRequestRepository.findByReceiveRequestId(event.getReceiveRequestId()).isPresent()) {
+            System.out.println("Receive request already exists for receiveRequestId: " + event.getReceiveRequestId());
+            return;
+        }
+
+        ReceiveRequest receiveRequest = new ReceiveRequest();
+        receiveRequest.setReceiveRequestId(event.getReceiveRequestId());
+        receiveRequest.setRecipientId(event.getRecipientId());
+        receiveRequest.setRequestedBloodType(event.getRequestedBloodType());
+        receiveRequest.setRequestedOrgan(event.getRequestedOrgan());
+        receiveRequest.setUrgencyLevel(event.getUrgencyLevel());
+        receiveRequest.setQuantity(event.getQuantity());
+        receiveRequest.setRequestDate(event.getRequestDate());
+        receiveRequest.setStatus(event.getStatus());
+        receiveRequest.setNotes(event.getNotes());
+
+        receiveRequestRepository.save(receiveRequest);
+        System.out.println("Receive request created: " + receiveRequest.getReceiveRequestId());
+    }
+
     private void safeRun(Runnable r) {
         try {
             r.run();
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }
-
-    public void handleRecipientEvent(RecipientEvent event) {
-    }
-
-    public void handleReceiveRequestEvent(ReceiveRequestEvent event) {
     }
 }

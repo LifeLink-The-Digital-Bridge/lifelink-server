@@ -6,7 +6,7 @@ import java.util.UUID;
 
 @Data
 public class RecipientLocationEvent {
-    private Long locationId;
+    private UUID locationId;
     private UUID recipientId;
     private String addressLine;
     private String landmark;
