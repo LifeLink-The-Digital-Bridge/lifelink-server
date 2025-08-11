@@ -11,12 +11,14 @@ import com.recipientservice.model.*;
 import com.recipientservice.repository.*;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional
 public class RecipientServiceImpl implements RecipientService {
 
     private final RecipientRepository recipientRepository;
@@ -27,7 +29,8 @@ public class RecipientServiceImpl implements RecipientService {
     public RecipientServiceImpl(
             RecipientRepository recipientRepository,
             LocationRepository locationRepository,
-            ReceiveRequestRepository receiveRequestRepository, EventPublisher eventPublisher
+            ReceiveRequestRepository receiveRequestRepository,
+            EventPublisher eventPublisher
     ) {
         this.recipientRepository = recipientRepository;
         this.locationRepository = locationRepository;
@@ -45,9 +48,18 @@ public class RecipientServiceImpl implements RecipientService {
 
         recipient.setAvailability(dto.getAvailability());
 
-        if (dto.getLocation() != null) {
-            validateLocationFields(dto.getLocation());
-            recipient.setLocation(saveLocation(dto.getLocation()));
+        // Handle multiple addresses
+        if (dto.getAddresses() != null && !dto.getAddresses().isEmpty()) {
+            // Clear existing addresses
+            recipient.getAddresses().clear();
+
+            for (LocationDTO locationDTO : dto.getAddresses()) {
+                validateLocationFields(locationDTO);
+                Location location = new Location();
+                BeanUtils.copyProperties(locationDTO, location);
+                location.setRecipient(recipient);
+                recipient.getAddresses().add(location);
+            }
         }
 
         if (dto.getMedicalDetails() != null) {
@@ -75,13 +87,24 @@ public class RecipientServiceImpl implements RecipientService {
         ReceiveRequest request = new ReceiveRequest();
         BeanUtils.copyProperties(requestDTO, request);
         request.setRecipient(recipient);
+
+        // Set location if provided
+        if (requestDTO.getLocationId() != null) {
+            Location location = locationRepository.findById(requestDTO.getLocationId())
+                    .orElseThrow(() -> new InvalidLocationException("Location not found: " + requestDTO.getLocationId()));
+            request.setLocation(location);
+        }
+
         ReceiveRequest saved = receiveRequestRepository.save(request);
 
         eventPublisher.publishReceiveRequestEvent(toReceiveRequestEvent(saved));
         eventPublisher.publishRecipientEvent(toRecipientEvent(recipient));
 
-        if (recipient.getLocation() != null) {
-            eventPublisher.publishRecipientLocationEvent(toLocationEvent(recipient));
+        // Publish location events for all addresses
+        if (!recipient.getAddresses().isEmpty()) {
+            for (Location address : recipient.getAddresses()) {
+                eventPublisher.publishRecipientLocationEvent(toLocationEvent(address, recipient));
+            }
         }
 
         return mapReceiveRequestToDTO(saved);
@@ -98,6 +121,9 @@ public class RecipientServiceImpl implements RecipientService {
         event.setRequestDate(request.getRequestDate());
         event.setStatus(request.getStatus());
         event.setNotes(request.getNotes());
+        if (request.getLocation() != null) {
+            event.setLocationId(request.getLocation().getId());
+        }
         return event;
     }
 
@@ -126,8 +152,7 @@ public class RecipientServiceImpl implements RecipientService {
         return event;
     }
 
-    private LocationEvent toLocationEvent(Recipient recipient) {
-        Location location = recipient.getLocation();
+    private LocationEvent toLocationEvent(Location location, Recipient recipient) {
         if (location == null) return null;
 
         LocationEvent event = new LocationEvent();
@@ -146,7 +171,6 @@ public class RecipientServiceImpl implements RecipientService {
 
         return event;
     }
-
 
     @Override
     public RecipientDTO getRecipientByUserId(UUID userId) {
@@ -170,12 +194,6 @@ public class RecipientServiceImpl implements RecipientService {
         if (locationDTO.getAddressLine() == null || locationDTO.getCity() == null || locationDTO.getState() == null) {
             throw new InvalidLocationException("Location fields cannot be null");
         }
-    }
-
-    private Location saveLocation(LocationDTO dto) {
-        Location location = new Location();
-        BeanUtils.copyProperties(dto, location);
-        return locationRepository.save(location);
     }
 
     private MedicalDetails copyMedicalDetails(MedicalDetailsDTO dto, MedicalDetails existing, Recipient recipient) {
@@ -204,7 +222,13 @@ public class RecipientServiceImpl implements RecipientService {
 
         RecipientDTO dto = new RecipientDTO();
         BeanUtils.copyProperties(recipient, dto);
-        dto.setLocation(mapLocationToDTO(recipient.getLocation()));
+
+        // Map addresses list
+        if (recipient.getAddresses() != null) {
+            dto.setAddresses(recipient.getAddresses().stream()
+                    .map(this::mapLocationToDTO)
+                    .collect(Collectors.toList()));
+        }
 
         if (recipient.getMedicalDetails() != null) {
             MedicalDetailsDTO mdDTO = new MedicalDetailsDTO();
@@ -240,6 +264,9 @@ public class RecipientServiceImpl implements RecipientService {
         ReceiveRequestDTO dto = new ReceiveRequestDTO();
         BeanUtils.copyProperties(request, dto);
         dto.setRecipientId(request.getRecipient().getId());
+        if (request.getLocation() != null) {
+            dto.setLocationId(request.getLocation().getId());
+        }
         return dto;
     }
 }

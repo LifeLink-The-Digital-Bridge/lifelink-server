@@ -1,15 +1,25 @@
 package com.recipientservice.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
+
+import java.util.UUID;
 
 @Data
 @Entity
 @Table(name = "locations")
 public class Location {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private UUID id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "recipient_id")
+    @JsonBackReference
+    @ToString.Exclude
+    private Recipient recipient;
 
     @Column(nullable = false)
     private String addressLine;

@@ -13,7 +13,7 @@ import java.util.UUID;
 public class ReceiveRequestDTO {
     private UUID id;
     private UUID recipientId;
-    private Long locationId;
+    private UUID locationId;
     private BloodType requestedBloodType;
     private OrganType requestedOrgan;
     private UrgencyLevel urgencyLevel;

@@ -8,6 +8,6 @@ import java.util.List;
 import java.util.UUID;
 
 @Repository
-public interface ReceiveRequestRepository extends JpaRepository<ReceiveRequest, Long> {
+public interface ReceiveRequestRepository extends JpaRepository<ReceiveRequest, UUID> {
     List<ReceiveRequest> findAllByRecipientId(UUID recipientId);
 }

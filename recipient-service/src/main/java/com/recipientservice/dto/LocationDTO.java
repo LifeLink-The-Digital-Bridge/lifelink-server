@@ -2,9 +2,11 @@ package com.recipientservice.dto;
 
 import lombok.Data;
 
+import java.util.UUID;
+
 @Data
 public class LocationDTO {
-    private Long id;
+    private UUID id;
     private String addressLine;
     private String landmark;
     private String area;

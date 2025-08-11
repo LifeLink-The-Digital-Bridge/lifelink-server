@@ -1,10 +1,14 @@
 package com.recipientservice.model;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.Data;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import com.recipientservice.enums.Availability;
+import lombok.ToString;
 
 @Data
 @Entity
@@ -18,9 +22,10 @@ public class Recipient {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
-    @ManyToOne
-    @JoinColumn(name = "location_id", referencedColumnName = "id")
-    private Location location;
+    @OneToMany(mappedBy = "recipient", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonManagedReference
+    @ToString.Exclude
+    private List<Location> addresses = new ArrayList<>();
 
     @OneToOne(mappedBy = "recipient", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     private EligibilityCriteria eligibilityCriteria;

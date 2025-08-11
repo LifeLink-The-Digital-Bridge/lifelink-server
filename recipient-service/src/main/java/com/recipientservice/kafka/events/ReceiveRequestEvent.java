@@ -13,6 +13,7 @@ import java.util.UUID;
 public class ReceiveRequestEvent {
     private UUID receiveRequestId;
     private UUID recipientId;
+    private UUID locationId;
     private BloodType requestedBloodType;
     private OrganType requestedOrgan;
     private UrgencyLevel urgencyLevel;
