@@ -1,9 +1,6 @@
 package com.donorservice.kafka.event;
 
-import com.donorservice.enums.DonationType;
-import com.donorservice.enums.OrganType;
-import com.donorservice.enums.StemCellType;
-import com.donorservice.enums.TissueType;
+import com.donorservice.enums.*;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -17,6 +14,7 @@ public class DonationEvent {
     private DonationType donationType;
     private String bloodType;
     private LocalDate donationDate;
+    private String status;
 
     private Double quantity;
     private OrganType organType;

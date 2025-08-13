@@ -146,6 +146,7 @@ public class MatchingEventHandlerService {
         donation.setDonationType(event.getDonationType());
         donation.setDonationDate(event.getDonationDate());
         donation.setBloodType(event.getBloodType());
+        donation.setStatus(event.getStatus());
 
         LocationSummary summary = new LocationSummary();
         summary.setCity(location.getCity());

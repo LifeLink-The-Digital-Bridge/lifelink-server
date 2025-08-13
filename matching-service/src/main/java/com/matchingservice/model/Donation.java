@@ -32,9 +32,12 @@ public class Donation {
     private DonationType donationType;
 
     private String bloodType;
+
     private LocalDate donationDate;
+
+    @Column(nullable = false)
+    private String status;
 
     @Embedded
     private LocationSummary locationSummary;
 }
-

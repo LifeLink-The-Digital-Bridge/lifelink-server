@@ -296,6 +296,7 @@ public class DonorServiceImpl implements DonorService {
         event.setDonationType(donationDTO.getDonationType());
         event.setBloodType(donationDTO.getBloodType() != null ? donationDTO.getBloodType().name() : null);
         event.setDonationDate(donationDTO.getDonationDate());
+        event.setStatus(donationDTO.getStatus());
         event.setQuantity(donationDTO.getQuantity());
         event.setOrganType(donationDTO.getOrganType());
         event.setIsCompatible(donationDTO.getIsCompatible());
