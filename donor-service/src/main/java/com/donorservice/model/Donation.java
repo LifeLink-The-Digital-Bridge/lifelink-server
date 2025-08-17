@@ -1,6 +1,8 @@
 package com.donorservice.model;
 
 import com.donorservice.enums.BloodType;
+import com.donorservice.enums.DonationStatus;
+import com.donorservice.enums.DonationType;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDate;
@@ -27,10 +29,15 @@ public abstract class Donation {
     @Column(nullable = false)
     private LocalDate donationDate;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String status;
+    private DonationStatus status;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "blood_type")
     private BloodType bloodType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "donation_type", nullable = false)
+    private DonationType donationType;
 }

@@ -16,6 +16,7 @@ public class RegisterDonor {
     private EligibilityCriteriaDTO eligibilityCriteria;
     private ConsentFormDTO consentForm;
     private List<LocationDTO> addresses;
+    private HLAProfileDTO hlaProfile;
 
     @PrePersist
     public void setRegistrationDate() {
@@ -23,6 +24,5 @@ public class RegisterDonor {
             registrationDate = LocalDate.now();
         }
     }
-
 }
 

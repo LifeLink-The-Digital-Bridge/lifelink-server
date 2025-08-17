@@ -2,6 +2,7 @@ package com.donorservice.service;
 
 import com.donorservice.client.UserClient;
 import com.donorservice.dto.*;
+import com.donorservice.enums.DonationStatus;
 import com.donorservice.enums.DonationType;
 import com.donorservice.exception.InvalidDonorProfileException;
 import com.donorservice.exception.InvalidLocationException;
@@ -81,6 +82,18 @@ public class DonorServiceImpl implements DonorService {
         consentForm.setUserId(userId);
         donor.setConsentForm(consentForm);
 
+        if (donorDTO.getHlaProfile() != null) {
+            HLAProfile hlaProfile = donor.getHlaProfile();
+            if (hlaProfile == null) {
+                hlaProfile = new HLAProfile();
+                hlaProfile.setDonor(donor);
+            } else {
+                donorDTO.getHlaProfile().setId(hlaProfile.getId());
+            }
+            BeanUtils.copyProperties(donorDTO.getHlaProfile(), hlaProfile, "id", "donor");
+            hlaProfile.setDonor(donor);
+            donor.setHlaProfile(hlaProfile);
+        }
 
         List<Location> freshAddresses = new ArrayList<>();
         if (donorDTO.getAddresses() != null && !donorDTO.getAddresses().isEmpty()) {
@@ -106,7 +119,6 @@ public class DonorServiceImpl implements DonorService {
         Donor savedDonor = donorRepository.save(donor);
         return getDonorDTO(savedDonor);
     }
-
 
     @Override
     public DonorDTO getDonorById(UUID id) {
@@ -144,7 +156,6 @@ public class DonorServiceImpl implements DonorService {
             BeanUtils.copyProperties(savedDonor.getConsentForm(), cfDTO);
             responseDTO.setConsentForm(cfDTO);
         }
-
         if (savedDonor.getAddresses() != null && !savedDonor.getAddresses().isEmpty()) {
             List<LocationDTO> locDTOList = savedDonor.getAddresses().stream().map(location -> {
                 LocationDTO locDTO = new LocationDTO();
@@ -155,9 +166,14 @@ public class DonorServiceImpl implements DonorService {
         } else {
             responseDTO.setAddresses(new ArrayList<>());
         }
-
+        if (savedDonor.getHlaProfile() != null) {
+            HLAProfileDTO hlaProfileDTO = new HLAProfileDTO();
+            BeanUtils.copyProperties(savedDonor.getHlaProfile(), hlaProfileDTO);
+            responseDTO.setHlaProfile(hlaProfileDTO);
+        }
         return responseDTO;
     }
+
 
     @Override
     public DonationDTO registerDonation(DonationRequestDTO donationRequestDTO) {
@@ -186,8 +202,9 @@ public class DonorServiceImpl implements DonorService {
                 bloodDonation.setLocation(location);
                 bloodDonation.setDonationDate(donationRequestDTO.getDonationDate());
                 bloodDonation.setQuantity(donationRequestDTO.getQuantity());
-                bloodDonation.setStatus(Optional.ofNullable(donationRequestDTO.getStatus()).orElse("PENDING"));
+                bloodDonation.setStatus(DonationStatus.PENDING);
                 bloodDonation.setBloodType(donationRequestDTO.getBloodType());
+                bloodDonation.setDonationType(DonationType.BLOOD);
                 donation = bloodDonation;
             }
             case ORGAN -> {
@@ -197,8 +214,20 @@ public class DonorServiceImpl implements DonorService {
                 organDonation.setDonationDate(donationRequestDTO.getDonationDate());
                 organDonation.setOrganType(donationRequestDTO.getOrganType());
                 organDonation.setIsCompatible(Optional.ofNullable(donationRequestDTO.getIsCompatible()).orElse(false));
-                organDonation.setStatus(Optional.ofNullable(donationRequestDTO.getStatus()).orElse("PENDING"));
+                organDonation.setStatus(DonationStatus.PENDING);
                 organDonation.setBloodType(donationRequestDTO.getBloodType());
+                organDonation.setDonationType(DonationType.ORGAN);
+
+                organDonation.setOrganQuality(donationRequestDTO.getOrganQuality());
+                organDonation.setOrganViabilityExpiry(donationRequestDTO.getOrganViabilityExpiry());
+                organDonation.setColdIschemiaTime(donationRequestDTO.getColdIschemiaTime());
+                organDonation.setOrganPerfused(donationRequestDTO.getOrganPerfused());
+                organDonation.setOrganWeight(donationRequestDTO.getOrganWeight());
+                organDonation.setOrganSize(donationRequestDTO.getOrganSize());
+                organDonation.setFunctionalAssessment(donationRequestDTO.getFunctionalAssessment());
+                organDonation.setHasAbnormalities(donationRequestDTO.getHasAbnormalities());
+                organDonation.setAbnormalityDescription(donationRequestDTO.getAbnormalityDescription());
+
                 donation = organDonation;
             }
             case TISSUE -> {
@@ -208,8 +237,9 @@ public class DonorServiceImpl implements DonorService {
                 tissueDonation.setDonationDate(donationRequestDTO.getDonationDate());
                 tissueDonation.setTissueType(donationRequestDTO.getTissueType());
                 tissueDonation.setQuantity(donationRequestDTO.getQuantity());
-                tissueDonation.setStatus(Optional.ofNullable(donationRequestDTO.getStatus()).orElse("PENDING"));
+                tissueDonation.setStatus(DonationStatus.PENDING);
                 tissueDonation.setBloodType(donationRequestDTO.getBloodType());
+                tissueDonation.setDonationType(DonationType.TISSUE);
                 donation = tissueDonation;
             }
             case STEM_CELL -> {
@@ -219,8 +249,9 @@ public class DonorServiceImpl implements DonorService {
                 stemCellDonation.setDonationDate(donationRequestDTO.getDonationDate());
                 stemCellDonation.setStemCellType(donationRequestDTO.getStemCellType());
                 stemCellDonation.setQuantity(donationRequestDTO.getQuantity());
-                stemCellDonation.setStatus(Optional.ofNullable(donationRequestDTO.getStatus()).orElse("PENDING"));
+                stemCellDonation.setStatus(DonationStatus.PENDING);
                 stemCellDonation.setBloodType(donationRequestDTO.getBloodType());
+                stemCellDonation.setDonationType(DonationType.STEM_CELL);
                 donation = stemCellDonation;
             }
             default -> throw new UnsupportedDonationTypeException(
@@ -228,7 +259,6 @@ public class DonorServiceImpl implements DonorService {
         }
 
         Donation savedDonation = donationRepository.save(donation);
-
         DonationDTO donationDTO = convertToDTO(savedDonation);
 
         eventPublisher.publishDonationEvent(getDonationEvent(donationDTO));
@@ -267,41 +297,74 @@ public class DonorServiceImpl implements DonorService {
         if (donor.getStatus() != null) donorEvent.setStatus(donor.getStatus().name());
 
         if (donor.getMedicalDetails() != null) {
-            donorEvent.setHemoglobinLevel(donor.getMedicalDetails().getHemoglobinLevel());
-            donorEvent.setBloodPressure(donor.getMedicalDetails().getBloodPressure());
-            donorEvent.setHasDiseases(donor.getMedicalDetails().getHasDiseases());
-            donorEvent.setTakingMedication(donor.getMedicalDetails().getTakingMedication());
-            donorEvent.setDiseaseDescription(donor.getMedicalDetails().getDiseaseDescription());
+            MedicalDetails md = donor.getMedicalDetails();
+            donorEvent.setHemoglobinLevel(md.getHemoglobinLevel());
+            donorEvent.setBloodPressure(md.getBloodPressure());
+            donorEvent.setHasDiseases(md.getHasDiseases());
+            donorEvent.setTakingMedication(md.getTakingMedication());
+            donorEvent.setDiseaseDescription(md.getDiseaseDescription());
+
+            donorEvent.setCurrentMedications(md.getCurrentMedications());
+            donorEvent.setLastMedicalCheckup(md.getLastMedicalCheckup());
+            donorEvent.setMedicalHistory(md.getMedicalHistory());
+            donorEvent.setHasInfectiousDiseases(md.getHasInfectiousDiseases());
+            donorEvent.setInfectiousDiseaseDetails(md.getInfectiousDiseaseDetails());
+            donorEvent.setCreatinineLevel(md.getCreatinineLevel());
+            donorEvent.setLiverFunctionTests(md.getLiverFunctionTests());
+            donorEvent.setCardiacStatus(md.getCardiacStatus());
+            donorEvent.setPulmonaryFunction(md.getPulmonaryFunction());
+            donorEvent.setOverallHealthStatus(md.getOverallHealthStatus());
         }
 
         if (donor.getEligibilityCriteria() != null) {
-            donorEvent.setMedicalClearance(donor.getEligibilityCriteria().getMedicalClearance());
-            donorEvent.setRecentSurgery(donor.getEligibilityCriteria().getRecentSurgery());
-            donorEvent.setChronicDiseases(donor.getEligibilityCriteria().getChronicDiseases());
-            donorEvent.setAllergies(donor.getEligibilityCriteria().getAllergies());
-            donorEvent.setLastDonationDate(donor.getEligibilityCriteria().getLastDonationDate());
-            donorEvent.setAge(donor.getEligibilityCriteria().getAge());
-            donorEvent.setWeight(donor.getEligibilityCriteria().getWeight());
+            EligibilityCriteria ec = donor.getEligibilityCriteria();
+            donorEvent.setMedicalClearance(ec.getMedicalClearance());
+            donorEvent.setRecentSurgery(ec.getRecentSurgery());
+            donorEvent.setChronicDiseases(ec.getChronicDiseases());
+            donorEvent.setAllergies(ec.getAllergies());
+            donorEvent.setLastDonationDate(ec.getLastDonationDate());
+            donorEvent.setAge(ec.getAge());
+            donorEvent.setWeight(ec.getWeight());
+            donorEvent.setDob(ec.getDob());
+            donorEvent.setRecentTattooOrPiercing(ec.getRecentTattooOrPiercing());
+            donorEvent.setRecentTravelDetails(ec.getRecentTravelDetails());
+            donorEvent.setRecentVaccination(ec.getRecentVaccination());
+            donorEvent.setHeight(ec.getHeight());
+            donorEvent.setBodyMassIndex(ec.getBodyMassIndex());
+            donorEvent.setBodySize(ec.getBodySize());
+            donorEvent.setIsLivingDonor(ec.getIsLivingDonor());
         }
 
         return donorEvent;
     }
 
-    public static DonationEvent getDonationEvent(DonationDTO donationDTO) {
+    private DonationEvent getDonationEvent(DonationDTO donationDTO) {
         if (donationDTO == null) return null;
         DonationEvent event = new DonationEvent();
         event.setDonationId(donationDTO.getId());
         event.setDonorId(donationDTO.getDonorId());
         event.setLocationId(donationDTO.getLocationId());
         event.setDonationType(donationDTO.getDonationType());
-        event.setBloodType(donationDTO.getBloodType() != null ? donationDTO.getBloodType().name() : null);
+        event.setBloodType(donationDTO.getBloodType());
         event.setDonationDate(donationDTO.getDonationDate());
         event.setStatus(donationDTO.getStatus());
         event.setQuantity(donationDTO.getQuantity());
+
         event.setOrganType(donationDTO.getOrganType());
         event.setIsCompatible(donationDTO.getIsCompatible());
+        event.setOrganQuality(donationDTO.getOrganQuality());
+        event.setOrganViabilityExpiry(donationDTO.getOrganViabilityExpiry());
+        event.setColdIschemiaTime(donationDTO.getColdIschemiaTime());
+        event.setOrganPerfused(donationDTO.getOrganPerfused());
+        event.setOrganWeight(donationDTO.getOrganWeight());
+        event.setOrganSize(donationDTO.getOrganSize());
+        event.setFunctionalAssessment(donationDTO.getFunctionalAssessment());
+        event.setHasAbnormalities(donationDTO.getHasAbnormalities());
+        event.setAbnormalityDescription(donationDTO.getAbnormalityDescription());
+
         event.setTissueType(donationDTO.getTissueType());
         event.setStemCellType(donationDTO.getStemCellType());
+
         return event;
     }
 
@@ -331,6 +394,15 @@ public class DonorServiceImpl implements DonorService {
                 dto.setDonationType(DonationType.ORGAN);
                 dto.setOrganType(organDonation.getOrganType());
                 dto.setIsCompatible(organDonation.getIsCompatible());
+                dto.setOrganQuality(organDonation.getOrganQuality());
+                dto.setOrganViabilityExpiry(organDonation.getOrganViabilityExpiry());
+                dto.setColdIschemiaTime(organDonation.getColdIschemiaTime());
+                dto.setOrganPerfused(organDonation.getOrganPerfused());
+                dto.setOrganWeight(organDonation.getOrganWeight());
+                dto.setOrganSize(organDonation.getOrganSize());
+                dto.setFunctionalAssessment(organDonation.getFunctionalAssessment());
+                dto.setHasAbnormalities(organDonation.getHasAbnormalities());
+                dto.setAbnormalityDescription(organDonation.getAbnormalityDescription());
             }
             case TissueDonation tissueDonation -> {
                 dto.setDonationType(DonationType.TISSUE);

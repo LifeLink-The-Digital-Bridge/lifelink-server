@@ -56,5 +56,17 @@ public class EligibilityCriteria {
 
     @Column
     private LocalDate lastDonationDate;
+
+    @Column
+    private Double height;
+
+    @Column
+    private Double bodyMassIndex;
+
+    @Column
+    private String bodySize;
+
+    @Column(nullable = false)
+    private Boolean isLivingDonor;
 }
 

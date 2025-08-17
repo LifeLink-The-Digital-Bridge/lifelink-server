@@ -1,5 +1,6 @@
 package com.donorservice.dto;
 
+import jakarta.persistence.Column;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -20,4 +21,8 @@ public class EligibilityCriteriaDTO {
     private String chronicDiseases;
     private String allergies;
     private LocalDate lastDonationDate;
+    private Double height;
+    private Double bodyMassIndex;
+    private String bodySize;
+    private Boolean isLivingDonor;
 }

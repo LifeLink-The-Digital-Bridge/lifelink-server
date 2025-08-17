@@ -43,6 +43,9 @@ public class Donor {
     @OneToOne(mappedBy = "donor", cascade = CascadeType.ALL)
     private ConsentForm consentForm;
 
+    @OneToOne(mappedBy = "donor", cascade = CascadeType.ALL)
+    private HLAProfile hlaProfile;
+
     @OneToMany(mappedBy = "donor", cascade = CascadeType.ALL)
     private List<DonationHistory> donationHistory;
 
@@ -55,5 +58,4 @@ public class Donor {
             registrationDate = LocalDate.now();
         }
     }
-
 }
