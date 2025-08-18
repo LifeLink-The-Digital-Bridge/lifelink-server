@@ -39,21 +39,44 @@ public class MatchingEventHandlerService {
             donor = new Donor();
             donor.setDonorId(event.getDonorId());
         }
+
         donor.setUserId(event.getUserId());
         donor.setRegistrationDate(event.getRegistrationDate());
+
         donor.setStatus(DonorStatus.valueOf(event.getStatus()));
+
         donor.setWeight(event.getWeight());
         donor.setAge(event.getAge());
+        donor.setDob(event.getDob());
         donor.setMedicalClearance(event.getMedicalClearance());
+        donor.setRecentTattooOrPiercing(event.getRecentTattooOrPiercing());
+        donor.setRecentTravelDetails(event.getRecentTravelDetails());
+        donor.setRecentVaccination(event.getRecentVaccination());
         donor.setRecentSurgery(event.getRecentSurgery());
         donor.setChronicDiseases(event.getChronicDiseases());
         donor.setAllergies(event.getAllergies());
         donor.setLastDonationDate(event.getLastDonationDate());
+        donor.setHeight(event.getHeight());
+        donor.setBodyMassIndex(event.getBodyMassIndex());
+        donor.setBodySize(event.getBodySize());
+        donor.setIsLivingDonor(event.getIsLivingDonor());
+
         donor.setHemoglobinLevel(event.getHemoglobinLevel());
         donor.setBloodPressure(event.getBloodPressure());
         donor.setHasDiseases(event.getHasDiseases());
         donor.setTakingMedication(event.getTakingMedication());
         donor.setDiseaseDescription(event.getDiseaseDescription());
+
+        donor.setCurrentMedications(event.getCurrentMedications());
+        donor.setLastMedicalCheckup(event.getLastMedicalCheckup());
+        donor.setMedicalHistory(event.getMedicalHistory());
+        donor.setHasInfectiousDiseases(event.getHasInfectiousDiseases());
+        donor.setInfectiousDiseaseDetails(event.getInfectiousDiseaseDetails());
+        donor.setCreatinineLevel(event.getCreatinineLevel());
+        donor.setLiverFunctionTests(event.getLiverFunctionTests());
+        donor.setCardiacStatus(event.getCardiacStatus());
+        donor.setPulmonaryFunction(event.getPulmonaryFunction());
+        donor.setOverallHealthStatus(event.getOverallHealthStatus());
 
         System.out.println("Inside handleDonorEvent: " + donor.getDonorId());
         donorRepository.save(donor);
@@ -100,6 +123,7 @@ public class MatchingEventHandlerService {
             System.out.println("Donor not found - buffering donation event for donorId: " + event.getDonorId());
             return;
         }
+
         DonorLocation location = donorLocationRepository.findByLocationId(event.getLocationId()).orElse(null);
         if (location == null) {
             donationEventBuffer.buffer(event.getDonorId(), event.getLocationId(), () -> {
@@ -109,6 +133,7 @@ public class MatchingEventHandlerService {
             System.out.println("Location not found - buffering donation event for donorId: " + event.getDonorId() + ", locationId: " + event.getLocationId());
             return;
         }
+
         if (donationRepository.findByDonationId(event.getDonationId()).isPresent()) {
             System.out.println("Donation already exists for donationId: " + event.getDonationId());
             return;
@@ -124,6 +149,15 @@ public class MatchingEventHandlerService {
                 OrganDonation d = new OrganDonation();
                 d.setOrganType(event.getOrganType());
                 d.setIsCompatible(event.getIsCompatible());
+                d.setOrganQuality(event.getOrganQuality());
+                d.setOrganViabilityExpiry(event.getOrganViabilityExpiry());
+                d.setColdIschemiaTime(event.getColdIschemiaTime());
+                d.setOrganPerfused(event.getOrganPerfused());
+                d.setOrganWeight(event.getOrganWeight());
+                d.setOrganSize(event.getOrganSize());
+                d.setFunctionalAssessment(event.getFunctionalAssessment());
+                d.setHasAbnormalities(event.getHasAbnormalities());
+                d.setAbnormalityDescription(event.getAbnormalityDescription());
                 yield d;
             }
             case TISSUE -> {
@@ -153,7 +187,6 @@ public class MatchingEventHandlerService {
         summary.setState(location.getState());
         summary.setLatitude(location.getLatitude());
         summary.setLongitude(location.getLongitude());
-
         donation.setLocationSummary(summary);
 
         donationRepository.save(donation);
@@ -248,6 +281,7 @@ public class MatchingEventHandlerService {
         ReceiveRequest receiveRequest = new ReceiveRequest();
         receiveRequest.setReceiveRequestId(event.getReceiveRequestId());
         receiveRequest.setRecipientId(event.getRecipientId());
+        receiveRequest.setLocation(location);
         receiveRequest.setRequestedBloodType(event.getRequestedBloodType());
         receiveRequest.setRequestedOrgan(event.getRequestedOrgan());
         receiveRequest.setUrgencyLevel(event.getUrgencyLevel());
@@ -267,4 +301,5 @@ public class MatchingEventHandlerService {
             e.printStackTrace();
         }
     }
+
 }

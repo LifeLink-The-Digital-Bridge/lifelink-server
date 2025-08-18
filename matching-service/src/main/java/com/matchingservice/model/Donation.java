@@ -1,5 +1,7 @@
 package com.matchingservice.model;
 
+import com.matchingservice.enums.BloodType;
+import com.matchingservice.enums.DonationStatus;
 import com.matchingservice.enums.DonationType;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -31,12 +33,14 @@ public class Donation {
     @Enumerated(EnumType.STRING)
     private DonationType donationType;
 
-    private String bloodType;
+    @Enumerated(EnumType.STRING)
+    private BloodType bloodType;
 
     private LocalDate donationDate;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String status;
+    private DonationStatus status;
 
     @Embedded
     private LocationSummary locationSummary;
