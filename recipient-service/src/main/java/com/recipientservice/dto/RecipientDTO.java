@@ -15,5 +15,6 @@ public class RecipientDTO {
     private EligibilityCriteriaDTO eligibilityCriteria;
     private ConsentFormDTO consentForm;
     private List<LocationDTO> addresses;
+    private HLAProfileDTO hlaProfile;
 }
 

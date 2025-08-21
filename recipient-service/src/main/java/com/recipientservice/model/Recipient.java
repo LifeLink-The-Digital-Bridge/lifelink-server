@@ -36,16 +36,16 @@ public class Recipient {
     @OneToOne(mappedBy = "recipient", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     private ConsentForm consentForm;
 
-    @OneToMany(mappedBy = "recipient", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
-    private List<RecipientHistory> recipientHistories;
+    @OneToOne(mappedBy = "recipient", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    private HLAProfile hlaProfile;
 
     @OneToMany(mappedBy = "recipient", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
-    private List<ReceiveRequest> receiveRequests;
+    private List<RecipientHistory> recipientHistories = new ArrayList<>();
+
+    @OneToMany(mappedBy = "recipient", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    private List<ReceiveRequest> receiveRequests = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
-    private Availability availability;
+    private Availability availability = Availability.AVAILABLE;
 
-    public Recipient() {
-        this.availability = Availability.AVAILABLE;
-    }
 }

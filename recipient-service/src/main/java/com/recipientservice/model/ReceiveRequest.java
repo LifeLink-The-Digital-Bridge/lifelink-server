@@ -1,9 +1,6 @@
 package com.recipientservice.model;
 
-import com.recipientservice.enums.BloodType;
-import com.recipientservice.enums.OrganType;
-import com.recipientservice.enums.UrgencyLevel;
-import com.recipientservice.enums.RequestStatus;
+import com.recipientservice.enums.*;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -24,10 +21,20 @@ public class ReceiveRequest {
     private Recipient recipient;
 
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private RequestType requestType;
+
+    @Enumerated(EnumType.STRING)
     private BloodType requestedBloodType;
 
     @Enumerated(EnumType.STRING)
     private OrganType requestedOrgan;
+
+    @Enumerated(EnumType.STRING)
+    private TissueType requestedTissue;
+
+    @Enumerated(EnumType.STRING)
+    private StemCellType requestedStemCellType;
 
     @Enumerated(EnumType.STRING)
     private UrgencyLevel urgencyLevel;

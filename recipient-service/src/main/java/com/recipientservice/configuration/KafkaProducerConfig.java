@@ -1,5 +1,6 @@
 package com.recipientservice.configuration;
 
+import com.recipientservice.kafka.events.HLAProfileEvent;
 import com.recipientservice.kafka.events.LocationEvent;
 import com.recipientservice.kafka.events.RecipientEvent;
 import com.recipientservice.kafka.events.ReceiveRequestEvent;
@@ -39,6 +40,11 @@ public class KafkaProducerConfig {
 
     @Bean
     public KafkaTemplate<String, LocationEvent> recipientLocationKafkaTemplate() {
+        return new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(producerConfigs()));
+    }
+
+    @Bean
+    public KafkaTemplate<String, HLAProfileEvent> hlaProfileKafkaTemplate() {
         return new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(producerConfigs()));
     }
 }

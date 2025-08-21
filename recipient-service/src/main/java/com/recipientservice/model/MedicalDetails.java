@@ -13,8 +13,14 @@ public class MedicalDetails {
     private Long id;
 
     @OneToOne
-    @JoinColumn(name = "recipient_id", referencedColumnName = "id")
+    @JoinColumn(name = "recipient_id", referencedColumnName = "id", unique = true)
     private Recipient recipient;
+
+    @Column(nullable = false)
+    private Double hemoglobinLevel;
+
+    @Column(nullable = false)
+    private String bloodPressure;
 
     @Column
     private String diagnosis;
@@ -27,5 +33,27 @@ public class MedicalDetails {
 
     @Column
     private String additionalNotes;
+
+    @Column
+    private Boolean hasInfectiousDiseases;
+
+    @Column
+    private String infectiousDiseaseDetails;
+
+    @Column
+    private Double creatinineLevel;
+
+    @Column
+    private String liverFunctionTests;
+
+    @Column
+    private String cardiacStatus;
+
+    @Column
+    private Double pulmonaryFunction;
+
+    @Column
+    private String overallHealthStatus;
+
 }
 

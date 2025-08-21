@@ -7,8 +7,7 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 @Data
-public class ReceiveRequestDTO {
-    private UUID id;
+public class CreateReceiveRequestDTO {
     private UUID recipientId;
     private UUID locationId;
     private RequestType requestType;
@@ -19,7 +18,6 @@ public class ReceiveRequestDTO {
     private UrgencyLevel urgencyLevel;
     private Double quantity;
     private LocalDate requestDate;
-    private RequestStatus status;
     private String notes;
 }
 

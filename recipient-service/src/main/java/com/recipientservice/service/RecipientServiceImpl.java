@@ -1,9 +1,12 @@
 package com.recipientservice.service;
 
 import com.recipientservice.dto.*;
+import com.recipientservice.enums.RequestStatus;
+import com.recipientservice.enums.RequestType;
 import com.recipientservice.exceptions.InvalidLocationException;
 import com.recipientservice.exceptions.RecipientNotFoundException;
 import com.recipientservice.kafka.EventPublisher;
+import com.recipientservice.kafka.events.HLAProfileEvent;
 import com.recipientservice.kafka.events.LocationEvent;
 import com.recipientservice.kafka.events.ReceiveRequestEvent;
 import com.recipientservice.kafka.events.RecipientEvent;
@@ -13,6 +16,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -80,6 +84,20 @@ public class RecipientServiceImpl implements RecipientService {
         consentForm.setUserId(userId);
         recipient.setConsentForm(consentForm);
 
+        if (dto.getHlaProfile() != null) {
+            validateHLAProfileDTO(dto.getHlaProfile());
+
+            HLAProfile hlaProfile = recipient.getHlaProfile();
+            if (hlaProfile == null) {
+                hlaProfile = new HLAProfile();
+                hlaProfile.setRecipient(recipient);
+            } else {
+                dto.getHlaProfile().setId(hlaProfile.getId());
+            }
+            BeanUtils.copyProperties(dto.getHlaProfile(), hlaProfile);
+            recipient.setHlaProfile(hlaProfile);
+        }
+
         List<Location> freshAddresses = new ArrayList<>();
         if (dto.getAddresses() != null && !dto.getAddresses().isEmpty()) {
             for (LocationDTO locDTO : dto.getAddresses()) {
@@ -106,12 +124,12 @@ public class RecipientServiceImpl implements RecipientService {
     }
 
     @Override
-    public ReceiveRequestDTO createReceiveRequest(UUID userId, ReceiveRequestDTO requestDTO) {
+    public ReceiveRequestDTO createReceiveRequest(UUID userId, CreateReceiveRequestDTO requestDTO) {
         if (userId == null) {
             throw new IllegalArgumentException("UserId cannot be null");
         }
         if (requestDTO == null) {
-            throw new IllegalArgumentException("ReceiveRequestDTO cannot be null");
+            throw new IllegalArgumentException("CreateReceiveRequestDTO cannot be null");
         }
 
         Recipient recipient = recipientRepository.findByUserId(userId);
@@ -127,16 +145,16 @@ public class RecipientServiceImpl implements RecipientService {
                     .orElseThrow(() -> new InvalidLocationException("Invalid location ID"));
         }
 
-        System.out.println("ReceiveRequestDTO: " + requestDTO);
+        System.out.println("CreateReceiveRequestDTO: " + requestDTO);
         System.out.println("Location: " + location);
 
         ReceiveRequest request = new ReceiveRequest();
-        copyReceiveRequestProperties(requestDTO, request);
+        copyCreateReceiveRequestProperties(requestDTO, request);
         request.setRecipient(recipient);
         request.setLocation(location);
+        request.setStatus(RequestStatus.PENDING);
 
         ReceiveRequest saved = receiveRequestRepository.save(request);
-
         ReceiveRequestDTO responseDTO = convertToDTO(saved);
 
         eventPublisher.publishReceiveRequestEvent(getReceiveRequestEvent(responseDTO));
@@ -144,9 +162,32 @@ public class RecipientServiceImpl implements RecipientService {
         if (location != null) {
             eventPublisher.publishRecipientLocationEvent(getLocationEvent(location, recipient.getId()));
         }
-
+        if (recipient.getHlaProfile() != null && requestDTO.getRequestType() == RequestType.ORGAN) {
+            eventPublisher.publishHLAProfileEvent(getHLAProfileEvent(recipient.getHlaProfile(), recipient.getId()));
+        }
         System.out.println("Event published successfully.");
         return responseDTO;
+    }
+
+    private HLAProfileEvent getHLAProfileEvent(HLAProfile hlaProfile, UUID recipientId) {
+        if (hlaProfile == null) return null;
+
+        HLAProfileEvent event = new HLAProfileEvent();
+        BeanUtils.copyProperties(hlaProfile, event);
+        event.setRecipientId(recipientId);
+        return event;
+    }
+
+    private void copyCreateReceiveRequestProperties(CreateReceiveRequestDTO source, ReceiveRequest target) {
+        target.setRequestType(source.getRequestType());
+        target.setRequestedBloodType(source.getRequestedBloodType());
+        target.setRequestedOrgan(source.getRequestedOrgan());
+        target.setRequestedTissue(source.getRequestedTissue());
+        target.setRequestedStemCellType(source.getRequestedStemCellType());
+        target.setUrgencyLevel(source.getUrgencyLevel());
+        target.setQuantity(source.getQuantity());
+        target.setRequestDate(source.getRequestDate());
+        target.setNotes(source.getNotes());
     }
 
     @Override
@@ -195,6 +236,12 @@ public class RecipientServiceImpl implements RecipientService {
             responseDTO.setConsentForm(cfDTO);
         }
 
+        if (savedRecipient.getHlaProfile() != null) {
+            HLAProfileDTO hlaDTO = new HLAProfileDTO();
+            BeanUtils.copyProperties(savedRecipient.getHlaProfile(), hlaDTO);
+            responseDTO.setHlaProfile(hlaDTO);
+        }
+
         if (savedRecipient.getAddresses() != null && !savedRecipient.getAddresses().isEmpty()) {
             List<LocationDTO> locDTOList = savedRecipient.getAddresses().stream().map(location -> {
                 LocationDTO locDTO = new LocationDTO();
@@ -209,6 +256,26 @@ public class RecipientServiceImpl implements RecipientService {
         return responseDTO;
     }
 
+    private void validateHLAProfileDTO(HLAProfileDTO hlaProfileDTO) {
+        if (hlaProfileDTO.getTestingDate() == null) {
+            throw new IllegalArgumentException("Testing date is required for HLA profile");
+        }
+
+        if (hlaProfileDTO.getTestingDate().isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException("Testing date cannot be in the future");
+        }
+
+        if (hlaProfileDTO.getHlaA1() == null && hlaProfileDTO.getHlaA2() == null &&
+                hlaProfileDTO.getHlaB1() == null && hlaProfileDTO.getHlaB2() == null) {
+            throw new IllegalArgumentException("At least some HLA markers must be provided");
+        }
+
+        if (hlaProfileDTO.getLaboratoryName() == null || hlaProfileDTO.getLaboratoryName().trim().isEmpty()) {
+            throw new IllegalArgumentException("Laboratory name is required for HLA profile");
+        }
+    }
+
+
     private void validateLocationDTO(LocationDTO locDTO) {
         if (locDTO.getAddressLine() == null || locDTO.getLandmark() == null ||
                 locDTO.getArea() == null || locDTO.getCity() == null ||
@@ -217,16 +284,6 @@ public class RecipientServiceImpl implements RecipientService {
                 locDTO.getLatitude() == null || locDTO.getLongitude() == null) {
             throw new InvalidLocationException("All location fields must be provided and non-null.");
         }
-    }
-
-    private void copyReceiveRequestProperties(ReceiveRequestDTO source, ReceiveRequest target) {
-        target.setRequestedBloodType(source.getRequestedBloodType());
-        target.setRequestedOrgan(source.getRequestedOrgan());
-        target.setUrgencyLevel(source.getUrgencyLevel());
-        target.setQuantity(source.getQuantity());
-        target.setRequestDate(source.getRequestDate());
-        target.setStatus(source.getStatus());
-        target.setNotes(source.getNotes());
     }
 
     private LocationEvent getLocationEvent(Location location, UUID recipientId) {
@@ -272,8 +329,11 @@ public class RecipientServiceImpl implements RecipientService {
         event.setReceiveRequestId(requestDTO.getId());
         event.setRecipientId(requestDTO.getRecipientId());
         event.setLocationId(requestDTO.getLocationId());
+        event.setRequestType(requestDTO.getRequestType());
         event.setRequestedBloodType(requestDTO.getRequestedBloodType());
         event.setRequestedOrgan(requestDTO.getRequestedOrgan());
+        event.setRequestedTissue(requestDTO.getRequestedTissue());
+        event.setRequestedStemCellType(requestDTO.getRequestedStemCellType());
         event.setUrgencyLevel(requestDTO.getUrgencyLevel());
         event.setQuantity(requestDTO.getQuantity());
         event.setRequestDate(requestDTO.getRequestDate());
@@ -282,6 +342,7 @@ public class RecipientServiceImpl implements RecipientService {
         return event;
     }
 
+
     private ReceiveRequestDTO convertToDTO(ReceiveRequest request) {
         if (request == null) return null;
 
@@ -289,8 +350,11 @@ public class RecipientServiceImpl implements RecipientService {
         dto.setId(request.getId());
         dto.setRecipientId(request.getRecipient().getId());
         dto.setLocationId(request.getLocation() != null ? request.getLocation().getId() : null);
+        dto.setRequestType(request.getRequestType());
         dto.setRequestedBloodType(request.getRequestedBloodType());
         dto.setRequestedOrgan(request.getRequestedOrgan());
+        dto.setRequestedTissue(request.getRequestedTissue());
+        dto.setRequestedStemCellType(request.getRequestedStemCellType());
         dto.setUrgencyLevel(request.getUrgencyLevel());
         dto.setQuantity(request.getQuantity());
         dto.setRequestDate(request.getRequestDate());
@@ -299,6 +363,7 @@ public class RecipientServiceImpl implements RecipientService {
 
         return dto;
     }
+
 
     private void validateRecipientProfileComplete(Recipient recipient) {
         if (recipient.getMedicalDetails() == null ||

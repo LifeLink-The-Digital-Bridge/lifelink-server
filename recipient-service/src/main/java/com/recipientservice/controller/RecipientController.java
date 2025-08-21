@@ -37,7 +37,7 @@ public class RecipientController {
 
     @RequireRole("RECIPIENT")
     @PostMapping("/request")
-    public ResponseEntity<ReceiveRequestDTO> createReceiveRequest(@RequestHeader("id") UUID userId, @RequestBody ReceiveRequestDTO requestDTO) {
+    public ResponseEntity<ReceiveRequestDTO> createReceiveRequest(@RequestHeader("id") UUID userId, @RequestBody CreateReceiveRequestDTO  requestDTO) {
         ReceiveRequestDTO response = recipientService.createReceiveRequest(userId, requestDTO);
         return ResponseEntity.ok(response);
     }

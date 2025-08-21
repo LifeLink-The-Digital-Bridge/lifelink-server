@@ -15,8 +15,23 @@ public class EligibilityCriteria {
     private Long id;
 
     @OneToOne
-    @JoinColumn(name = "recipient_id", referencedColumnName = "id")
+    @JoinColumn(name = "recipient_id", referencedColumnName = "id", unique = true)
     private Recipient recipient;
+
+    @Column(nullable = false)
+    private Boolean ageEligible;
+
+    @Column
+    private Integer age;
+
+    @Column
+    private LocalDate dob;
+
+    @Column(nullable = false)
+    private Boolean weightEligible;
+
+    @Column
+    private Double weight;
 
     @Column(nullable = false)
     private Boolean medicallyEligible;
@@ -29,4 +44,17 @@ public class EligibilityCriteria {
 
     @Column
     private LocalDate lastReviewed;
+
+    @Column
+    private Double height;
+
+    @Column
+    private Double bodyMassIndex;
+
+    @Column
+    private String bodySize;
+
+    @Column(nullable = false)
+    private Boolean isLivingDonor;
+
 }
