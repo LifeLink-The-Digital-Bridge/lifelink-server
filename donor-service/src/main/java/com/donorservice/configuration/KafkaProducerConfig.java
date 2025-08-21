@@ -2,6 +2,7 @@ package com.donorservice.configuration;
 
 import com.donorservice.kafka.event.DonorEvent;
 import com.donorservice.kafka.event.DonationEvent;
+import com.donorservice.kafka.event.HLAProfileEvent;
 import com.donorservice.kafka.event.LocationEvent;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -35,6 +36,10 @@ public class KafkaProducerConfig {
 
     @Bean
     public KafkaTemplate<String, LocationEvent> locationKafkaTemplate() {
+        return new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(donorProducerFactory().getConfigurationProperties()));
+    }
+
+    @Bean KafkaTemplate<String, HLAProfileEvent> hlaProfileKafkaTemplate() {
         return new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(donorProducerFactory().getConfigurationProperties()));
     }
 }

@@ -11,6 +11,7 @@ import com.donorservice.exception.UnsupportedDonationTypeException;
 import com.donorservice.kafka.EventPublisher;
 import com.donorservice.kafka.event.DonationEvent;
 import com.donorservice.kafka.event.DonorEvent;
+import com.donorservice.kafka.event.HLAProfileEvent;
 import com.donorservice.kafka.event.LocationEvent;
 import com.donorservice.model.*;
 import com.donorservice.repository.*;
@@ -266,8 +267,24 @@ public class DonorServiceImpl implements DonorService {
         if (location != null) {
             eventPublisher.publishLocationEvent(getLocationEvent(location, donor.getId()));
         }
+        HLAProfileEvent hlaProfileEvent = getHLAProfileEvent(donor);
+        if (hlaProfileEvent != null) {
+            eventPublisher.publishHLAProfileEvent(hlaProfileEvent);
+        }
         System.out.println("Event published successfully.");
         return donationDTO;
+    }
+
+    private HLAProfileEvent getHLAProfileEvent(Donor donor) {
+        if (donor == null || donor.getHlaProfile() == null) return null;
+
+        HLAProfileEvent event = new HLAProfileEvent();
+        HLAProfile hlaProfile = donor.getHlaProfile();
+
+        BeanUtils.copyProperties(hlaProfile, event);
+        event.setDonorId(donor.getId());
+
+        return event;
     }
 
     private void validateLocationDTO(LocationDTO locDTO) {
