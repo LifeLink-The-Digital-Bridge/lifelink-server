@@ -1,6 +1,6 @@
 package com.matchingservice.repository;
 
-import com.matchingservice.model.Donation;
+import com.matchingservice.model.donor.Donation;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

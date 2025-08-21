@@ -1,20 +1,27 @@
 package com.matchingservice.service;
 
 import com.matchingservice.enums.DonorStatus;
+import com.matchingservice.exceptions.ResourceNotFoundException;
 import com.matchingservice.kafka.event.donor_events.DonationEvent;
 import com.matchingservice.kafka.event.donor_events.DonorEvent;
+import com.matchingservice.kafka.event.donor_events.DonorHLAProfileEvent;
 import com.matchingservice.kafka.event.donor_events.DonorLocationEvent;
 import com.matchingservice.kafka.event.recipient_events.ReceiveRequestEvent;
 import com.matchingservice.kafka.event.recipient_events.RecipientEvent;
+import com.matchingservice.kafka.event.recipient_events.RecipientHLAProfileEvent;
 import com.matchingservice.kafka.event.recipient_events.RecipientLocationEvent;
-import com.matchingservice.model.*;
+import com.matchingservice.model.donor.*;
 import com.matchingservice.model.recipients.Recipient;
+import com.matchingservice.model.recipients.RecipientHLAProfile;
 import com.matchingservice.model.recipients.RecipientLocation;
 import com.matchingservice.model.recipients.ReceiveRequest;
 import com.matchingservice.repository.*;
 import com.matchingservice.utils.*;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -27,11 +34,13 @@ public class MatchingEventHandlerService {
     private final RecipientRepository recipientRepository;
     private final RecipientLocationRepository recipientLocationRepository;
     private final ReceiveRequestRepository receiveRequestRepository;
+    private final DonorHLAProfileRepository donorHLAProfileRepository;
 
     private final DonorEventBuffer donorEventBuffer;
     private final DonationEventBuffer donationEventBuffer;
     private final RecipientEventBuffer recipientEventBuffer;
     private final ReceiveRequestEventBuffer receiveRequestEventBuffer;
+    private final RecipientHLAProfileRepository recipientHLAProfileRepository;
 
     public void handleDonorEvent(DonorEvent event) {
         Donor donor = donorRepository.findByDonorId(event.getDonorId()).orElse(null);
@@ -282,8 +291,11 @@ public class MatchingEventHandlerService {
         receiveRequest.setReceiveRequestId(event.getReceiveRequestId());
         receiveRequest.setRecipientId(event.getRecipientId());
         receiveRequest.setLocation(location);
+        receiveRequest.setRequestType(event.getRequestType());
         receiveRequest.setRequestedBloodType(event.getRequestedBloodType());
         receiveRequest.setRequestedOrgan(event.getRequestedOrgan());
+        receiveRequest.setRequestedTissue(event.getRequestedTissue());
+        receiveRequest.setRequestedStemCellType(event.getRequestedStemCellType());
         receiveRequest.setUrgencyLevel(event.getUrgencyLevel());
         receiveRequest.setQuantity(event.getQuantity());
         receiveRequest.setRequestDate(event.getRequestDate());
@@ -300,6 +312,99 @@ public class MatchingEventHandlerService {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    @Transactional
+    public void handleDonorHLAProfileEvent(DonorHLAProfileEvent event) {
+        System.out.println("Processing HLA Profile Event for donor: " + event.getDonorId());
+
+        Donor donor = donorRepository.findByDonorId(event.getDonorId())
+                .orElseThrow(() -> new ResourceNotFoundException("Donor not found with id: " + event.getDonorId()));
+
+        Optional<DonorHLAProfile> existingProfileOptional = donorHLAProfileRepository.findByDonor(donor);
+
+        DonorHLAProfile profile = getDonorHLAProfile(event, existingProfileOptional, donor);
+
+        DonorHLAProfile savedProfile = donorHLAProfileRepository.save(profile);
+
+        if (existingProfileOptional.isPresent()) {
+            System.out.println("Updated existing HLA profile for donor: " + event.getDonorId());
+        } else {
+            System.out.println("Created new HLA profile for donor: " + event.getDonorId());
+        }
+
+    }
+
+    private static DonorHLAProfile getDonorHLAProfile(DonorHLAProfileEvent event, Optional<DonorHLAProfile> existingProfileOptional, Donor donor) {
+        DonorHLAProfile profile = existingProfileOptional.orElse(new DonorHLAProfile());
+
+        profile.setDonor(donor);
+        profile.setHlaA1(event.getHlaA1());
+        profile.setHlaA2(event.getHlaA2());
+        profile.setHlaB1(event.getHlaB1());
+        profile.setHlaB2(event.getHlaB2());
+        profile.setHlaC1(event.getHlaC1());
+        profile.setHlaC2(event.getHlaC2());
+        profile.setHlaDR1(event.getHlaDR1());
+        profile.setHlaDR2(event.getHlaDR2());
+        profile.setHlaDQ1(event.getHlaDQ1());
+        profile.setHlaDQ2(event.getHlaDQ2());
+        profile.setHlaDP1(event.getHlaDP1());
+        profile.setHlaDP2(event.getHlaDP2());
+        profile.setTestingDate(event.getTestingDate());
+        profile.setTestingMethod(event.getTestingMethod());
+        profile.setLaboratoryName(event.getLaboratoryName());
+        profile.setCertificationNumber(event.getCertificationNumber());
+        profile.setHlaString(event.getHlaString());
+        profile.setIsHighResolution(event.getIsHighResolution());
+        return profile;
+    }
+
+    @Transactional
+    public void handleRecipientHLAProfileEvent(RecipientHLAProfileEvent event) {
+        System.out.println("Processing HLA Profile Event for recipient: " + event.getRecipientId());
+
+        Recipient recipient = recipientRepository.findByRecipientId(event.getRecipientId())
+                .orElseThrow(() -> new ResourceNotFoundException("Recipient not found with id: " + event.getRecipientId()));
+
+        Optional<RecipientHLAProfile> existingProfileOptional = recipientHLAProfileRepository.findByRecipient(recipient);
+
+        RecipientHLAProfile profile = getRecipientHLAProfile(event, existingProfileOptional, recipient);
+
+        RecipientHLAProfile savedProfile = recipientHLAProfileRepository.save(profile);
+
+        if (existingProfileOptional.isPresent()) {
+            System.out.println("Updated existing HLA profile for recipient: " + event.getRecipientId());
+        } else {
+            System.out.println("Created new HLA profile for recipient: " + event.getRecipientId());
+        }
+    }
+
+    private static RecipientHLAProfile getRecipientHLAProfile(RecipientHLAProfileEvent event,
+                                                              Optional<RecipientHLAProfile> existingProfileOptional, Recipient recipient) {
+        RecipientHLAProfile profile = existingProfileOptional.orElse(new RecipientHLAProfile());
+
+        profile.setRecipient(recipient);
+        profile.setHlaA1(event.getHlaA1());
+        profile.setHlaA2(event.getHlaA2());
+        profile.setHlaB1(event.getHlaB1());
+        profile.setHlaB2(event.getHlaB2());
+        profile.setHlaC1(event.getHlaC1());
+        profile.setHlaC2(event.getHlaC2());
+        profile.setHlaDR1(event.getHlaDR1());
+        profile.setHlaDR2(event.getHlaDR2());
+        profile.setHlaDQ1(event.getHlaDQ1());
+        profile.setHlaDQ2(event.getHlaDQ2());
+        profile.setHlaDP1(event.getHlaDP1());
+        profile.setHlaDP2(event.getHlaDP2());
+        profile.setTestingDate(event.getTestingDate());
+        profile.setTestingMethod(event.getTestingMethod());
+        profile.setLaboratoryName(event.getLaboratoryName());
+        profile.setCertificationNumber(event.getCertificationNumber());
+        profile.setHlaString(event.getHlaString());
+        profile.setIsHighResolution(event.getIsHighResolution());
+
+        return profile;
     }
 
 }

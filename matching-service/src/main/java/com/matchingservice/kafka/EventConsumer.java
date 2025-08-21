@@ -2,9 +2,11 @@ package com.matchingservice.kafka;
 
 import com.matchingservice.kafka.event.donor_events.DonorEvent;
 import com.matchingservice.kafka.event.donor_events.DonationEvent;
+import com.matchingservice.kafka.event.donor_events.DonorHLAProfileEvent;
 import com.matchingservice.kafka.event.donor_events.DonorLocationEvent;
 import com.matchingservice.kafka.event.recipient_events.RecipientEvent;
 import com.matchingservice.kafka.event.recipient_events.ReceiveRequestEvent;
+import com.matchingservice.kafka.event.recipient_events.RecipientHLAProfileEvent;
 import com.matchingservice.kafka.event.recipient_events.RecipientLocationEvent;
 import com.matchingservice.service.MatchingEventHandlerService;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +37,12 @@ public class EventConsumer {
         handler.handleDonorLocationEvent(event);
     }
 
+    @KafkaListener(topics = "donor-hla-profile-event", groupId = "matching-service-group", containerFactory = "hlaProfileKafkaListenerFactory")
+    public void consumeDonorHLAProfileEvent(DonorHLAProfileEvent event) {
+        System.out.println("Received DonorHLAProfileEvent: " + event);
+        handler.handleDonorHLAProfileEvent(event);
+    }
+
     @KafkaListener(topics = "recipient-events", groupId = "matching-service-group", containerFactory = "recipientKafkaListenerFactory")
     public void consumeRecipientEvent(RecipientEvent event) {
         System.out.println("Received RecipientEvent: " + event);
@@ -51,5 +59,11 @@ public class EventConsumer {
     public void consumeRecipientLocationEvent(RecipientLocationEvent event) {
         System.out.println("Received RecipientLocationEvent: " + event);
         handler.handleRecipientLocationEvent(event);
+    }
+
+    @KafkaListener(topics = "recipient-hla-profile-events", groupId = "matching-service-group", containerFactory = "recipientHlaProfileKafkaListenerFactory")
+    public void consumeRecipientHLAProfileEvent(RecipientHLAProfileEvent event) {
+        System.out.println("Received RecipientHLAProfileEvent: " + event);
+        handler.handleRecipientHLAProfileEvent(event);
     }
 }

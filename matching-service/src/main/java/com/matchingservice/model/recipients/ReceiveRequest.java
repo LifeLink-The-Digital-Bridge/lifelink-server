@@ -1,9 +1,6 @@
 package com.matchingservice.model.recipients;
 
-import com.matchingservice.enums.BloodType;
-import com.matchingservice.enums.OrganType;
-import com.matchingservice.enums.RequestStatus;
-import com.matchingservice.enums.UrgencyLevel;
+import com.matchingservice.enums.*;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -12,7 +9,7 @@ import java.util.UUID;
 
 @Data
 @Entity
-@Table(name = "receive_request_events")
+@Table(name = "receive_request")
 public class ReceiveRequest {
 
     @Id
@@ -25,11 +22,25 @@ public class ReceiveRequest {
     @Column(nullable = false)
     private UUID recipientId;
 
+    @ManyToOne
+    @JoinColumn(name = "location_id", referencedColumnName = "id")
+    private RecipientLocation location;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private RequestType requestType;
+
     @Enumerated(EnumType.STRING)
     private BloodType requestedBloodType;
 
     @Enumerated(EnumType.STRING)
     private OrganType requestedOrgan;
+
+    @Enumerated(EnumType.STRING)
+    private TissueType requestedTissue;
+
+    @Enumerated(EnumType.STRING)
+    private StemCellType requestedStemCellType;
 
     @Enumerated(EnumType.STRING)
     private UrgencyLevel urgencyLevel;
@@ -47,4 +58,3 @@ public class ReceiveRequest {
     @Column
     private String notes;
 }
-

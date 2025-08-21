@@ -1,4 +1,4 @@
-package com.matchingservice.model;
+package com.matchingservice.model.donor;
 
 import com.matchingservice.enums.DonorStatus;
 import jakarta.persistence.*;
@@ -65,7 +65,4 @@ public class Donor {
     @OneToMany(mappedBy = "donor", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Donation> donations = new ArrayList<>();
 
-    @ManyToOne
-    @JoinColumn(name = "location_id", referencedColumnName = "id")
-    private DonorLocation donorLocation;
 }

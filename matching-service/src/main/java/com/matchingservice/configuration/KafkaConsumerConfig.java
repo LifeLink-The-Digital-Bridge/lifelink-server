@@ -88,6 +88,20 @@ public class KafkaConsumerConfig {
     }
 
     @Bean
+    public ConsumerFactory<String, DonorHLAProfileEvent> hlaProfileConsumerFactory() {
+        Map<String, Object> props = new HashMap<>(baseConsumerProps());
+        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, DonorHLAProfileEvent.class.getName());
+        return new DefaultKafkaConsumerFactory<>(props);
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, DonorHLAProfileEvent> hlaProfileKafkaListenerFactory() {
+        var factory = new ConcurrentKafkaListenerContainerFactory<String, DonorHLAProfileEvent>();
+        factory.setConsumerFactory(hlaProfileConsumerFactory());
+        return factory;
+    }
+
+    @Bean
     public ConsumerFactory<String, RecipientEvent> recipientConsumerFactory() {
         Map<String, Object> props = new HashMap<>(baseConsumerProps());
         props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, RecipientEvent.class.getName());
@@ -126,6 +140,19 @@ public class KafkaConsumerConfig {
     public ConcurrentKafkaListenerContainerFactory<String, RecipientLocationEvent> recipientLocationKafkaListenerFactory() {
         var factory = new ConcurrentKafkaListenerContainerFactory<String, RecipientLocationEvent>();
         factory.setConsumerFactory(recipientLocationConsumerFactory());
+        return factory;
+    }
+    @Bean
+    public ConsumerFactory<String, RecipientHLAProfileEvent> recipientHlaProfileConsumerFactory() {
+        Map<String, Object> props = new HashMap<>(baseConsumerProps());
+        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, RecipientHLAProfileEvent.class.getName());
+        return new DefaultKafkaConsumerFactory<>(props);
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, RecipientHLAProfileEvent> recipientHlaProfileKafkaListenerFactory() {
+        var factory = new ConcurrentKafkaListenerContainerFactory<String, RecipientHLAProfileEvent>();
+        factory.setConsumerFactory(recipientHlaProfileConsumerFactory());
         return factory;
     }
 }

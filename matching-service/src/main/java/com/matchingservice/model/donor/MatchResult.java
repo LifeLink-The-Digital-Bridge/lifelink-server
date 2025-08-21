@@ -1,4 +1,4 @@
-package com.matchingservice.model;
+package com.matchingservice.model.donor;
 
 import com.matchingservice.model.recipients.ReceiveRequest;
 import com.matchingservice.model.recipients.RecipientLocation;

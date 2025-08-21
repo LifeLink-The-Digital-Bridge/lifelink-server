@@ -1,4 +1,4 @@
-package com.matchingservice.model;
+package com.matchingservice.model.donor;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
