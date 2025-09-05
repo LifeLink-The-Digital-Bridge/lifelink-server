@@ -36,14 +36,12 @@ public class MatchingServiceImpl implements MatchingService {
                 " with ReceiveRequest " + request.getReceiveRequestId());
 
         try {
-            Donation donation = donationRepository.findById(request.getDonationId())
+            Donation donation = donationRepository.findByDonationId(request.getDonationId())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Donation not found with ID: " + request.getDonationId()));
-
-            ReceiveRequest receiveRequest = receiveRequestRepository.findById(request.getReceiveRequestId())
+            ReceiveRequest receiveRequest = receiveRequestRepository.findByReceiveRequestId(request.getReceiveRequestId())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "ReceiveRequest not found with ID: " + request.getReceiveRequestId()));
-
             DonorLocation donorLocation = null;
             if (request.getDonorLocationId() != null) {
                 donorLocation = donorLocationRepository.findByLocationId(request.getDonorLocationId())
@@ -54,7 +52,7 @@ public class MatchingServiceImpl implements MatchingService {
             }
             RecipientLocation recipientLocation = null;
             if (request.getRecipientLocationId() != null) {
-                recipientLocation = recipientLocationRepository.findById(request.getRecipientLocationId())
+                recipientLocation = recipientLocationRepository.findByLocationId(request.getRecipientLocationId())
                         .orElseThrow(() -> new ResourceNotFoundException(
                                 "Recipient location not found with ID: " + request.getRecipientLocationId()));
             } else if (receiveRequest.getLocation() != null) {
@@ -64,10 +62,8 @@ public class MatchingServiceImpl implements MatchingService {
             MatchResult matchResult = new MatchResult();
             matchResult.setDonation(donation);
             matchResult.setReceiveRequest(receiveRequest);
-
             matchResult.setMatchedAt(LocalDateTime.now());
             matchResult.setIsConfirmed(false);
-
             matchResult.setDonorLocation(donorLocation);
             matchResult.setRecipientLocation(recipientLocation);
             matchResult.setDistance(0.0);
@@ -75,19 +71,40 @@ public class MatchingServiceImpl implements MatchingService {
             MatchResult savedMatchResult = matchResultRepository.save(matchResult);
 
             System.out.println("Successfully created manual match result: " + savedMatchResult.getId());
+            ManualMatchResponse.MatchDetails matchDetails = ManualMatchResponse.MatchDetails.builder()
+                    .donorId(donation.getDonor() != null ? donation.getDonor().getUserId() : null)
+                    .recipientId(receiveRequest.getRecipientId())
+                    .donationId(donation.getDonationId())
+                    .receiveRequestId(receiveRequest.getReceiveRequestId())
+                    .donationType(donation.getDonationType() != null ? donation.getDonationType().toString() : null)
+                    .requestType(receiveRequest.getRequestType() != null ? receiveRequest.getRequestType().toString() : null)
+                    .bloodType(donation.getBloodType() != null ? donation.getBloodType().toString() : null)
+                    .matchType("DONOR_TO_RECIPIENT")
+                    .build();
 
-            return new ManualMatchResponse(
-                    true,
-                    "Manual match successful. MatchResult ID: " + savedMatchResult.getId(),
-                    savedMatchResult.getId()
-            );
+            return ManualMatchResponse.builder()
+                    .success(true)
+                    .message("Manual match successful. MatchResult ID: " + savedMatchResult.getId())
+                    .matchResultId(savedMatchResult.getId())
+                    .matchDetails(matchDetails)
+                    .build();
         } catch (ResourceNotFoundException e) {
             System.err.println("Validation Error during manual match: " + e.getMessage());
-            return new ManualMatchResponse(false, e.getMessage(), null);
+            return ManualMatchResponse.builder()
+                    .success(false)
+                    .message(e.getMessage())
+                    .matchResultId(null)
+                    .matchDetails(null)
+                    .build();
         } catch (Exception e) {
             System.err.println("Error during manual match: " + e.getMessage());
             e.printStackTrace();
-            return new ManualMatchResponse(false, "Failed to perform manual match: " + e.getMessage(), null);
+            return ManualMatchResponse.builder()
+                    .success(false)
+                    .message("Failed to perform manual match: " + e.getMessage())
+                    .matchResultId(null)
+                    .matchDetails(null)
+                    .build();
         }
     }
 }
