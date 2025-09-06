@@ -7,6 +7,8 @@ import com.donorservice.service.DonorService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -28,9 +30,14 @@ public class DonorController {
     }
 
     @RequireRole("DONOR")
-    @PostMapping("/register")
-    public ResponseEntity<DonorDTO> registerDonor(@RequestHeader("id") UUID userId, @RequestBody RegisterDonor donorDTO) {
-        return ResponseEntity.ok(donorService.createDonor(userId, donorDTO));
+    @PostMapping("/profile")
+    public ResponseEntity<?> saveOrUpdateDonor(@RequestHeader("id") UUID userId, @RequestBody RegisterDonor donorDTO) {
+        try {
+            DonorDTO result = donorService.saveOrUpdateDonor(userId, donorDTO);
+            return ResponseEntity.ok(result);
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 
     @RequireRole("DONOR")

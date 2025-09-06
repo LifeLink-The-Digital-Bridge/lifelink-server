@@ -8,4 +8,5 @@ import java.util.UUID;
 
 public interface DonationRepository extends JpaRepository<Donation, Long> {
     List<Donation> findByDonorId(UUID donorId);
+    boolean existsByDonorIdAndStatus(UUID donorId, com.donorservice.enums.DonationStatus status);
 }

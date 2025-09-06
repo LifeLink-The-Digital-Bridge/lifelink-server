@@ -26,7 +26,7 @@ public class Donor {
     @Column(nullable = false)
     private LocalDate registrationDate;
 
-    @OneToMany(mappedBy = "donor", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "donor", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonManagedReference
     @ToString.Exclude
     private List<Location> addresses = new ArrayList<>();

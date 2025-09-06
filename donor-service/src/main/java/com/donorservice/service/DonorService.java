@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.UUID;
 
 public interface DonorService {
-    DonorDTO createDonor(UUID userId, RegisterDonor donorDTO);
+    DonorDTO saveOrUpdateDonor(UUID userId, RegisterDonor donorDTO);
 
     DonorDTO getDonorById(UUID id);
 

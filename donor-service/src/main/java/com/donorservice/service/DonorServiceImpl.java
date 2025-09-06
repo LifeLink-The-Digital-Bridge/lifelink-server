@@ -28,20 +28,29 @@ public class DonorServiceImpl implements DonorService {
     private final DonationRepository donationRepository;
     private final LocationRepository locationRepository;
     private final EventPublisher eventPublisher;
+    private final ProfileLockService profileLockService;
 
     public DonorServiceImpl(DonorRepository donorRepository,
                             DonationRepository donationRepository,
                             UserClient userClient,
                             LocationRepository locationRepository,
-                            EventPublisher eventPublisher) {
+                            EventPublisher eventPublisher,
+                            ProfileLockService profileLockService) {
         this.donorRepository = donorRepository;
         this.donationRepository = donationRepository;
         this.locationRepository = locationRepository;
         this.eventPublisher = eventPublisher;
+        this.profileLockService = profileLockService;
     }
 
     @Override
-    public DonorDTO createDonor(UUID userId, RegisterDonor donorDTO) {
+    public DonorDTO saveOrUpdateDonor(UUID userId, RegisterDonor donorDTO) {
+        Donor existingDonor = donorRepository.findByUserId(userId);
+        
+        // Check if profile is locked for updates
+        if (existingDonor != null && profileLockService.isDonorProfileLocked(existingDonor.getId())) {
+            throw new IllegalStateException(profileLockService.getProfileLockReason(existingDonor.getId()));
+        }
         Donor donor = donorRepository.findByUserId(userId);
 
         if (donor == null) {
@@ -134,6 +143,8 @@ public class DonorServiceImpl implements DonorService {
         if (donor == null) throw new ResourceNotFoundException("Donor not found");
         return getDonorDTO(donor);
     }
+
+
 
     private DonorDTO getDonorDTO(Donor savedDonor) {
         DonorDTO responseDTO = new DonorDTO();
