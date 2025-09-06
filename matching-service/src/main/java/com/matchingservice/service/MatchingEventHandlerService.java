@@ -291,6 +291,7 @@ public class MatchingEventHandlerService {
         ReceiveRequest receiveRequest = new ReceiveRequest();
         receiveRequest.setReceiveRequestId(event.getReceiveRequestId());
         receiveRequest.setRecipientId(event.getRecipientId());
+        receiveRequest.setUserId(recipient.getUserId());
         receiveRequest.setLocationId(event.getLocationId());
         receiveRequest.setRequestType(event.getRequestType());
         receiveRequest.setRequestedBloodType(event.getRequestedBloodType());

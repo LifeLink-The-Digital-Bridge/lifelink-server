@@ -4,6 +4,7 @@ import com.matchingservice.aop.RequireRole;
 import com.matchingservice.dto.StatusResponse;
 import com.matchingservice.dto.DetailedStatusResponse;
 import com.matchingservice.enums.*;
+import com.matchingservice.exceptions.InvalidStatusException;
 import com.matchingservice.repository.DonationRepository;
 import com.matchingservice.repository.ReceiveRequestRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,8 +31,8 @@ public class StatusController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @GetMapping("/recipient/status/{requestId}")
-    public ResponseEntity<StatusResponse> getRecipientStatus(@PathVariable UUID requestId) {
+    @GetMapping("/request/status/{requestId}")
+    public ResponseEntity<StatusResponse> getRequestStatus(@PathVariable UUID requestId) {
         return receiveRequestRepository.findById(requestId)
                 .map(request -> ResponseEntity.ok(new StatusResponse(request.getStatus().toString())))
                 .orElse(ResponseEntity.notFound().build());
@@ -44,15 +45,15 @@ public class StatusController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @GetMapping("/recipient/details/{requestId}")
-    public ResponseEntity<DetailedStatusResponse> getRecipientDetails(@PathVariable UUID requestId) {
+    @GetMapping("/request/details/{requestId}")
+    public ResponseEntity<DetailedStatusResponse> getRequestDetails(@PathVariable UUID requestId) {
         return receiveRequestRepository.findById(requestId)
                 .map(request -> ResponseEntity.ok(DetailedStatusResponse.fromReceiveRequest(request)))
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @RequireRole("ADMIN")
-    @GetMapping("/donations")
+    @GetMapping("/admin/donations")
     public ResponseEntity<List<DetailedStatusResponse>> getAllDonations() {
         List<DetailedStatusResponse> donations = donationRepository.findAll()
                 .stream()
@@ -62,8 +63,8 @@ public class StatusController {
     }
 
     @RequireRole("ADMIN")
-    @GetMapping("/requests")
-    public ResponseEntity<List<DetailedStatusResponse>> getAllReceiveRequests() {
+    @GetMapping("/admin/requests")
+    public ResponseEntity<List<DetailedStatusResponse>> getAllRequests() {
         List<DetailedStatusResponse> requests = receiveRequestRepository.findAll()
                 .stream()
                 .map(DetailedStatusResponse::fromReceiveRequest)
@@ -72,78 +73,87 @@ public class StatusController {
     }
 
     @RequireRole("ADMIN")
-    @GetMapping("/donations/status/{status}")
+    @GetMapping("/admin/donations/status/{status}")
     public ResponseEntity<List<DetailedStatusResponse>> getDonationsByStatus(@PathVariable String status) {
+        DonationStatus donationStatus;
         try {
-            DonationStatus donationStatus = DonationStatus.valueOf(status.toUpperCase());
-            List<DetailedStatusResponse> donations = donationRepository.findByStatusOrderByDonationDateDesc(donationStatus)
-                    .stream()
-                    .map(DetailedStatusResponse::fromDonation)
-                    .collect(Collectors.toList());
-            return ResponseEntity.ok(donations);
+            donationStatus = DonationStatus.valueOf(status.toUpperCase());
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
+            throw new InvalidStatusException("Invalid donation status: " + status);
         }
+        List<DetailedStatusResponse> donations = donationRepository.findByStatus(donationStatus)
+                .stream()
+                .map(DetailedStatusResponse::fromDonation)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(donations);
     }
 
     @RequireRole("ADMIN")
-    @GetMapping("/requests/status/{status}")
+    @GetMapping("/admin/requests/status/{status}")
     public ResponseEntity<List<DetailedStatusResponse>> getRequestsByStatus(@PathVariable String status) {
+        RequestStatus requestStatus;
         try {
-            RequestStatus requestStatus = RequestStatus.valueOf(status.toUpperCase());
-            List<DetailedStatusResponse> requests = receiveRequestRepository.findByStatusOrderByRequestDateDesc(requestStatus)
-                    .stream()
-                    .map(DetailedStatusResponse::fromReceiveRequest)
-                    .collect(Collectors.toList());
-            return ResponseEntity.ok(requests);
+            requestStatus = RequestStatus.valueOf(status.toUpperCase());
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
+            throw new InvalidStatusException("Invalid request status: " + status);
         }
+        List<DetailedStatusResponse> requests = receiveRequestRepository.findByStatus(requestStatus)
+                .stream()
+                .map(DetailedStatusResponse::fromReceiveRequest)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(requests);
     }
 
-    @GetMapping("/donations/blood-type/{bloodType}")
+    @RequireRole("ADMIN")
+    @GetMapping("/admin/donations/blood-type/{bloodType}")
     public ResponseEntity<List<DetailedStatusResponse>> getDonationsByBloodType(@PathVariable String bloodType) {
+        BloodType type;
         try {
-            BloodType type = BloodType.valueOf(bloodType.toUpperCase());
-            List<DetailedStatusResponse> donations = donationRepository.findByBloodType(type)
-                    .stream()
-                    .map(DetailedStatusResponse::fromDonation)
-                    .collect(Collectors.toList());
-            return ResponseEntity.ok(donations);
+            type = BloodType.valueOf(bloodType.toUpperCase());
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
+            throw new InvalidStatusException("Invalid blood type: " + bloodType);
         }
+        List<DetailedStatusResponse> donations = donationRepository.findByBloodType(type)
+                .stream()
+                .map(DetailedStatusResponse::fromDonation)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(donations);
     }
 
-    @GetMapping("/requests/blood-type/{bloodType}")
+    @RequireRole("ADMIN")
+    @GetMapping("/admin/requests/blood-type/{bloodType}")
     public ResponseEntity<List<DetailedStatusResponse>> getRequestsByBloodType(@PathVariable String bloodType) {
+        BloodType type;
         try {
-            BloodType type = BloodType.valueOf(bloodType.toUpperCase());
-            List<DetailedStatusResponse> requests = receiveRequestRepository.findByRequestedBloodType(type)
-                    .stream()
-                    .map(DetailedStatusResponse::fromReceiveRequest)
-                    .collect(Collectors.toList());
-            return ResponseEntity.ok(requests);
+            type = BloodType.valueOf(bloodType.toUpperCase());
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
+            throw new InvalidStatusException("Invalid blood type: " + bloodType);
         }
+        List<DetailedStatusResponse> requests = receiveRequestRepository.findByRequestedBloodType(type)
+                .stream()
+                .map(DetailedStatusResponse::fromReceiveRequest)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(requests);
     }
 
-    @GetMapping("/requests/urgency/{urgencyLevel}")
+    @RequireRole("ADMIN")
+    @GetMapping("/admin/requests/urgency/{urgencyLevel}")
     public ResponseEntity<List<DetailedStatusResponse>> getRequestsByUrgency(@PathVariable String urgencyLevel) {
+        UrgencyLevel level;
         try {
-            UrgencyLevel level = UrgencyLevel.valueOf(urgencyLevel.toUpperCase());
-            List<DetailedStatusResponse> requests = receiveRequestRepository.findByUrgencyLevel(level)
-                    .stream()
-                    .map(DetailedStatusResponse::fromReceiveRequest)
-                    .collect(Collectors.toList());
-            return ResponseEntity.ok(requests);
+            level = UrgencyLevel.valueOf(urgencyLevel.toUpperCase());
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
+            throw new InvalidStatusException("Invalid urgency level: " + urgencyLevel);
         }
+        List<DetailedStatusResponse> requests = receiveRequestRepository.findByUrgencyLevel(level)
+                .stream()
+                .map(DetailedStatusResponse::fromReceiveRequest)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(requests);
     }
 
-    @GetMapping("/donations/recent")
+    @RequireRole("ADMIN")
+    @GetMapping("/admin/donations/recent")
     public ResponseEntity<List<DetailedStatusResponse>> getRecentDonations() {
         LocalDate thirtyDaysAgo = LocalDate.now().minusDays(30);
         List<DetailedStatusResponse> donations = donationRepository.findRecentDonations(thirtyDaysAgo)
@@ -153,7 +163,8 @@ public class StatusController {
         return ResponseEntity.ok(donations);
     }
 
-    @GetMapping("/requests/recent")
+    @RequireRole("ADMIN")
+    @GetMapping("/admin/requests/recent")
     public ResponseEntity<List<DetailedStatusResponse>> getRecentRequests() {
         LocalDate thirtyDaysAgo = LocalDate.now().minusDays(30);
         List<DetailedStatusResponse> requests = receiveRequestRepository.findRecentRequests(thirtyDaysAgo)
@@ -163,7 +174,8 @@ public class StatusController {
         return ResponseEntity.ok(requests);
     }
 
-    @GetMapping("/requests/urgent")
+    @RequireRole("ADMIN")
+    @GetMapping("/admin/requests/urgent")
     public ResponseEntity<List<DetailedStatusResponse>> getUrgentRequests() {
         List<DetailedStatusResponse> requests = receiveRequestRepository.findUrgentRequests()
                 .stream()
@@ -172,25 +184,29 @@ public class StatusController {
         return ResponseEntity.ok(requests);
     }
 
-    @GetMapping("/donations/count/{status}")
+    @RequireRole("ADMIN")
+    @GetMapping("/admin/donations/count/{status}")
     public ResponseEntity<Long> getDonationsCountByStatus(@PathVariable String status) {
+        DonationStatus donationStatus;
         try {
-            DonationStatus donationStatus = DonationStatus.valueOf(status.toUpperCase());
-            long count = donationRepository.countByStatus(donationStatus);
-            return ResponseEntity.ok(count);
+            donationStatus = DonationStatus.valueOf(status.toUpperCase());
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
+            throw new InvalidStatusException("Invalid donation status: " + status);
         }
+        long count = donationRepository.countByStatus(donationStatus);
+        return ResponseEntity.ok(count);
     }
 
-    @GetMapping("/requests/count/{status}")
+    @RequireRole("ADMIN")
+    @GetMapping("/admin/requests/count/{status}")
     public ResponseEntity<Long> getRequestsCountByStatus(@PathVariable String status) {
+        RequestStatus requestStatus;
         try {
-            RequestStatus requestStatus = RequestStatus.valueOf(status.toUpperCase());
-            long count = receiveRequestRepository.countByStatus(requestStatus);
-            return ResponseEntity.ok(count);
+            requestStatus = RequestStatus.valueOf(status.toUpperCase());
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
+            throw new InvalidStatusException("Invalid request status: " + status);
         }
+        long count = receiveRequestRepository.countByStatus(requestStatus);
+        return ResponseEntity.ok(count);
     }
 }

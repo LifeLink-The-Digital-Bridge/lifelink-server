@@ -12,4 +12,8 @@ public interface MatchingService {
     List<MatchResponse> getMatchesByDonation(UUID donationId);
     List<MatchResponse> getMatchesByRequest(UUID receiveRequestId);
     MatchResponse getMatchById(UUID matchId);
+    String donorConfirmMatch(UUID matchId, UUID userId);
+    String recipientConfirmMatch(UUID matchId, UUID userId);
+    List<MatchResponse> getMatchesForDonor(UUID donorUserId);
+    List<MatchResponse> getMatchesForRecipient(UUID recipientUserId);
 }

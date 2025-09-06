@@ -17,8 +17,6 @@ import java.util.UUID;
 public class DetailedStatusResponse {
     private UUID id;
     private UUID userId;
-    private String userName;
-    private String userEmail;
     private String status;
     private String type;
     private String bloodType;
@@ -52,7 +50,7 @@ public class DetailedStatusResponse {
     public static DetailedStatusResponse fromReceiveRequest(ReceiveRequest request) {
         return DetailedStatusResponse.builder()
                 .id(request.getReceiveRequestId())
-                .userId(request.getRecipientId())
+                .userId(request.getUserId())
                 .status(request.getStatus() != null ? request.getStatus().toString() : null)
                 .type("RECEIVE_REQUEST")
                 .bloodType(request.getRequestedBloodType() != null ? request.getRequestedBloodType().toString() : null)

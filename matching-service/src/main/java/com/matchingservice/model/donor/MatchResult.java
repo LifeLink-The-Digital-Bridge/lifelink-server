@@ -37,5 +37,13 @@ public class MatchResult {
 
     private Boolean isConfirmed = false;
 
+    private Boolean donorConfirmed = false;
+
+    private Boolean recipientConfirmed = false;
+
+    private LocalDateTime donorConfirmedAt;
+
+    private LocalDateTime recipientConfirmedAt;
+
     private LocalDateTime matchedAt;
 }

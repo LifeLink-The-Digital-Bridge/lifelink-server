@@ -1,0 +1,14 @@
+package com.matchingservice.client;
+
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+
+import java.util.UUID;
+
+@FeignClient(name = "DONOR-SERVICE", path = "/donors", configuration = FeignClientConfig.class)
+public interface DonorServiceClient {
+    
+    @PutMapping("/donations/{donationId}/status/completed")
+    void updateDonationStatusToCompleted(@PathVariable UUID donationId);
+}

@@ -7,7 +7,7 @@ import lombok.Data;
 import java.time.LocalDate;
 import java.util.UUID;
 
-@Data
+@Data 
 @Entity
 @Table(name = "receive_request")
 public class ReceiveRequest {
@@ -17,6 +17,9 @@ public class ReceiveRequest {
 
     @Column(nullable = false)
     private UUID recipientId;
+
+    @Column(nullable = false)
+    private UUID userId;
 
     @Column
     private UUID locationId;

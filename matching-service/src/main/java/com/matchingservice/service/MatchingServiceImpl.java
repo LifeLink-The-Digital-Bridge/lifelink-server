@@ -3,6 +3,8 @@ package com.matchingservice.service;
 import com.matchingservice.dto.ManualMatchRequest;
 import com.matchingservice.dto.ManualMatchResponse;
 import com.matchingservice.dto.MatchResponse;
+import com.matchingservice.enums.DonationStatus;
+import com.matchingservice.enums.RequestStatus;
 import com.matchingservice.exceptions.ResourceNotFoundException;
 import com.matchingservice.model.donor.Donation;
 import com.matchingservice.model.donor.DonorLocation;
@@ -16,6 +18,8 @@ import com.matchingservice.repository.MatchResultRepository;
 import com.matchingservice.repository.ReceiveRequestRepository;
 import com.matchingservice.repository.RecipientLocationRepository;
 import com.matchingservice.repository.RecipientRepository;
+import com.matchingservice.client.DonorServiceClient;
+import com.matchingservice.client.RecipientServiceClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +39,8 @@ public class MatchingServiceImpl implements MatchingService {
     private final DonorLocationRepository donorLocationRepository;
     private final RecipientLocationRepository recipientLocationRepository;
     private final RecipientRepository recipientRepository;
+    private final DonorServiceClient donorServiceClient;
+    private final RecipientServiceClient recipientServiceClient;
 
     @Override
     @Transactional
@@ -154,5 +160,103 @@ public class MatchingServiceImpl implements MatchingService {
                 });
         
         return response;
+    }
+
+    @Override
+    @Transactional
+    public String donorConfirmMatch(UUID matchId, UUID userId) {
+        MatchResult matchResult = matchResultRepository.findById(matchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Match not found with ID: " + matchId));
+        
+        if (!matchResult.getDonorUserId().equals(userId)) {
+            throw new IllegalStateException("Only the donor can confirm this match");
+        }
+        
+        if (matchResult.getDonorConfirmed()) {
+            return "Donor has already confirmed this match";
+        }
+        
+        matchResult.setDonorConfirmed(true);
+        matchResult.setDonorConfirmedAt(LocalDateTime.now());
+        
+        if (matchResult.getRecipientConfirmed()) {
+            finalizeMatch(matchResult);
+            matchResultRepository.save(matchResult);
+            return "Match fully confirmed! Both donor and recipient have agreed. Donation process initiated.";
+        }
+        
+        matchResultRepository.save(matchResult);
+        return "Donor confirmation recorded. Waiting for recipient confirmation.";
+    }
+
+    @Override
+    @Transactional
+    public String recipientConfirmMatch(UUID matchId, UUID userId) {
+        MatchResult matchResult = matchResultRepository.findById(matchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Match not found with ID: " + matchId));
+        
+        if (!matchResult.getRecipientUserId().equals(userId)) {
+            throw new IllegalStateException("Only the recipient can confirm this match");
+        }
+        
+        if (matchResult.getRecipientConfirmed()) {
+            return "Recipient has already confirmed this match";
+        }
+        
+        matchResult.setRecipientConfirmed(true);
+        matchResult.setRecipientConfirmedAt(LocalDateTime.now());
+        
+        if (matchResult.getDonorConfirmed()) {
+            finalizeMatch(matchResult);
+            matchResultRepository.save(matchResult);
+            return "Match fully confirmed! Both donor and recipient have agreed. Donation process initiated.";
+        }
+        
+        matchResultRepository.save(matchResult);
+        return "Recipient confirmation recorded. Waiting for donor confirmation.";
+    }
+
+    private void finalizeMatch(MatchResult matchResult) {
+        matchResult.setIsConfirmed(true);
+        
+        donationRepository.findById(matchResult.getDonationId())
+                .ifPresent(donation -> {
+                    donation.setStatus(DonationStatus.COMPLETED);
+                    donationRepository.save(donation);
+                });
+        
+        receiveRequestRepository.findById(matchResult.getReceiveRequestId())
+                .ifPresent(request -> {
+                    request.setStatus(RequestStatus.FULFILLED);
+                    receiveRequestRepository.save(request);
+                });
+        
+        try {
+            donorServiceClient.updateDonationStatusToCompleted(matchResult.getDonationId());
+        } catch (Exception e) {
+            System.err.println("Failed to update donation status in donor-service: " + e.getMessage());
+        }
+        
+        try {
+            recipientServiceClient.updateRequestStatusToFulfilled(matchResult.getReceiveRequestId());
+        } catch (Exception e) {
+            System.err.println("Failed to update request status in recipient-service: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public List<MatchResponse> getMatchesForDonor(UUID donorUserId) {
+        return matchResultRepository.findByDonorUserId(donorUserId)
+                .stream()
+                .map(this::enrichMatchResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<MatchResponse> getMatchesForRecipient(UUID recipientUserId) {
+        return matchResultRepository.findByRecipientUserId(recipientUserId)
+                .stream()
+                .map(this::enrichMatchResponse)
+                .collect(Collectors.toList());
     }
 }

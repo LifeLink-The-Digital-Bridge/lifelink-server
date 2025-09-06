@@ -56,14 +56,37 @@ public class MatchingController {
         return ResponseEntity.ok(matches);
     }
 
-    @PutMapping("/match/{matchId}/confirm")
-    public ResponseEntity<String> confirmMatch(@PathVariable UUID matchId) {
-        return matchResultRepository.findById(matchId)
-                .map(match -> {
-                    match.setIsConfirmed(true);
-                    matchResultRepository.save(match);
-                    return ResponseEntity.ok("Match confirmed successfully");
-                })
-                .orElse(ResponseEntity.notFound().build());
+    @PutMapping("/match/{matchId}/donor-confirm")
+    public ResponseEntity<String> donorConfirmMatch(@PathVariable UUID matchId, @RequestHeader("id") UUID userId) {
+        try {
+            String result = matchingService.donorConfirmMatch(matchId, userId);
+            return ResponseEntity.ok(result);
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PutMapping("/match/{matchId}/recipient-confirm")
+    public ResponseEntity<String> recipientConfirmMatch(@PathVariable UUID matchId, @RequestHeader("id") UUID userId) {
+        try {
+            String result = matchingService.recipientConfirmMatch(matchId, userId);
+            return ResponseEntity.ok(result);
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/my-matches/as-donor")
+    public ResponseEntity<List<MatchResponse>> getMyMatchesAsDonor(@RequestHeader("id") UUID userId) {
+        return ResponseEntity.ok(matchingService.getMatchesForDonor(userId));
+    }
+
+    @GetMapping("/my-matches/as-recipient")
+    public ResponseEntity<List<MatchResponse>> getMyMatchesAsRecipient(@RequestHeader("id") UUID userId) {
+        return ResponseEntity.ok(matchingService.getMatchesForRecipient(userId));
     }
 }

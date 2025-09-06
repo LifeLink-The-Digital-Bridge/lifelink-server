@@ -24,6 +24,10 @@ public class MatchResponse {
     private String bloodType;
     private String matchType;
     private boolean isConfirmed;
+    private boolean donorConfirmed;
+    private boolean recipientConfirmed;
+    private LocalDateTime donorConfirmedAt;
+    private LocalDateTime recipientConfirmedAt;
     private LocalDateTime matchedAt;
     private Double distance;
 
@@ -36,6 +40,10 @@ public class MatchResponse {
                 .recipientUserId(matchResult.getRecipientUserId())
                 .matchType("DONOR_TO_RECIPIENT")
                 .isConfirmed(matchResult.getIsConfirmed())
+                .donorConfirmed(matchResult.getDonorConfirmed())
+                .recipientConfirmed(matchResult.getRecipientConfirmed())
+                .donorConfirmedAt(matchResult.getDonorConfirmedAt())
+                .recipientConfirmedAt(matchResult.getRecipientConfirmedAt())
                 .matchedAt(matchResult.getMatchedAt())
                 .distance(matchResult.getDistance())
                 .build();
