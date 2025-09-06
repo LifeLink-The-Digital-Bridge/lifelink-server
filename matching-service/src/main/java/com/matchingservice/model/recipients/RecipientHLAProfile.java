@@ -1,22 +1,21 @@
 package com.matchingservice.model.recipients;
 
-import com.matchingservice.model.donor.Donor;
+
 import jakarta.persistence.*;
 import lombok.Data;
 
 import java.time.LocalDate;
+import java.util.UUID;
 
 @Data
 @Entity
 @Table(name = "recipient_hla_profiles")
 public class RecipientHLAProfile {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne
-    @JoinColumn(name = "recipient_id", referencedColumnName = "id", unique = true)
-    private Recipient recipient;
+    @Column(nullable = false)
+    private UUID recipientId;
 
     @Column(name = "hla_a1")
     private String hlaA1;

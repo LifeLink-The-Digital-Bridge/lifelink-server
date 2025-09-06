@@ -1,7 +1,5 @@
 package com.matchingservice.model.donor;
 
-import com.matchingservice.model.recipients.ReceiveRequest;
-import com.matchingservice.model.recipients.RecipientLocation;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -17,25 +15,27 @@ public class MatchResult {
     @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
 
-    @ManyToOne
-    @JoinColumn(name = "donation_id", nullable = false)
-    private Donation donation;
+    @Column(nullable = false)
+    private UUID donationId;
 
-    @ManyToOne
-    @JoinColumn(name = "receive_request_id", nullable = false)
-    private ReceiveRequest receiveRequest;
+    @Column(nullable = false)
+    private UUID receiveRequestId;
+
+    @Column(nullable = false)
+    private UUID donorUserId;
+
+    @Column(nullable = false)
+    private UUID recipientUserId;
+
+    @Column
+    private UUID donorLocationId;
+
+    @Column
+    private UUID recipientLocationId;
 
     private Double distance;
 
     private Boolean isConfirmed = false;
 
     private LocalDateTime matchedAt;
-
-    @ManyToOne
-    @JoinColumn(name = "donor_location_id")
-    private DonorLocation donorLocation;
-
-    @ManyToOne
-    @JoinColumn(name = "recipient_location_id")
-    private RecipientLocation recipientLocation;
 }

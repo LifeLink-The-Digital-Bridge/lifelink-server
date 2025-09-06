@@ -43,7 +43,7 @@ public class MatchingEventHandlerService {
     private final RecipientHLAProfileRepository recipientHLAProfileRepository;
 
     public void handleDonorEvent(DonorEvent event) {
-        Donor donor = donorRepository.findByDonorId(event.getDonorId()).orElse(null);
+        Donor donor = donorRepository.findById(event.getDonorId()).orElse(null);
         if (donor == null) {
             donor = new Donor();
             donor.setDonorId(event.getDonorId());
@@ -97,7 +97,7 @@ public class MatchingEventHandlerService {
     }
 
     public void handleDonorLocationEvent(DonorLocationEvent event) {
-        DonorLocation location = donorLocationRepository.findByLocationId(event.getLocationId()).orElse(null);
+        DonorLocation location = donorLocationRepository.findById(event.getLocationId()).orElse(null);
         if (location == null) {
             location = new DonorLocation();
             location.setLocationId(event.getLocationId());
@@ -123,7 +123,7 @@ public class MatchingEventHandlerService {
     }
 
     public void handleDonationEvent(DonationEvent event) {
-        Donor donor = donorRepository.findByDonorId(event.getDonorId()).orElse(null);
+        Donor donor = donorRepository.findById(event.getDonorId()).orElse(null);
         if (donor == null) {
             donorEventBuffer.buffer(event.getDonorId(), () -> {
                 System.out.println("Re-running buffered donation event after donor created for donorId: " + event.getDonorId());
@@ -133,7 +133,7 @@ public class MatchingEventHandlerService {
             return;
         }
 
-        DonorLocation location = donorLocationRepository.findByLocationId(event.getLocationId()).orElse(null);
+        DonorLocation location = donorLocationRepository.findById(event.getLocationId()).orElse(null);
         if (location == null) {
             donationEventBuffer.buffer(event.getDonorId(), event.getLocationId(), () -> {
                 System.out.println("Re-running buffered donation event after location created for donorId: " + event.getDonorId() + ", locationId: " + event.getLocationId());
@@ -143,7 +143,7 @@ public class MatchingEventHandlerService {
             return;
         }
 
-        if (donationRepository.findByDonationId(event.getDonationId()).isPresent()) {
+        if (donationRepository.findById(event.getDonationId()).isPresent()) {
             System.out.println("Donation already exists for donationId: " + event.getDonationId());
             return;
         }
@@ -184,8 +184,9 @@ public class MatchingEventHandlerService {
         };
 
         donation.setDonationId(event.getDonationId());
-        donation.setDonor(donor);
-        donation.setLocation(location);
+        donation.setDonorId(event.getDonorId());
+        donation.setUserId(donor.getUserId());
+        donation.setLocationId(event.getLocationId());
         donation.setDonationType(event.getDonationType());
         donation.setDonationDate(event.getDonationDate());
         donation.setBloodType(event.getBloodType());
@@ -203,7 +204,7 @@ public class MatchingEventHandlerService {
     }
 
     public void handleRecipientEvent(RecipientEvent event) {
-        Recipient recipient = recipientRepository.findByRecipientId(event.getRecipientId()).orElse(null);
+        Recipient recipient = recipientRepository.findById(event.getRecipientId()).orElse(null);
         if (recipient == null) {
             recipient = new Recipient();
             recipient.setRecipientId(event.getRecipientId());
@@ -232,7 +233,7 @@ public class MatchingEventHandlerService {
     }
 
     public void handleRecipientLocationEvent(RecipientLocationEvent event) {
-        RecipientLocation location = recipientLocationRepository.findByLocationId(event.getLocationId()).orElse(null);
+        RecipientLocation location = recipientLocationRepository.findById(event.getLocationId()).orElse(null);
         if (location == null) {
             location = new RecipientLocation();
             location.setLocationId(event.getLocationId());
@@ -259,7 +260,7 @@ public class MatchingEventHandlerService {
     }
 
     public void handleReceiveRequestEvent(ReceiveRequestEvent event) {
-        Recipient recipient = recipientRepository.findByRecipientId(event.getRecipientId()).orElse(null);
+        Recipient recipient = recipientRepository.findById(event.getRecipientId()).orElse(null);
         if (recipient == null) {
             recipientEventBuffer.buffer(event.getRecipientId(), () -> {
                 System.out.println("Re-running buffered receive request event after recipient created for recipientId: " + event.getRecipientId());
@@ -271,7 +272,7 @@ public class MatchingEventHandlerService {
 
         RecipientLocation location = null;
         if (event.getLocationId() != null) {
-            location = recipientLocationRepository.findByLocationId(event.getLocationId()).orElse(null);
+            location = recipientLocationRepository.findById(event.getLocationId()).orElse(null);
             if (location == null) {
                 receiveRequestEventBuffer.buffer(event.getRecipientId(), event.getLocationId(), () -> {
                     System.out.println("Re-running buffered receive request event after location created for recipientId: " + event.getRecipientId() + ", locationId: " + event.getLocationId());
@@ -282,7 +283,7 @@ public class MatchingEventHandlerService {
             }
         }
 
-        if (receiveRequestRepository.findByReceiveRequestId(event.getReceiveRequestId()).isPresent()) {
+        if (receiveRequestRepository.findById(event.getReceiveRequestId()).isPresent()) {
             System.out.println("Receive request already exists for receiveRequestId: " + event.getReceiveRequestId());
             return;
         }
@@ -290,7 +291,7 @@ public class MatchingEventHandlerService {
         ReceiveRequest receiveRequest = new ReceiveRequest();
         receiveRequest.setReceiveRequestId(event.getReceiveRequestId());
         receiveRequest.setRecipientId(event.getRecipientId());
-        receiveRequest.setLocation(location);
+        receiveRequest.setLocationId(event.getLocationId());
         receiveRequest.setRequestType(event.getRequestType());
         receiveRequest.setRequestedBloodType(event.getRequestedBloodType());
         receiveRequest.setRequestedOrgan(event.getRequestedOrgan());
@@ -318,12 +319,9 @@ public class MatchingEventHandlerService {
     public void handleDonorHLAProfileEvent(DonorHLAProfileEvent event) {
         System.out.println("Processing HLA Profile Event for donor: " + event.getDonorId());
 
-        Donor donor = donorRepository.findByDonorId(event.getDonorId())
-                .orElseThrow(() -> new ResourceNotFoundException("Donor not found with id: " + event.getDonorId()));
+        Optional<DonorHLAProfile> existingProfileOptional = donorHLAProfileRepository.findById(event.getId());
 
-        Optional<DonorHLAProfile> existingProfileOptional = donorHLAProfileRepository.findByDonor(donor);
-
-        DonorHLAProfile profile = getDonorHLAProfile(event, existingProfileOptional, donor);
+        DonorHLAProfile profile = getDonorHLAProfile(event, existingProfileOptional);
 
         DonorHLAProfile savedProfile = donorHLAProfileRepository.save(profile);
 
@@ -335,10 +333,11 @@ public class MatchingEventHandlerService {
 
     }
 
-    private static DonorHLAProfile getDonorHLAProfile(DonorHLAProfileEvent event, Optional<DonorHLAProfile> existingProfileOptional, Donor donor) {
+    private static DonorHLAProfile getDonorHLAProfile(DonorHLAProfileEvent event, Optional<DonorHLAProfile> existingProfileOptional) {
         DonorHLAProfile profile = existingProfileOptional.orElse(new DonorHLAProfile());
 
-        profile.setDonor(donor);
+        profile.setId(event.getId());
+        profile.setDonorId(event.getDonorId());
         profile.setHlaA1(event.getHlaA1());
         profile.setHlaA2(event.getHlaA2());
         profile.setHlaB1(event.getHlaB1());
@@ -364,12 +363,9 @@ public class MatchingEventHandlerService {
     public void handleRecipientHLAProfileEvent(RecipientHLAProfileEvent event) {
         System.out.println("Processing HLA Profile Event for recipient: " + event.getRecipientId());
 
-        Recipient recipient = recipientRepository.findByRecipientId(event.getRecipientId())
-                .orElseThrow(() -> new ResourceNotFoundException("Recipient not found with id: " + event.getRecipientId()));
+        Optional<RecipientHLAProfile> existingProfileOptional = recipientHLAProfileRepository.findById(event.getId());
 
-        Optional<RecipientHLAProfile> existingProfileOptional = recipientHLAProfileRepository.findByRecipient(recipient);
-
-        RecipientHLAProfile profile = getRecipientHLAProfile(event, existingProfileOptional, recipient);
+        RecipientHLAProfile profile = getRecipientHLAProfile(event, existingProfileOptional);
 
         RecipientHLAProfile savedProfile = recipientHLAProfileRepository.save(profile);
 
@@ -381,10 +377,11 @@ public class MatchingEventHandlerService {
     }
 
     private static RecipientHLAProfile getRecipientHLAProfile(RecipientHLAProfileEvent event,
-                                                              Optional<RecipientHLAProfile> existingProfileOptional, Recipient recipient) {
+                                                              Optional<RecipientHLAProfile> existingProfileOptional) {
         RecipientHLAProfile profile = existingProfileOptional.orElse(new RecipientHLAProfile());
 
-        profile.setRecipient(recipient);
+        profile.setId(event.getId());
+        profile.setRecipientId(event.getRecipientId());
         profile.setHlaA1(event.getHlaA1());
         profile.setHlaA2(event.getHlaA2());
         profile.setHlaB1(event.getHlaB1());

@@ -10,13 +10,6 @@ import java.util.UUID;
 
 @Repository
 public interface RecipientHLAProfileRepository extends JpaRepository<RecipientHLAProfile, Long> {
-
-    Optional<RecipientHLAProfile> findByRecipient(Recipient recipient);
-
-    Optional<RecipientHLAProfile> findByRecipient_RecipientId(UUID recipientId);
-
-    boolean existsByRecipient(Recipient recipient);
-
-    void deleteByRecipient(Recipient recipient);
+    Optional<RecipientHLAProfile> findByRecipientId(UUID recipientId);
 }
 

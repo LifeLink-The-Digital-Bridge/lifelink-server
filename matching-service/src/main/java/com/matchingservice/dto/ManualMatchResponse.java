@@ -21,10 +21,10 @@ public class ManualMatchResponse {
     @AllArgsConstructor
     @Builder
     public static class MatchDetails {
-        private UUID donorId;
-        private UUID recipientId;
         private UUID donationId;
         private UUID receiveRequestId;
+        private UUID donorUserId;
+        private UUID recipientUserId;
         private String donationType;
         private String requestType;
         private String bloodType;

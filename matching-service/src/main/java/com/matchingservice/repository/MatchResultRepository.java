@@ -9,12 +9,6 @@ import java.util.UUID;
 
 @Repository
 public interface MatchResultRepository extends JpaRepository<MatchResult, UUID> {
-
-    List<MatchResult> findByIsConfirmedTrue();
-    List<MatchResult> findByIsConfirmedFalse();
-
-    List<MatchResult> findByDonationDonorUserId(UUID donorUserId);
-    List<MatchResult> findByDonationDonationId(UUID donationId);
-    List<MatchResult> findByReceiveRequestRecipientId(UUID recipientUserId);
-    List<MatchResult> findByReceiveRequestReceiveRequestId(UUID receiveRequestId);
+    List<MatchResult> findByDonationId(UUID donationId);
+    List<MatchResult> findByReceiveRequestId(UUID receiveRequestId);
 }

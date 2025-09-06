@@ -13,18 +13,13 @@ import java.util.UUID;
 public class ReceiveRequest {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    private UUID id;
-
-    @Column(nullable = false)
     private UUID receiveRequestId;
 
     @Column(nullable = false)
     private UUID recipientId;
 
-    @ManyToOne
-    @JoinColumn(name = "location_id", referencedColumnName = "id")
-    private RecipientLocation location;
+    @Column
+    private UUID locationId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

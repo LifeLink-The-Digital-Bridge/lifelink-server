@@ -36,19 +36,9 @@ public class DetailedStatusResponse {
     private String state;
 
     public static DetailedStatusResponse fromDonation(Donation donation) {
-        UUID userId = null;
-        String userName = null;
-        String userEmail = null;
-
-        if (donation.getDonor() != null) {
-            userId = donation.getDonor().getId();
-        }
-
         return DetailedStatusResponse.builder()
                 .id(donation.getDonationId())
-                .userId(userId)
-                .userName(userName)
-                .userEmail(userEmail)
+                .userId(donation.getUserId())
                 .status(donation.getStatus() != null ? donation.getStatus().toString() : null)
                 .type("DONATION")
                 .bloodType(donation.getBloodType() != null ? donation.getBloodType().toString() : null)
@@ -74,8 +64,6 @@ public class DetailedStatusResponse {
                 .quantity(request.getQuantity())
                 .requestDate(request.getRequestDate())
                 .notes(request.getNotes())
-                .city(request.getLocation() != null ? request.getLocation().getCity() : null)
-                .state(request.getLocation() != null ? request.getLocation().getState() : null)
                 .build();
     }
 }

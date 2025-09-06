@@ -11,12 +11,10 @@ import java.util.UUID;
 @Table(name = "donor_hla_profiles")
 public class DonorHLAProfile {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne
-    @JoinColumn(name = "donor_id", referencedColumnName = "id")
-    private Donor donor;
+    @Column(nullable = false)
+    private UUID donorId;
 
     @Column(name = "hla_a1")
     private String hlaA1;

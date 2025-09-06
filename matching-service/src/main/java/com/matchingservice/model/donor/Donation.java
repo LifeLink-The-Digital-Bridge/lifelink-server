@@ -16,19 +16,16 @@ import java.util.UUID;
 public class Donation {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    private UUID id;
-
-    @Column(nullable = false, unique = true)
     private UUID donationId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "donor_id", nullable = false)
-    private Donor donor;
+    @Column(nullable = false)
+    private UUID donorId;
 
-    @ManyToOne
-    @JoinColumn(name = "location_id", referencedColumnName = "id")
-    private DonorLocation location;
+    @Column(nullable = false)
+    private UUID userId;
+
+    @Column
+    private UUID locationId;
 
     @Enumerated(EnumType.STRING)
     private DonationType donationType;

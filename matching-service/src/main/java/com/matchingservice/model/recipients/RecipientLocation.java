@@ -11,10 +11,6 @@ import java.util.UUID;
 public class RecipientLocation {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    private UUID id;
-
-    @Column(nullable = false)
     private UUID locationId;
 
     @Column(nullable = false)

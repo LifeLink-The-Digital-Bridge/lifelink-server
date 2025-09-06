@@ -9,8 +9,6 @@ import java.util.UUID;
 
 @Repository
 public interface DonorHLAProfileRepository extends JpaRepository<DonorHLAProfile, Long> {
-    Optional<DonorHLAProfile> findByDonor(Donor donor);
     Optional<DonorHLAProfile> findByDonorId(UUID donorId);
-    void deleteByDonor(Donor donor);
 }
 

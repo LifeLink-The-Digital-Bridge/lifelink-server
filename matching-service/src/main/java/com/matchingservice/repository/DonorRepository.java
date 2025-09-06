@@ -7,6 +7,5 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface DonorRepository extends JpaRepository<Donor, UUID> {
-    Optional<Donor> findByDonorId(UUID donorId);
 }
 

@@ -25,28 +25,28 @@ public class StatusController {
 
     @GetMapping("/donation/status/{donationId}")
     public ResponseEntity<StatusResponse> getDonationStatus(@PathVariable UUID donationId) {
-        return donationRepository.findByDonationId(donationId)
+        return donationRepository.findById(donationId)
                 .map(donation -> ResponseEntity.ok(new StatusResponse(donation.getStatus().toString())))
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/recipient/status/{requestId}")
     public ResponseEntity<StatusResponse> getRecipientStatus(@PathVariable UUID requestId) {
-        return receiveRequestRepository.findByReceiveRequestId(requestId)
+        return receiveRequestRepository.findById(requestId)
                 .map(request -> ResponseEntity.ok(new StatusResponse(request.getStatus().toString())))
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/donation/details/{donationId}")
     public ResponseEntity<DetailedStatusResponse> getDonationDetails(@PathVariable UUID donationId) {
-        return donationRepository.findByDonationId(donationId)
+        return donationRepository.findById(donationId)
                 .map(donation -> ResponseEntity.ok(DetailedStatusResponse.fromDonation(donation)))
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/recipient/details/{requestId}")
     public ResponseEntity<DetailedStatusResponse> getRecipientDetails(@PathVariable UUID requestId) {
-        return receiveRequestRepository.findByReceiveRequestId(requestId)
+        return receiveRequestRepository.findById(requestId)
                 .map(request -> ResponseEntity.ok(DetailedStatusResponse.fromReceiveRequest(request)))
                 .orElse(ResponseEntity.notFound().build());
     }

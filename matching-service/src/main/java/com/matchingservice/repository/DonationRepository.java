@@ -14,7 +14,7 @@ import java.util.UUID;
 @Repository
 public interface DonationRepository extends JpaRepository<Donation, UUID> {
 
-    Optional<Donation> findByDonationId(UUID donationId);
+
 
     List<Donation> findByStatus(com.matchingservice.enums.DonationStatus status);
 
@@ -39,13 +39,8 @@ public interface DonationRepository extends JpaRepository<Donation, UUID> {
     @Query("SELECT d FROM Donation d WHERE d.donationDate >= :thirtyDaysAgo ORDER BY d.donationDate DESC")
     List<Donation> findRecentDonations(@Param("thirtyDaysAgo") LocalDate thirtyDaysAgo);
 
-    @Query("SELECT d FROM Donation d WHERE d.donor.id = :donorId")
-    List<Donation> findByDonorId(@Param("donorId") UUID donorId);
-
     long countByStatus(com.matchingservice.enums.DonationStatus status);
 
     @Query("SELECT d FROM Donation d WHERE d.status = 'PENDING' ORDER BY d.donationDate ASC")
     List<Donation> findPendingDonationsOrderedByDate();
-
-    List<Donation> findByDonor_UserId(UUID userId);
 }

@@ -15,10 +15,6 @@ import java.util.UUID;
 public class Donor {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    private UUID id;
-
-    @Column(nullable = false, unique = true)
     private UUID donorId;
 
     @Column(nullable = false)
@@ -62,7 +58,6 @@ public class Donor {
     private Double pulmonaryFunction;
     private String overallHealthStatus;
 
-    @OneToMany(mappedBy = "donor", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Donation> donations = new ArrayList<>();
+
 
 }

@@ -14,7 +14,7 @@ import java.util.UUID;
 @Repository
 public interface ReceiveRequestRepository extends JpaRepository<ReceiveRequest, UUID> {
 
-    Optional<ReceiveRequest> findByReceiveRequestId(UUID receiveRequestId);
+
 
     List<ReceiveRequest> findByStatus(com.matchingservice.enums.RequestStatus status);
 

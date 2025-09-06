@@ -1,7 +1,9 @@
 package com.matchingservice.controller;
 
-import com.matchingservice.aop.RequireRole;
-import com.matchingservice.dto.*;
+import com.matchingservice.dto.ManualMatchRequest;
+import com.matchingservice.dto.ManualMatchResponse;
+import com.matchingservice.dto.MatchResponse;
+import com.matchingservice.exceptions.ResourceNotFoundException;
 import com.matchingservice.repository.MatchResultRepository;
 import com.matchingservice.service.MatchingService;
 import lombok.RequiredArgsConstructor;
@@ -26,73 +28,30 @@ public class MatchingController {
         return ResponseEntity.ok(response);
     }
 
-    @RequireRole("DONOR")
-    @GetMapping("/donor/{donorUserId}/matches")
-    public ResponseEntity<List<MatchedProfileResponse>> getMatchesForDonor(@PathVariable UUID donorUserId) {
-        List<MatchedProfileResponse> matches = matchResultRepository.findByDonationDonorUserId(donorUserId)
-                .stream()
-                .map(MatchedProfileResponse::fromMatchResult)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(matches);
-    }
-
     @GetMapping("/donation/{donationId}/matches")
-    public ResponseEntity<List<MatchedProfileResponse>> getMatchesByDonation(@PathVariable UUID donationId) {
-        List<MatchedProfileResponse> matches = matchResultRepository.findByDonationDonationId(donationId)
-                .stream()
-                .map(MatchedProfileResponse::fromMatchResult)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(matches);
-    }
-
-    @RequireRole("RECIPIENT")
-    @GetMapping("/recipient/{recipientUserId}/matches")
-    public ResponseEntity<List<MatchedProfileResponse>> getMatchesForRecipient(@PathVariable UUID recipientUserId) {
-        List<MatchedProfileResponse> matches = matchResultRepository.findByReceiveRequestRecipientId(recipientUserId)
-                .stream()
-                .map(MatchedProfileResponse::fromMatchResult)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(matches);
+    public ResponseEntity<List<MatchResponse>> getMatchesByDonation(@PathVariable UUID donationId) {
+        return ResponseEntity.ok(matchingService.getMatchesByDonation(donationId));
     }
 
     @GetMapping("/request/{receiveRequestId}/matches")
-    public ResponseEntity<List<MatchedProfileResponse>> getMatchesByRequest(@PathVariable UUID receiveRequestId) {
-        List<MatchedProfileResponse> matches = matchResultRepository.findByReceiveRequestReceiveRequestId(receiveRequestId)
-                .stream()
-                .map(MatchedProfileResponse::fromMatchResult)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(matches);
+    public ResponseEntity<List<MatchResponse>> getMatchesByRequest(@PathVariable UUID receiveRequestId) {
+        return ResponseEntity.ok(matchingService.getMatchesByRequest(receiveRequestId));
     }
 
-    @GetMapping("/match-details/{matchId}")
-    public ResponseEntity<MatchDetailsResponse> getMatchDetails(@PathVariable UUID matchId) {
-        return matchResultRepository.findById(matchId)
-                .map(match -> {
-                    MatchDetailsResponse.MatchDetailsResponseBuilder builder = MatchDetailsResponse.builder()
-                            .matchId(match.getId())
-                            .isConfirmed(match.getIsConfirmed())
-                            .matchedAt(match.getMatchedAt())
-                            .distance(match.getDistance());
-
-                    if (match.getDonation() != null && match.getDonation().getDonor() != null) {
-                        builder.donorId(match.getDonation().getDonor().getUserId())
-                                .donationId(match.getDonation().getDonationId());
-                    }
-                    if (match.getReceiveRequest() != null) {
-                        builder.recipientId(match.getReceiveRequest().getRecipientId())
-                                .receiveRequestId(match.getReceiveRequest().getReceiveRequestId());
-                    }
-
-                    return ResponseEntity.ok(builder.build());
-                })
-                .orElse(ResponseEntity.notFound().build());
+    @GetMapping("/match/{matchId}")
+    public ResponseEntity<MatchResponse> getMatch(@PathVariable UUID matchId) {
+        try {
+            return ResponseEntity.ok(matchingService.getMatchById(matchId));
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @GetMapping("/admin/all-matches")
-    public ResponseEntity<List<MatchResultResponse>> getAllMatches() {
-        List<MatchResultResponse> matches = matchResultRepository.findAll()
+    public ResponseEntity<List<MatchResponse>> getAllMatches() {
+        List<MatchResponse> matches = matchResultRepository.findAll()
                 .stream()
-                .map(MatchResultResponse::fromMatchResult)
+                .map(MatchResponse::fromMatchResult)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(matches);
     }
