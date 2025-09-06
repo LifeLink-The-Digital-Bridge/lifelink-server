@@ -47,7 +47,6 @@ public class DonorServiceImpl implements DonorService {
     public DonorDTO saveOrUpdateDonor(UUID userId, RegisterDonor donorDTO) {
         Donor existingDonor = donorRepository.findByUserId(userId);
         
-        // Check if profile is locked for updates
         if (existingDonor != null && profileLockService.isDonorProfileLocked(existingDonor.getId())) {
             throw new IllegalStateException(profileLockService.getProfileLockReason(existingDonor.getId()));
         }
@@ -138,10 +137,28 @@ public class DonorServiceImpl implements DonorService {
     }
 
     @Override
+    public List<DonationDTO> getDonationsByUserId(UUID userId) {
+        Donor donor = donorRepository.findByUserId(userId);
+        if (donor == null) {
+            throw new ResourceNotFoundException("Donor not found");
+        }
+        return getDonationsByDonorId(donor.getId());
+    }
+
+    @Override
     public DonorDTO getDonorByUserId(UUID userId) {
         Donor donor = donorRepository.findByUserId(userId);
         if (donor == null) throw new ResourceNotFoundException("Donor not found");
         return getDonorDTO(donor);
+    }
+
+    @Override
+    public void updateDonationStatus(UUID donationId, DonationStatus status) {
+        donationRepository.findById(donationId)
+                .ifPresent(donation -> {
+                    donation.setStatus(status);
+                    donationRepository.save(donation);
+                });
     }
 
 

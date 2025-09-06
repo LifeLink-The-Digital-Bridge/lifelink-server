@@ -3,6 +3,7 @@ package com.donorservice.controller;
 import com.donorservice.aop.RequireRole;
 import com.donorservice.client.UserClient;
 import com.donorservice.dto.*;
+import com.donorservice.enums.DonationStatus;
 import com.donorservice.service.DonorService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -68,5 +69,17 @@ public class DonorController {
     @GetMapping("/{donorId}/donations")
     public ResponseEntity<List<DonationDTO>> getDonations(@PathVariable UUID donorId) {
         return ResponseEntity.ok(donorService.getDonationsByDonorId(donorId));
+    }
+
+    @RequireRole("DONOR")
+    @GetMapping("/my-donations")
+    public ResponseEntity<List<DonationDTO>> getMyDonations(@RequestHeader("id") UUID userId) {
+        return ResponseEntity.ok(donorService.getDonationsByUserId(userId));
+    }
+
+    @PutMapping("/donations/{donationId}/status/completed")
+    public ResponseEntity<String> updateDonationStatusToCompleted(@PathVariable UUID donationId) {
+        donorService.updateDonationStatus(donationId, DonationStatus.COMPLETED);
+        return ResponseEntity.ok("Donation status updated to completed");
     }
 }
