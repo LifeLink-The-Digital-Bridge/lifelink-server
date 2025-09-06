@@ -48,7 +48,6 @@ public class RecipientServiceImpl implements RecipientService {
     public RecipientDTO saveOrUpdateRecipient(UUID userId, RegisterRecipientDTO dto) {
         Recipient recipient = recipientRepository.findByUserId(userId);
         
-        // Check if profile is locked for updates
         if (recipient != null && profileLockService.isRecipientProfileLocked(recipient.getId())) {
             throw new IllegalStateException(profileLockService.getProfileLockReason(recipient.getId()));
         }
@@ -218,6 +217,24 @@ public class RecipientServiceImpl implements RecipientService {
         return requests.stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<ReceiveRequestDTO> getReceiveRequestsByUserId(UUID userId) {
+        Recipient recipient = recipientRepository.findByUserId(userId);
+        if (recipient == null) {
+            throw new RecipientNotFoundException("Recipient not found");
+        }
+        return getReceiveRequestsByRecipientId(recipient.getId());
+    }
+
+    @Override
+    public void updateRequestStatus(UUID requestId, RequestStatus status) {
+        receiveRequestRepository.findById(requestId)
+                .ifPresent(request -> {
+                    request.setStatus(status);
+                    receiveRequestRepository.save(request);
+                });
     }
 
     private RecipientDTO getRecipientDTO(Recipient savedRecipient) {

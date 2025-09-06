@@ -4,6 +4,7 @@ import com.recipientservice.dto.CreateReceiveRequestDTO;
 import com.recipientservice.dto.ReceiveRequestDTO;
 import com.recipientservice.dto.RecipientDTO;
 import com.recipientservice.dto.RegisterRecipientDTO;
+import com.recipientservice.enums.RequestStatus;
 
 
 import java.util.List;
@@ -20,5 +21,9 @@ public interface RecipientService {
     RecipientDTO getRecipientById(UUID id);
 
     List<ReceiveRequestDTO> getReceiveRequestsByRecipientId(UUID recipientId);
+    
+    List<ReceiveRequestDTO> getReceiveRequestsByUserId(UUID userId);
+    
+    void updateRequestStatus(UUID requestId, RequestStatus status);
 
 }

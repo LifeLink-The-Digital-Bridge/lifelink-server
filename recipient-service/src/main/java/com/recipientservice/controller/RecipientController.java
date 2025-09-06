@@ -3,6 +3,7 @@ package com.recipientservice.controller;
 import com.recipientservice.aop.RequireRole;
 import com.recipientservice.client.UserClient;
 import com.recipientservice.dto.*;
+import com.recipientservice.enums.RequestStatus;
 import com.recipientservice.service.RecipientService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -68,5 +69,17 @@ public class RecipientController {
     @GetMapping("/{recipientId}/requests")
     public ResponseEntity<List<ReceiveRequestDTO>> getReceiveRequests(@PathVariable UUID recipientId) {
         return ResponseEntity.ok(recipientService.getReceiveRequestsByRecipientId(recipientId));
+    }
+
+    @RequireRole("RECIPIENT")
+    @GetMapping("/my-requests")
+    public ResponseEntity<List<ReceiveRequestDTO>> getMyRequests(@RequestHeader("id") UUID userId) {
+        return ResponseEntity.ok(recipientService.getReceiveRequestsByUserId(userId));
+    }
+
+    @PutMapping("/requests/{requestId}/status/fulfilled")
+    public ResponseEntity<String> updateRequestStatusToFulfilled(@PathVariable UUID requestId) {
+        recipientService.updateRequestStatus(requestId, RequestStatus.FULFILLED);
+        return ResponseEntity.ok("Request status updated to fulfilled");
     }
 }
