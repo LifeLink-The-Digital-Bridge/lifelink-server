@@ -11,7 +11,7 @@ import java.util.UUID;
 
 public interface RecipientService {
 
-    RecipientDTO createRecipient(UUID userId, RegisterRecipientDTO recipientDTO);
+    RecipientDTO saveOrUpdateRecipient(UUID userId, RegisterRecipientDTO recipientDTO);
 
     ReceiveRequestDTO createReceiveRequest(UUID userId, CreateReceiveRequestDTO requestDTO);
 

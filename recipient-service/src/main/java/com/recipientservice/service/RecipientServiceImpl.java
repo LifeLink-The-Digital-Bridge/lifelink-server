@@ -28,22 +28,30 @@ public class RecipientServiceImpl implements RecipientService {
     private final LocationRepository locationRepository;
     private final ReceiveRequestRepository receiveRequestRepository;
     private final EventPublisher eventPublisher;
+    private final ProfileLockService profileLockService;
 
     public RecipientServiceImpl(
             RecipientRepository recipientRepository,
             LocationRepository locationRepository,
             ReceiveRequestRepository receiveRequestRepository,
-            EventPublisher eventPublisher
+            EventPublisher eventPublisher,
+            ProfileLockService profileLockService
     ) {
         this.recipientRepository = recipientRepository;
         this.locationRepository = locationRepository;
         this.receiveRequestRepository = receiveRequestRepository;
         this.eventPublisher = eventPublisher;
+        this.profileLockService = profileLockService;
     }
 
     @Override
-    public RecipientDTO createRecipient(UUID userId, RegisterRecipientDTO dto) {
+    public RecipientDTO saveOrUpdateRecipient(UUID userId, RegisterRecipientDTO dto) {
         Recipient recipient = recipientRepository.findByUserId(userId);
+        
+        // Check if profile is locked for updates
+        if (recipient != null && profileLockService.isRecipientProfileLocked(recipient.getId())) {
+            throw new IllegalStateException(profileLockService.getProfileLockReason(recipient.getId()));
+        }
 
         if (recipient == null) {
             recipient = new Recipient();

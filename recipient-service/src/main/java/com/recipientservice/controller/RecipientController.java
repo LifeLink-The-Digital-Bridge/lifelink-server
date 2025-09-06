@@ -7,6 +7,8 @@ import com.recipientservice.service.RecipientService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -29,10 +31,14 @@ public class RecipientController {
     }
 
     @RequireRole("RECIPIENT")
-    @PostMapping("/register")
-    public ResponseEntity<RecipientDTO> registerRecipient(@RequestHeader("id") UUID userId, @RequestBody RegisterRecipientDTO recipientDTO) {
-        RecipientDTO recipient = recipientService.createRecipient(userId, recipientDTO);
-        return ResponseEntity.ok(recipient);
+    @PostMapping("/profile")
+    public ResponseEntity<?> saveOrUpdateRecipient(@RequestHeader("id") UUID userId, @RequestBody RegisterRecipientDTO recipientDTO) {
+        try {
+            RecipientDTO result = recipientService.saveOrUpdateRecipient(userId, recipientDTO);
+            return ResponseEntity.ok(result);
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 
     @RequireRole("RECIPIENT")
