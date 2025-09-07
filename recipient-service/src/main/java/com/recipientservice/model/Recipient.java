@@ -40,9 +40,6 @@ public class Recipient {
     private HLAProfile hlaProfile;
 
     @OneToMany(mappedBy = "recipient", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
-    private List<RecipientHistory> recipientHistories = new ArrayList<>();
-
-    @OneToMany(mappedBy = "recipient", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     private List<ReceiveRequest> receiveRequests = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)

@@ -1,11 +1,11 @@
 package com.recipientservice.model;
 
-import com.recipientservice.enums.BloodType;
-import com.recipientservice.enums.OrganType;
+import com.recipientservice.model.history.*;
 import jakarta.persistence.*;
 import lombok.Data;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -14,29 +14,49 @@ import java.util.UUID;
 public class RecipientHistory {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private UUID id;
 
-    @ManyToOne
-    @JoinColumn(name = "recipient_id", referencedColumnName = "id")
-    private Recipient recipient;
+    @OneToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "recipient_snapshot_id")
+    private RecipientSnapshotHistory recipientSnapshot;
 
-    @Column(nullable = false)
-    private UUID donorId;
+    @OneToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "medical_details_snapshot_id")
+    private RecipientMedicalDetailsSnapshotHistory medicalDetailsSnapshot;
 
-    @Column(nullable = false)
-    private LocalDate receivedDate;
+    @OneToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "eligibility_criteria_snapshot_id")
+    private RecipientEligibilityCriteriaSnapshotHistory eligibilityCriteriaSnapshot;
 
-    @Enumerated(EnumType.STRING)
-    private BloodType bloodType;
+    @OneToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "hla_profile_snapshot_id")
+    private RecipientHLAProfileSnapshotHistory hlaProfileSnapshot;
 
-    @Enumerated(EnumType.STRING)
-    private OrganType organType;
+    @OneToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "consent_form_snapshot_id")
+    private RecipientConsentFormSnapshotHistory consentFormSnapshot;
 
-    @Column
-    private Double quantity;
+    @OneToMany(cascade = CascadeType.ALL)
+    @JoinColumn(name = "recipient_history_id")
+    private List<RecipientLocationSnapshotHistory> locationSnapshots;
 
-    @Column
-    private String location;
+    @OneToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "receive_request_snapshot_id")
+    private ReceiveRequestSnapshotHistory receiveRequestSnapshot;
 
+    @Column(name = "match_id")
+    private UUID matchId;
+
+    @Column(name = "donation_id")
+    private UUID donationId;
+
+    @Column(name = "donor_user_id")
+    private UUID donorUserId;
+
+    @Column(name = "matched_at")
+    private LocalDateTime matchedAt;
+
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
 }

@@ -1,9 +1,6 @@
 package com.recipientservice.service;
 
-import com.recipientservice.dto.CreateReceiveRequestDTO;
-import com.recipientservice.dto.ReceiveRequestDTO;
-import com.recipientservice.dto.RecipientDTO;
-import com.recipientservice.dto.RegisterRecipientDTO;
+import com.recipientservice.dto.*;
 import com.recipientservice.enums.RequestStatus;
 
 
@@ -25,5 +22,13 @@ public interface RecipientService {
     List<ReceiveRequestDTO> getReceiveRequestsByUserId(UUID userId);
     
     void updateRequestStatus(UUID requestId, RequestStatus status);
+    
+    String getRequestStatus(UUID requestId);
+    
+    ReceiveRequestDTO getRequestById(UUID requestId);
+    
+    void createRecipientHistory(CreateRecipientHistoryRequest request);
+    
+    List<RecipientHistoryDTO> getRecipientHistory(UUID userId);
 
 }

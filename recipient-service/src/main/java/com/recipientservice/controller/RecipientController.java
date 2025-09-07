@@ -1,8 +1,10 @@
 package com.recipientservice.controller;
 
+import com.recipientservice.aop.InternalOnly;
 import com.recipientservice.aop.RequireRole;
 import com.recipientservice.client.UserClient;
 import com.recipientservice.dto.*;
+import com.recipientservice.dto.CreateRecipientHistoryRequest;
 import com.recipientservice.enums.RequestStatus;
 import com.recipientservice.service.RecipientService;
 import org.springframework.http.ResponseEntity;
@@ -49,9 +51,17 @@ public class RecipientController {
         return ResponseEntity.ok(response);
     }
 
-    @RequireRole("RECIPIENT")
     @GetMapping("/by-userId")
     public ResponseEntity<RecipientDTO> getRecipientByUserId(@RequestHeader("id") UUID userId) {
+        RecipientDTO recipient = recipientService.getRecipientByUserId(userId);
+        if (recipient == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(recipient);
+    }
+
+    @GetMapping("/by-userId/{userId}")
+    public ResponseEntity<RecipientDTO> getRecipientByUser(@PathVariable UUID userId) {
         RecipientDTO recipient = recipientService.getRecipientByUserId(userId);
         if (recipient == null) {
             return ResponseEntity.notFound().build();
@@ -77,9 +87,37 @@ public class RecipientController {
         return ResponseEntity.ok(recipientService.getReceiveRequestsByUserId(userId));
     }
 
+    @InternalOnly
     @PutMapping("/requests/{requestId}/status/fulfilled")
     public ResponseEntity<String> updateRequestStatusToFulfilled(@PathVariable UUID requestId) {
         recipientService.updateRequestStatus(requestId, RequestStatus.FULFILLED);
         return ResponseEntity.ok("Request status updated to fulfilled");
     }
+
+    @RequireRole("RECIPIENT")
+    @GetMapping("/requests/{requestId}/status")
+    public ResponseEntity<String> getRequestStatus(@PathVariable UUID requestId) {
+        String status = recipientService.getRequestStatus(requestId);
+        return ResponseEntity.ok(status);
+    }
+
+    @GetMapping("/requests/{requestId}")
+    public ResponseEntity<ReceiveRequestDTO> getRequestDetails(@PathVariable UUID requestId) {
+        ReceiveRequestDTO request = recipientService.getRequestById(requestId);
+        return ResponseEntity.ok(request);
+    }
+
+    @InternalOnly
+    @PostMapping("/history/create")
+    public ResponseEntity<String> createRecipientHistory(@RequestBody CreateRecipientHistoryRequest request) {
+        recipientService.createRecipientHistory(request);
+        return ResponseEntity.ok("Recipient history created");
+    }
+    
+    @GetMapping("/user/{userId}/history")
+    public ResponseEntity<List<RecipientHistoryDTO>> getRecipientHistory(@PathVariable UUID userId) {
+        List<RecipientHistoryDTO> history = recipientService.getRecipientHistory(userId);
+        return ResponseEntity.ok(history);
+    }
+
 }

@@ -1,8 +1,7 @@
 package com.recipientservice.service;
 
 import com.recipientservice.dto.*;
-import com.recipientservice.enums.RequestStatus;
-import com.recipientservice.enums.RequestType;
+import com.recipientservice.enums.*;
 import com.recipientservice.exceptions.InvalidLocationException;
 import com.recipientservice.exceptions.RecipientNotFoundException;
 import com.recipientservice.kafka.EventPublisher;
@@ -11,6 +10,7 @@ import com.recipientservice.kafka.events.LocationEvent;
 import com.recipientservice.kafka.events.ReceiveRequestEvent;
 import com.recipientservice.kafka.events.RecipientEvent;
 import com.recipientservice.model.*;
+import com.recipientservice.model.history.*;
 import com.recipientservice.repository.*;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
@@ -27,6 +27,7 @@ public class RecipientServiceImpl implements RecipientService {
     private final RecipientRepository recipientRepository;
     private final LocationRepository locationRepository;
     private final ReceiveRequestRepository receiveRequestRepository;
+    private final RecipientHistoryRepository recipientHistoryRepository;
     private final EventPublisher eventPublisher;
     private final ProfileLockService profileLockService;
 
@@ -34,12 +35,14 @@ public class RecipientServiceImpl implements RecipientService {
             RecipientRepository recipientRepository,
             LocationRepository locationRepository,
             ReceiveRequestRepository receiveRequestRepository,
+            RecipientHistoryRepository recipientHistoryRepository,
             EventPublisher eventPublisher,
             ProfileLockService profileLockService
     ) {
         this.recipientRepository = recipientRepository;
         this.locationRepository = locationRepository;
         this.receiveRequestRepository = receiveRequestRepository;
+        this.recipientHistoryRepository = recipientHistoryRepository;
         this.eventPublisher = eventPublisher;
         this.profileLockService = profileLockService;
     }
@@ -235,6 +238,130 @@ public class RecipientServiceImpl implements RecipientService {
                     request.setStatus(status);
                     receiveRequestRepository.save(request);
                 });
+    }
+
+    @Override
+    public String getRequestStatus(UUID requestId) {
+        return receiveRequestRepository.findById(requestId)
+                .map(request -> request.getStatus().toString())
+                .orElseThrow(() -> new RecipientNotFoundException("Request not found"));
+    }
+
+    @Override
+    public ReceiveRequestDTO getRequestById(UUID requestId) {
+        ReceiveRequest request = receiveRequestRepository.findById(requestId)
+                .orElseThrow(() -> new RecipientNotFoundException("Request not found"));
+        return convertToDTO(request);
+    }
+
+    @Override
+    public void createRecipientHistory(CreateRecipientHistoryRequest request) {
+        RecipientSnapshotHistory recipientSnapshot = new RecipientSnapshotHistory();
+        recipientSnapshot.setOriginalRecipientId(request.getRecipientId());
+        recipientSnapshot.setUserId(request.getRecipientUserId());
+        recipientSnapshot.setAvailability(Availability.valueOf(request.getAvailability()));
+
+        RecipientMedicalDetailsSnapshotHistory medicalSnapshot = new RecipientMedicalDetailsSnapshotHistory();
+        medicalSnapshot.setDiagnosis(request.getDiagnosis());
+        medicalSnapshot.setAllergies(request.getAllergies());
+        medicalSnapshot.setCurrentMedications(request.getCurrentMedications());
+        medicalSnapshot.setAdditionalNotes(request.getAdditionalNotes());
+
+        RecipientEligibilityCriteriaSnapshotHistory eligibilitySnapshot = new RecipientEligibilityCriteriaSnapshotHistory();
+        eligibilitySnapshot.setMedicallyEligible(request.getMedicallyEligible());
+        eligibilitySnapshot.setLegalClearance(request.getLegalClearance());
+        eligibilitySnapshot.setNotes(request.getNotes());
+        eligibilitySnapshot.setLastReviewed(request.getLastReviewed());
+
+        RecipientHLAProfileSnapshotHistory hlaSnapshot = new RecipientHLAProfileSnapshotHistory();
+        hlaSnapshot.setHlaA1(request.getHlaA1());
+        hlaSnapshot.setHlaA2(request.getHlaA2());
+        hlaSnapshot.setHlaB1(request.getHlaB1());
+        hlaSnapshot.setHlaB2(request.getHlaB2());
+        hlaSnapshot.setHlaC1(request.getHlaC1());
+        hlaSnapshot.setHlaC2(request.getHlaC2());
+        hlaSnapshot.setHlaDr1(request.getHlaDR1());
+        hlaSnapshot.setHlaDr2(request.getHlaDR2());
+        hlaSnapshot.setHlaDq1(request.getHlaDQ1());
+        hlaSnapshot.setHlaDq2(request.getHlaDQ2());
+        hlaSnapshot.setHlaDP1(request.getHlaDP1());
+        hlaSnapshot.setHlaDP2(request.getHlaDP2());
+        hlaSnapshot.setTestingDate(request.getTestingDate());
+        hlaSnapshot.setTestMethod(request.getTestingMethod());
+        hlaSnapshot.setLaboratoryName(request.getLaboratoryName());
+        hlaSnapshot.setCertificationNumber(request.getCertificationNumber());
+        hlaSnapshot.setHlaString(request.getHlaString());
+        hlaSnapshot.setIsHighResolution(request.getIsHighResolution());
+        hlaSnapshot.setResolutionLevel(request.getCertificationNumber());
+
+        RecipientConsentFormSnapshotHistory consentSnapshot = new RecipientConsentFormSnapshotHistory();
+        consentSnapshot.setUserId(request.getRecipientUserId());
+        consentSnapshot.setIsConsented(request.getIsConsented());
+        consentSnapshot.setConsentedAt(request.getConsentedAt());
+
+        ReceiveRequestSnapshotHistory requestSnapshot = new ReceiveRequestSnapshotHistory();
+        requestSnapshot.setOriginalRequestId(request.getReceiveRequestId());
+        requestSnapshot.setRequestType(RequestType.valueOf(request.getRequestType()));
+        if (request.getRequestedBloodType() != null) {
+            requestSnapshot.setRequestedBloodType(BloodType.valueOf(request.getRequestedBloodType()));
+        }
+        if (request.getRequestedOrgan() != null) {
+            requestSnapshot.setRequestedOrgan(OrganType.valueOf(request.getRequestedOrgan()));
+        }
+        if (request.getRequestedTissue() != null) {
+            requestSnapshot.setRequestedTissue(TissueType.valueOf(request.getRequestedTissue()));
+        }
+        if (request.getRequestedStemCellType() != null) {
+            requestSnapshot.setRequestedStemCellType(StemCellType.valueOf(request.getRequestedStemCellType()));
+        }
+        requestSnapshot.setUrgencyLevel(UrgencyLevel.valueOf(request.getUrgencyLevel()));
+        requestSnapshot.setQuantity(request.getQuantity());
+        requestSnapshot.setRequestDate(request.getRequestDate());
+        requestSnapshot.setStatus(RequestStatus.valueOf(request.getRequestStatus()));
+        requestSnapshot.setNotes(request.getRequestNotes());
+
+        RecipientHistory history = new RecipientHistory();
+        history.setRecipientSnapshot(recipientSnapshot);
+        history.setMedicalDetailsSnapshot(medicalSnapshot);
+        history.setEligibilityCriteriaSnapshot(eligibilitySnapshot);
+        history.setHlaProfileSnapshot(hlaSnapshot);
+        history.setConsentFormSnapshot(consentSnapshot);
+        history.setReceiveRequestSnapshot(requestSnapshot);
+        history.setMatchId(request.getMatchId());
+        history.setDonationId(request.getDonationId());
+        history.setDonorUserId(request.getDonorUserId());
+        history.setMatchedAt(request.getMatchedAt());
+        history.setCompletedAt(request.getCompletedAt());
+
+        recipientHistoryRepository.save(history);
+    }
+    
+    @Override
+    public List<RecipientHistoryDTO> getRecipientHistory(UUID userId) {
+        List<RecipientHistory> histories = recipientHistoryRepository.findByRecipientSnapshot_UserId(userId);
+        return histories.stream()
+                .map(this::convertToHistoryDTO)
+                .collect(Collectors.toList());
+    }
+    
+    private RecipientHistoryDTO convertToHistoryDTO(RecipientHistory history) {
+        RecipientHistoryDTO dto = new RecipientHistoryDTO();
+        dto.setMatchId(history.getMatchId());
+        dto.setDonationId(history.getDonationId());
+        dto.setDonorUserId(history.getDonorUserId());
+        dto.setMatchedAt(history.getMatchedAt());
+        dto.setCompletedAt(history.getCompletedAt());
+        
+        if (history.getReceiveRequestSnapshot() != null) {
+            ReceiveRequestDTO requestDTO = new ReceiveRequestDTO();
+            requestDTO.setId(history.getReceiveRequestSnapshot().getOriginalRequestId());
+            requestDTO.setRequestDate(history.getReceiveRequestSnapshot().getRequestDate());
+            requestDTO.setStatus(history.getReceiveRequestSnapshot().getStatus());
+            requestDTO.setRequestType(history.getReceiveRequestSnapshot().getRequestType());
+            dto.setReceiveRequestSnapshot(requestDTO);
+        }
+        
+        return dto;
     }
 
     private RecipientDTO getRecipientDTO(Recipient savedRecipient) {
