@@ -152,12 +152,38 @@ public class UserServiceImpl implements UserService {
         return responseDTO;
     }
 
+    @Override
+    public UserDTO getUserProfileById(UUID userId, UUID requesterId) {
+        User profileUser = userRepository.findByIdWithRoles(userId)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        UserDTO responseDTO = new UserDTO();
+        BeanUtils.copyProperties(profileUser, responseDTO);
+
+        if (canViewProfile(profileUser, requesterId)) {
+            responseDTO.setRoles(profileUser.getUserRoles().stream()
+                    .map(ur -> ur.getRole().getName().name())
+                    .collect(Collectors.toSet()));
+        } else {
+            responseDTO.setRoles(Set.of());
+            responseDTO.setEmail(null);
+            responseDTO.setPhone(null);
+            responseDTO.setDob(null);
+        }
+
+        responseDTO.setProfileVisibility(profileUser.getProfileVisibility());
+        return responseDTO;
+    }
+
     private boolean canViewProfile(User profileUser, UUID requesterId) {
         if (profileUser.getProfileVisibility() == Visibility.PUBLIC) return true;
         if (profileUser.getProfileVisibility() == Visibility.PRIVATE) {
             return profileUser.getId().equals(requesterId);
         }
-        return requesterId != null && followService.isFollowing(requesterId, profileUser.getId());
+        if (profileUser.getProfileVisibility() == Visibility.FOLLOWERS_ONLY) {
+            return requesterId != null && followService.isFollowing(requesterId, profileUser.getId());
+        }
+        return false;
     }
 
     @Override

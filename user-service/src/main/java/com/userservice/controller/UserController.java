@@ -67,6 +67,15 @@ public class UserController {
         return ResponseEntity.ok(profile);
     }
 
+    @GetMapping("/profile/id/{userId}")
+    public ResponseEntity<UserDTO> getUserProfileById(
+            @PathVariable UUID userId,
+            @RequestHeader(value = "id", required = false) String requesterId) {
+
+        UserDTO profile = userService.getUserProfileById(userId, requesterId != null ? UUID.fromString(requesterId) : null);
+        return ResponseEntity.ok(profile);
+    }
+
 
     @Value("${internal.access-token}")
     private String expectedSecret;

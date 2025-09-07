@@ -22,4 +22,6 @@ public interface UserService {
     UserDTO updateUser(UUID userId, UserUpdateRequest updateRequest);
 
     UserDTO getUserProfile(String username, UUID uuid);
+
+    UserDTO getUserProfileById(UUID userId, UUID requesterId);
 }
