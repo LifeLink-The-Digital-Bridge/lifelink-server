@@ -47,9 +47,6 @@ public class Donor {
     private HLAProfile hlaProfile;
 
     @OneToMany(mappedBy = "donor", cascade = CascadeType.ALL)
-    private List<DonationHistory> donationHistory;
-
-    @OneToMany(mappedBy = "donor", cascade = CascadeType.ALL)
     private List<Donation> donations;
 
     @PrePersist

@@ -1,9 +1,6 @@
 package com.donorservice.service;
 
-import com.donorservice.dto.DonationDTO;
-import com.donorservice.dto.DonationRequestDTO;
-import com.donorservice.dto.DonorDTO;
-import com.donorservice.dto.RegisterDonor;
+import com.donorservice.dto.*;
 import com.donorservice.enums.DonationStatus;
 
 import java.util.List;
@@ -23,4 +20,12 @@ public interface DonorService {
     List<DonationDTO> getDonationsByUserId(UUID userId);
     
     void updateDonationStatus(UUID donationId, DonationStatus status);
+    
+    String getDonationStatus(UUID donationId);
+    
+    DonationDTO getDonationById(UUID donationId);
+    
+    void createDonationHistory(CreateDonationHistoryRequest request);
+    
+    List<DonorHistoryDTO> getDonorHistory(UUID userId);
 }

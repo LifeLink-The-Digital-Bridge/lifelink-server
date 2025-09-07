@@ -1,8 +1,10 @@
 package com.donorservice.controller;
 
+import com.donorservice.aop.InternalOnly;
 import com.donorservice.aop.RequireRole;
 import com.donorservice.client.UserClient;
 import com.donorservice.dto.*;
+import com.donorservice.dto.CreateDonationHistoryRequest;
 import com.donorservice.enums.DonationStatus;
 import com.donorservice.service.DonorService;
 import org.springframework.http.ResponseEntity;
@@ -48,7 +50,6 @@ public class DonorController {
         return ResponseEntity.ok(response);
     }
 
-    @RequireRole("DONOR")
     @GetMapping("/by-userId")
     public ResponseEntity<DonorDTO> getDonorByUserId(@RequestHeader("id") UUID userId) {
         DonorDTO donor = donorService.getDonorByUserId(userId);
@@ -77,9 +78,36 @@ public class DonorController {
         return ResponseEntity.ok(donorService.getDonationsByUserId(userId));
     }
 
+    @InternalOnly
     @PutMapping("/donations/{donationId}/status/completed")
     public ResponseEntity<String> updateDonationStatusToCompleted(@PathVariable UUID donationId) {
         donorService.updateDonationStatus(donationId, DonationStatus.COMPLETED);
         return ResponseEntity.ok("Donation status updated to completed");
+    }
+
+    @RequireRole("DONOR")
+    @GetMapping("/donations/{donationId}/status")
+    public ResponseEntity<String> getDonationStatus(@PathVariable UUID donationId) {
+        String status = donorService.getDonationStatus(donationId);
+        return ResponseEntity.ok(status);
+    }
+
+    @GetMapping("/donations/{donationId}")
+    public ResponseEntity<DonationDTO> getDonationDetails(@PathVariable UUID donationId) {
+        DonationDTO donation = donorService.getDonationById(donationId);
+        return ResponseEntity.ok(donation);
+    }
+
+    @InternalOnly
+    @PostMapping("/history/create")
+    public ResponseEntity<String> createDonationHistory(@RequestBody CreateDonationHistoryRequest request) {
+        donorService.createDonationHistory(request);
+        return ResponseEntity.ok("Donation history created");
+    }
+    
+    @GetMapping("/user/{userId}/history")
+    public ResponseEntity<List<DonorHistoryDTO>> getDonorHistory(@PathVariable UUID userId) {
+        List<DonorHistoryDTO> history = donorService.getDonorHistory(userId);
+        return ResponseEntity.ok(history);
     }
 }
