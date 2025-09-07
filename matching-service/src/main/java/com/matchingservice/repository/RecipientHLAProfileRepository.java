@@ -1,6 +1,5 @@
 package com.matchingservice.repository;
 
-import com.matchingservice.model.recipients.Recipient;
 import com.matchingservice.model.recipients.RecipientHLAProfile;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -12,4 +11,3 @@ import java.util.UUID;
 public interface RecipientHLAProfileRepository extends JpaRepository<RecipientHLAProfile, Long> {
     Optional<RecipientHLAProfile> findByRecipientId(UUID recipientId);
 }
-

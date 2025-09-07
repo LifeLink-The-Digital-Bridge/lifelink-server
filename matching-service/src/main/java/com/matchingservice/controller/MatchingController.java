@@ -1,5 +1,6 @@
 package com.matchingservice.controller;
 
+import com.matchingservice.aop.RequireRole;
 import com.matchingservice.dto.ManualMatchRequest;
 import com.matchingservice.dto.ManualMatchResponse;
 import com.matchingservice.dto.MatchResponse;
@@ -28,6 +29,23 @@ public class MatchingController {
         return ResponseEntity.ok(response);
     }
 
+    @RequireRole("DONOR")
+    @GetMapping("/my-matches/as-donor")
+    public ResponseEntity<List<MatchResponse>> getMyMatchesAsDonor(@RequestHeader("id") UUID userId) {
+        return ResponseEntity.ok(matchingService.getMatchesForDonor(userId));
+    }
+
+    @RequireRole("RECIPIENT")
+    @GetMapping("/my-matches/as-recipient")
+    public ResponseEntity<List<MatchResponse>> getMyMatchesAsRecipient(@RequestHeader("id") UUID userId) {
+        return ResponseEntity.ok(matchingService.getMatchesForRecipient(userId));
+    }
+
+    @GetMapping("/admin/all-matches")
+    public ResponseEntity<List<MatchResponse>> getAllMatches() {
+        return ResponseEntity.ok(matchingService.getAllMatches());
+    }
+
     @GetMapping("/donation/{donationId}/matches")
     public ResponseEntity<List<MatchResponse>> getMatchesByDonation(@PathVariable UUID donationId) {
         return ResponseEntity.ok(matchingService.getMatchesByDonation(donationId));
@@ -38,25 +56,8 @@ public class MatchingController {
         return ResponseEntity.ok(matchingService.getMatchesByRequest(receiveRequestId));
     }
 
-    @GetMapping("/match/{matchId}")
-    public ResponseEntity<MatchResponse> getMatch(@PathVariable UUID matchId) {
-        try {
-            return ResponseEntity.ok(matchingService.getMatchById(matchId));
-        } catch (ResourceNotFoundException e) {
-            return ResponseEntity.notFound().build();
-        }
-    }
-
-    @GetMapping("/admin/all-matches")
-    public ResponseEntity<List<MatchResponse>> getAllMatches() {
-        List<MatchResponse> matches = matchResultRepository.findAll()
-                .stream()
-                .map(MatchResponse::fromMatchResult)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(matches);
-    }
-
-    @PutMapping("/match/{matchId}/donor-confirm")
+    @RequireRole("DONOR")
+    @PostMapping("/donor/confirm/{matchId}")
     public ResponseEntity<String> donorConfirmMatch(@PathVariable UUID matchId, @RequestHeader("id") UUID userId) {
         try {
             String result = matchingService.donorConfirmMatch(matchId, userId);
@@ -68,7 +69,8 @@ public class MatchingController {
         }
     }
 
-    @PutMapping("/match/{matchId}/recipient-confirm")
+    @RequireRole("RECIPIENT")
+    @PostMapping("/recipient/confirm/{matchId}")
     public ResponseEntity<String> recipientConfirmMatch(@PathVariable UUID matchId, @RequestHeader("id") UUID userId) {
         try {
             String result = matchingService.recipientConfirmMatch(matchId, userId);
@@ -78,15 +80,5 @@ public class MatchingController {
         } catch (IllegalStateException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
-    }
-
-    @GetMapping("/my-matches/as-donor")
-    public ResponseEntity<List<MatchResponse>> getMyMatchesAsDonor(@RequestHeader("id") UUID userId) {
-        return ResponseEntity.ok(matchingService.getMatchesForDonor(userId));
-    }
-
-    @GetMapping("/my-matches/as-recipient")
-    public ResponseEntity<List<MatchResponse>> getMyMatchesAsRecipient(@RequestHeader("id") UUID userId) {
-        return ResponseEntity.ok(matchingService.getMatchesForRecipient(userId));
     }
 }
