@@ -15,6 +15,8 @@ import com.donorservice.kafka.event.LocationEvent;
 import com.donorservice.model.*;
 import com.donorservice.model.history.*;
 import com.donorservice.repository.*;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
@@ -186,41 +188,37 @@ public class DonorServiceImpl implements DonorService {
         donorSnapshot.setRegistrationDate(request.getRegistrationDate());
         donorSnapshot.setStatus(DonorStatus.valueOf(request.getDonorStatus()));
 
-        MedicalDetailsSnapshotHistory medicalSnapshot = new MedicalDetailsSnapshotHistory();
-        medicalSnapshot.setHemoglobinLevel(request.getHemoglobinLevel());
-        medicalSnapshot.setBloodPressure(request.getBloodPressure());
-        medicalSnapshot.setHasDiseases(request.getHasDiseases());
-        medicalSnapshot.setTakingMedication(request.getTakingMedication());
-        medicalSnapshot.setDiseaseDescription(request.getDiseaseDescription());
-        medicalSnapshot.setCurrentMedications(request.getCurrentMedications());
-        medicalSnapshot.setLastMedicalCheckup(request.getLastMedicalCheckup());
-        medicalSnapshot.setMedicalHistory(request.getMedicalHistory());
-        medicalSnapshot.setHasInfectiousDiseases(request.getHasInfectiousDiseases());
-        medicalSnapshot.setInfectiousDiseaseDetails(request.getInfectiousDiseaseDetails());
-        medicalSnapshot.setCreatinineLevel(request.getCreatinineLevel());
-        medicalSnapshot.setLiverFunctionTests(request.getLiverFunctionTests());
-        medicalSnapshot.setCardiacStatus(request.getCardiacStatus());
-        medicalSnapshot.setPulmonaryFunction(request.getPulmonaryFunction());
-        medicalSnapshot.setOverallHealthStatus(request.getOverallHealthStatus());
+        donorSnapshot.setHemoglobinLevel(request.getHemoglobinLevel());
+        donorSnapshot.setBloodPressure(request.getBloodPressure());
+        donorSnapshot.setHasDiseases(request.getHasDiseases());
+        donorSnapshot.setTakingMedication(request.getTakingMedication());
+        donorSnapshot.setDiseaseDescription(request.getDiseaseDescription());
+        donorSnapshot.setCurrentMedications(request.getCurrentMedications());
+        donorSnapshot.setLastMedicalCheckup(request.getLastMedicalCheckup());
+        donorSnapshot.setMedicalHistory(request.getMedicalHistory());
+        donorSnapshot.setHasInfectiousDiseases(request.getHasInfectiousDiseases());
+        donorSnapshot.setInfectiousDiseaseDetails(request.getInfectiousDiseaseDetails());
+        donorSnapshot.setCreatinineLevel(request.getCreatinineLevel());
+        donorSnapshot.setLiverFunctionTests(request.getLiverFunctionTests());
+        donorSnapshot.setCardiacStatus(request.getCardiacStatus());
+        donorSnapshot.setPulmonaryFunction(request.getPulmonaryFunction());
+        donorSnapshot.setOverallHealthStatus(request.getOverallHealthStatus());
 
-        EligibilityCriteriaSnapshotHistory eligibilitySnapshot = new EligibilityCriteriaSnapshotHistory();
-        eligibilitySnapshot.setAgeEligible(request.getAgeEligible());
-        eligibilitySnapshot.setAge(request.getAge());
-        eligibilitySnapshot.setDob(request.getDob());
-        eligibilitySnapshot.setWeightEligible(request.getWeightEligible());
-        eligibilitySnapshot.setWeight(request.getWeight());
-        eligibilitySnapshot.setMedicalClearance(request.getMedicalClearance());
-        eligibilitySnapshot.setRecentTattooOrPiercing(request.getRecentTattooOrPiercing());
-        eligibilitySnapshot.setRecentTravelDetails(request.getRecentTravelDetails());
-        eligibilitySnapshot.setRecentVaccination(request.getRecentVaccination());
-        eligibilitySnapshot.setRecentSurgery(request.getRecentSurgery());
-        eligibilitySnapshot.setChronicDiseases(request.getChronicDiseases());
-        eligibilitySnapshot.setAllergies(request.getAllergies());
-        eligibilitySnapshot.setLastDonationDate(request.getLastDonationDate());
-        eligibilitySnapshot.setHeight(request.getHeight());
-        eligibilitySnapshot.setBodyMassIndex(request.getBodyMassIndex());
-        eligibilitySnapshot.setBodySize(request.getBodySize());
-        eligibilitySnapshot.setIsLivingDonor(request.getIsLivingDonor());
+        donorSnapshot.setAge(request.getAge());
+        donorSnapshot.setDob(request.getDob());
+        donorSnapshot.setWeight(request.getWeight());
+        donorSnapshot.setMedicalClearance(request.getMedicalClearance());
+        donorSnapshot.setRecentTattooOrPiercing(request.getRecentTattooOrPiercing());
+        donorSnapshot.setRecentTravelDetails(request.getRecentTravelDetails());
+        donorSnapshot.setRecentVaccination(request.getRecentVaccination());
+        donorSnapshot.setRecentSurgery(request.getRecentSurgery());
+        donorSnapshot.setChronicDiseases(request.getChronicDiseases());
+        donorSnapshot.setAllergies(request.getAllergies());
+        donorSnapshot.setLastDonationDate(request.getLastDonationDate());
+        donorSnapshot.setHeight(request.getHeight());
+        donorSnapshot.setBodyMassIndex(request.getBodyMassIndex());
+        donorSnapshot.setBodySize(request.getBodySize());
+        donorSnapshot.setIsLivingDonor(request.getIsLivingDonor());
 
         HLAProfileSnapshotHistory hlaSnapshot = new HLAProfileSnapshotHistory();
         hlaSnapshot.setHlaA1(request.getHlaA1());
@@ -241,20 +239,22 @@ public class DonorServiceImpl implements DonorService {
         hlaSnapshot.setCertificationNumber(request.getCertificationNumber());
         hlaSnapshot.setHlaString(request.getHlaString());
         hlaSnapshot.setIsHighResolution(request.getIsHighResolution());
-        hlaSnapshot.setResolutionLevel(request.getCertificationNumber());
 
-        ConsentFormSnapshotHistory consentSnapshot = new ConsentFormSnapshotHistory();
-        consentSnapshot.setUserId(request.getDonorUserId());
-        consentSnapshot.setIsConsented(request.getIsConsented());
-        consentSnapshot.setConsentedAt(request.getConsentedAt());
+        List<LocationSnapshotHistory> locationSnapshots = parseLocationData(request.getLocationData());
 
         DonationSnapshotHistory donationSnapshot = new DonationSnapshotHistory();
         donationSnapshot.setOriginalDonationId(request.getDonationId());
+        donationSnapshot.setDonorId(request.getDonorId());
+        donationSnapshot.setUserId(request.getDonorUserId());
         donationSnapshot.setDonationDate(request.getDonationDate());
         donationSnapshot.setStatus(DonationStatus.valueOf(request.getDonationStatus()));
-        donationSnapshot.setBloodType(BloodType.valueOf(request.getBloodType()));
+
+        if (request.getBloodType() != null) {
+            donationSnapshot.setBloodType(BloodType.valueOf(request.getBloodType()));
+        }
         donationSnapshot.setDonationType(DonationType.valueOf(request.getDonationType()));
         donationSnapshot.setQuantity(request.getQuantity());
+
         if (request.getOrganType() != null) {
             donationSnapshot.setOrganType(OrganType.valueOf(request.getOrganType()));
             donationSnapshot.setIsCompatible(request.getIsCompatible());
@@ -275,12 +275,12 @@ public class DonorServiceImpl implements DonorService {
             donationSnapshot.setStemCellType(StemCellType.valueOf(request.getStemCellType()));
         }
 
+        System.out.println("Creating donation history for donation: " + request.getDonationId());
+
         DonorHistory history = new DonorHistory();
         history.setDonorSnapshot(donorSnapshot);
-        history.setMedicalDetailsSnapshot(medicalSnapshot);
-        history.setEligibilityCriteriaSnapshot(eligibilitySnapshot);
         history.setHlaProfileSnapshot(hlaSnapshot);
-        history.setConsentFormSnapshot(consentSnapshot);
+        history.setLocationSnapshots(locationSnapshots);
         history.setDonationSnapshot(donationSnapshot);
         history.setMatchId(request.getMatchId());
         history.setReceiveRequestId(request.getReceiveRequestId());
@@ -290,7 +290,40 @@ public class DonorServiceImpl implements DonorService {
 
         donorHistoryRepository.save(history);
     }
-    
+
+    private List<LocationSnapshotHistory> parseLocationData(String locationData) {
+        List<LocationSnapshotHistory> locationSnapshots = new ArrayList<>();
+
+        if (locationData != null && !locationData.trim().equals("[]")) {
+            try {
+                ObjectMapper objectMapper = new ObjectMapper();
+                JsonNode locationsNode = objectMapper.readTree(locationData);
+
+                if (locationsNode.isArray()) {
+                    for (JsonNode locationNode : locationsNode) {
+                        LocationSnapshotHistory locationSnapshot = new LocationSnapshotHistory();
+                        locationSnapshot.setAddressLine(locationNode.path("addressLine").asText());
+                        locationSnapshot.setLandmark(locationNode.path("landmark").asText());
+                        locationSnapshot.setArea(locationNode.path("area").asText());
+                        locationSnapshot.setCity(locationNode.path("city").asText());
+                        locationSnapshot.setDistrict(locationNode.path("district").asText());
+                        locationSnapshot.setState(locationNode.path("state").asText());
+                        locationSnapshot.setCountry(locationNode.path("country").asText());
+                        locationSnapshot.setPincode(locationNode.path("pincode").asText());
+                        locationSnapshot.setLatitude(locationNode.path("latitude").asDouble());
+                        locationSnapshot.setLongitude(locationNode.path("longitude").asDouble());
+
+                        locationSnapshots.add(locationSnapshot);
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Failed to parse location data: " + e.getMessage());
+            }
+        }
+
+        return locationSnapshots;
+    }
+
     @Override
     public List<DonorHistoryDTO> getDonorHistory(UUID userId) {
         Donor donor = donorRepository.findByUserId(userId);
@@ -302,6 +335,21 @@ public class DonorServiceImpl implements DonorService {
         return histories.stream()
                 .map(this::convertToHistoryDTO)
                 .collect(Collectors.toList());
+    }
+    
+    @Override
+    public boolean hasAccessToDonation(UUID donationId, UUID userId) {
+        Donation donation = donationRepository.findById(donationId).orElse(null);
+        if (donation == null) return false;
+        
+        Donor donor = donorRepository.findByUserId(userId);
+        if (donor != null && donation.getDonor().getId().equals(donor.getId())) {
+            return true;
+        }
+        
+        return donorHistoryRepository.findByDonorSnapshot_UserId(userId)
+                .stream()
+                .anyMatch(history -> donationId.equals(history.getDonationSnapshot().getOriginalDonationId()));
     }
     
     private DonorHistoryDTO convertToHistoryDTO(DonorHistory history) {

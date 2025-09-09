@@ -1,6 +1,6 @@
 package com.donorservice.repository;
 
-import com.donorservice.model.DonorHistory;
+import com.donorservice.model.history.DonorHistory;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

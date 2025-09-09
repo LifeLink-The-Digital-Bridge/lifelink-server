@@ -20,6 +20,15 @@ public class DonationSnapshotHistory {
     @Column(name = "original_donation_id")
     private UUID originalDonationId;
 
+    @Column(name = "donor_id")
+    private UUID donorId;
+
+    @Column(name = "user_id")
+    private UUID userId;
+
+    @Column(name = "location_id")
+    private UUID locationId;
+
     @Column(name = "donation_date")
     private LocalDate donationDate;
 

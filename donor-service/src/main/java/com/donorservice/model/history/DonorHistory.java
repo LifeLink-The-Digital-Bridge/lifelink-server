@@ -1,6 +1,5 @@
-package com.donorservice.model;
+package com.donorservice.model.history;
 
-import com.donorservice.model.history.*;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -22,20 +21,8 @@ public class DonorHistory {
     private DonorSnapshotHistory donorSnapshot;
 
     @OneToOne(cascade = CascadeType.ALL)
-    @JoinColumn(name = "medical_details_snapshot_id")
-    private MedicalDetailsSnapshotHistory medicalDetailsSnapshot;
-
-    @OneToOne(cascade = CascadeType.ALL)
-    @JoinColumn(name = "eligibility_criteria_snapshot_id")
-    private EligibilityCriteriaSnapshotHistory eligibilityCriteriaSnapshot;
-
-    @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "hla_profile_snapshot_id")
     private HLAProfileSnapshotHistory hlaProfileSnapshot;
-
-    @OneToOne(cascade = CascadeType.ALL)
-    @JoinColumn(name = "consent_form_snapshot_id")
-    private ConsentFormSnapshotHistory consentFormSnapshot;
 
     @OneToMany(cascade = CascadeType.ALL)
     @JoinColumn(name = "donor_history_id")

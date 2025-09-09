@@ -28,4 +28,6 @@ public interface DonorService {
     void createDonationHistory(CreateDonationHistoryRequest request);
     
     List<DonorHistoryDTO> getDonorHistory(UUID userId);
+    
+    boolean hasAccessToDonation(UUID donationId, UUID userId);
 }
