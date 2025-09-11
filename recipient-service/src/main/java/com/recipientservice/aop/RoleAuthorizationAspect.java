@@ -11,6 +11,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Arrays;
+import java.util.List;
 
 @Aspect
 @Component
@@ -24,13 +25,23 @@ public class RoleAuthorizationAspect {
         HttpServletRequest request = attributes.getRequest();
         String rolesHeader = request.getHeader("roles");
 
-        if (rolesHeader == null ||
-                Arrays.stream(rolesHeader.split(","))
-                        .noneMatch(role -> role.equalsIgnoreCase(requireRole.value()))) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access Denied: Role " + requireRole.value() + " required.");
+        if (rolesHeader == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access Denied: No roles found.");
+        }
+
+        List<String> userRoles = Arrays.asList(rolesHeader.split(","));
+
+        String[] requiredRoles = requireRole.value();
+
+        boolean hasRequiredRole = Arrays.stream(requiredRoles)
+                .anyMatch(requiredRole -> userRoles.stream()
+                        .anyMatch(userRole -> userRole.trim().equalsIgnoreCase(requiredRole.trim())));
+
+        if (!hasRequiredRole) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Access Denied: One of these roles required: " + Arrays.toString(requiredRoles));
         }
 
         return joinPoint.proceed();
     }
 }
-

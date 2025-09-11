@@ -294,11 +294,6 @@ public class RecipientServiceImpl implements RecipientService {
         hlaSnapshot.setIsHighResolution(request.getIsHighResolution());
         hlaSnapshot.setResolutionLevel(request.getCertificationNumber());
 
-        RecipientConsentFormSnapshotHistory consentSnapshot = new RecipientConsentFormSnapshotHistory();
-        consentSnapshot.setUserId(request.getRecipientUserId());
-        consentSnapshot.setIsConsented(request.getIsConsented());
-        consentSnapshot.setConsentedAt(request.getConsentedAt());
-
         ReceiveRequestSnapshotHistory requestSnapshot = new ReceiveRequestSnapshotHistory();
         requestSnapshot.setOriginalRequestId(request.getReceiveRequestId());
         requestSnapshot.setRequestType(RequestType.valueOf(request.getRequestType()));
@@ -322,10 +317,6 @@ public class RecipientServiceImpl implements RecipientService {
 
         RecipientHistory history = new RecipientHistory();
         history.setRecipientSnapshot(recipientSnapshot);
-        history.setMedicalDetailsSnapshot(medicalSnapshot);
-        history.setEligibilityCriteriaSnapshot(eligibilitySnapshot);
-        history.setHlaProfileSnapshot(hlaSnapshot);
-        history.setConsentFormSnapshot(consentSnapshot);
         history.setReceiveRequestSnapshot(requestSnapshot);
         history.setMatchId(request.getMatchId());
         history.setDonationId(request.getDonationId());
@@ -334,6 +325,7 @@ public class RecipientServiceImpl implements RecipientService {
         history.setCompletedAt(request.getCompletedAt());
 
         recipientHistoryRepository.save(history);
+        System.out.println("Created recipient history for request: " + request.getReceiveRequestId());
     }
     
     @Override
@@ -343,7 +335,7 @@ public class RecipientServiceImpl implements RecipientService {
                 .map(this::convertToHistoryDTO)
                 .collect(Collectors.toList());
     }
-    
+
     private RecipientHistoryDTO convertToHistoryDTO(RecipientHistory history) {
         RecipientHistoryDTO dto = new RecipientHistoryDTO();
         dto.setMatchId(history.getMatchId());
@@ -449,31 +441,54 @@ public class RecipientServiceImpl implements RecipientService {
 
     private RecipientEvent getRecipientEvent(Recipient recipient) {
         if (recipient == null) return null;
+
         RecipientEvent recipientEvent = new RecipientEvent();
-        BeanUtils.copyProperties(recipient, recipientEvent);
         recipientEvent.setRecipientId(recipient.getId());
+        recipientEvent.setUserId(recipient.getUserId());
+
         if (recipient.getAvailability() != null) {
             recipientEvent.setAvailability(recipient.getAvailability());
         }
 
         if (recipient.getMedicalDetails() != null) {
-            recipientEvent.setMedicalDetailsId(recipient.getMedicalDetails().getId());
-            recipientEvent.setDiagnosis(recipient.getMedicalDetails().getDiagnosis());
-            recipientEvent.setAllergies(recipient.getMedicalDetails().getAllergies());
-            recipientEvent.setCurrentMedications(recipient.getMedicalDetails().getCurrentMedications());
-            recipientEvent.setAdditionalNotes(recipient.getMedicalDetails().getAdditionalNotes());
+            MedicalDetails medical = recipient.getMedicalDetails();
+            recipientEvent.setMedicalDetailsId(medical.getId());
+            recipientEvent.setHemoglobinLevel(medical.getHemoglobinLevel());
+            recipientEvent.setBloodPressure(medical.getBloodPressure());
+            recipientEvent.setDiagnosis(medical.getDiagnosis());
+            recipientEvent.setAllergies(medical.getAllergies());
+            recipientEvent.setCurrentMedications(medical.getCurrentMedications());
+            recipientEvent.setAdditionalNotes(medical.getAdditionalNotes());
+            recipientEvent.setHasInfectiousDiseases(medical.getHasInfectiousDiseases());
+            recipientEvent.setInfectiousDiseaseDetails(medical.getInfectiousDiseaseDetails());
+            recipientEvent.setCreatinineLevel(medical.getCreatinineLevel());
+            recipientEvent.setLiverFunctionTests(medical.getLiverFunctionTests());
+            recipientEvent.setCardiacStatus(medical.getCardiacStatus());
+            recipientEvent.setPulmonaryFunction(medical.getPulmonaryFunction());
+            recipientEvent.setOverallHealthStatus(medical.getOverallHealthStatus());
         }
 
         if (recipient.getEligibilityCriteria() != null) {
-            recipientEvent.setEligibilityCriteriaId(recipient.getEligibilityCriteria().getId());
-            recipientEvent.setMedicallyEligible(recipient.getEligibilityCriteria().getMedicallyEligible());
-            recipientEvent.setLegalClearance(recipient.getEligibilityCriteria().getLegalClearance());
-            recipientEvent.setEligibilityNotes(recipient.getEligibilityCriteria().getNotes());
-            recipientEvent.setLastReviewed(recipient.getEligibilityCriteria().getLastReviewed());
+            EligibilityCriteria eligibility = recipient.getEligibilityCriteria();
+            recipientEvent.setEligibilityCriteriaId(eligibility.getId());
+            recipientEvent.setAgeEligible(eligibility.getAgeEligible());
+            recipientEvent.setAge(eligibility.getAge());
+            recipientEvent.setDob(eligibility.getDob());
+            recipientEvent.setWeightEligible(eligibility.getWeightEligible());
+            recipientEvent.setWeight(eligibility.getWeight());
+            recipientEvent.setMedicallyEligible(eligibility.getMedicallyEligible());
+            recipientEvent.setLegalClearance(eligibility.getLegalClearance());
+            recipientEvent.setEligibilityNotes(eligibility.getNotes());
+            recipientEvent.setLastReviewed(eligibility.getLastReviewed());
+            recipientEvent.setHeight(eligibility.getHeight());
+            recipientEvent.setBodyMassIndex(eligibility.getBodyMassIndex());
+            recipientEvent.setBodySize(eligibility.getBodySize());
+            recipientEvent.setIsLivingDonor(eligibility.getIsLivingDonor());
         }
 
         return recipientEvent;
     }
+
 
     public static ReceiveRequestEvent getReceiveRequestEvent(ReceiveRequestDTO requestDTO) {
         if (requestDTO == null) return null;

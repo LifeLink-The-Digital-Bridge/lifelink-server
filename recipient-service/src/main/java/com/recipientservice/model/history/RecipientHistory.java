@@ -1,6 +1,5 @@
-package com.recipientservice.model;
+package com.recipientservice.model.history;
 
-import com.recipientservice.model.history.*;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -22,20 +21,8 @@ public class RecipientHistory {
     private RecipientSnapshotHistory recipientSnapshot;
 
     @OneToOne(cascade = CascadeType.ALL)
-    @JoinColumn(name = "medical_details_snapshot_id")
-    private RecipientMedicalDetailsSnapshotHistory medicalDetailsSnapshot;
-
-    @OneToOne(cascade = CascadeType.ALL)
-    @JoinColumn(name = "eligibility_criteria_snapshot_id")
-    private RecipientEligibilityCriteriaSnapshotHistory eligibilityCriteriaSnapshot;
-
-    @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "hla_profile_snapshot_id")
     private RecipientHLAProfileSnapshotHistory hlaProfileSnapshot;
-
-    @OneToOne(cascade = CascadeType.ALL)
-    @JoinColumn(name = "consent_form_snapshot_id")
-    private RecipientConsentFormSnapshotHistory consentFormSnapshot;
 
     @OneToMany(cascade = CascadeType.ALL)
     @JoinColumn(name = "recipient_history_id")

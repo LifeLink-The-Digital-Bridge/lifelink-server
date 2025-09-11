@@ -1,6 +1,6 @@
 package com.recipientservice.repository;
 
-import com.recipientservice.model.RecipientHistory;
+import com.recipientservice.model.history.RecipientHistory;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

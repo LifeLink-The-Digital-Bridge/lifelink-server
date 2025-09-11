@@ -30,5 +30,4 @@ public interface RecipientService {
     void createRecipientHistory(CreateRecipientHistoryRequest request);
     
     List<RecipientHistoryDTO> getRecipientHistory(UUID userId);
-
 }
