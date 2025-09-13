@@ -24,10 +24,8 @@ public interface DonorService {
     String getDonationStatus(UUID donationId);
     
     DonationDTO getDonationById(UUID donationId);
-    
+
     void createDonationHistory(CreateDonationHistoryRequest request);
-    
+
     List<DonorHistoryDTO> getDonorHistory(UUID userId);
-    
-    boolean hasAccessToDonation(UUID donationId, UUID userId);
 }

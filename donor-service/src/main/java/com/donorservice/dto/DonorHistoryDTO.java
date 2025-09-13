@@ -16,6 +16,5 @@ public class DonorHistoryDTO {
     private MedicalDetailsDTO medicalDetailsSnapshot;
     private EligibilityCriteriaDTO eligibilityCriteriaSnapshot;
     private HLAProfileDTO hlaProfileSnapshot;
-    private ConsentFormDTO consentFormSnapshot;
     private DonationDTO donationSnapshot;
 }

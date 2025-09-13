@@ -39,10 +39,8 @@ public class CreateDonationHistoryRequest {
     private Double pulmonaryFunction;
     private String overallHealthStatus;
     
-    private Boolean ageEligible;
     private Integer age;
     private LocalDate dob;
-    private Boolean weightEligible;
     private Double weight;
     private Boolean medicalClearance;
     private Boolean recentTattooOrPiercing;

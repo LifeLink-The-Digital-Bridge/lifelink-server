@@ -15,6 +15,9 @@ public class MedicalDetailsSnapshotHistory {
     @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
 
+    @Column(name = "donor_id")
+    private UUID donorId;
+
     @Column(name = "hemoglobin_level")
     private Double hemoglobinLevel;
 

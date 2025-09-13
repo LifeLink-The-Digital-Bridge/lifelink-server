@@ -15,8 +15,10 @@ import com.donorservice.kafka.event.LocationEvent;
 import com.donorservice.model.*;
 import com.donorservice.model.history.*;
 import com.donorservice.repository.*;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.transaction.Transactional;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
@@ -32,6 +34,7 @@ public class DonorServiceImpl implements DonorService {
     private final LocationRepository locationRepository;
     private final EventPublisher eventPublisher;
     private final ProfileLockService profileLockService;
+    private final ObjectMapper objectMapper;
 
     public DonorServiceImpl(DonorRepository donorRepository,
                             DonationRepository donationRepository,
@@ -39,13 +42,14 @@ public class DonorServiceImpl implements DonorService {
                             UserClient userClient,
                             LocationRepository locationRepository,
                             EventPublisher eventPublisher,
-                            ProfileLockService profileLockService) {
+                            ProfileLockService profileLockService, ObjectMapper objectMapper) {
         this.donorRepository = donorRepository;
         this.donationRepository = donationRepository;
         this.donorHistoryRepository = donorHistoryRepository;
         this.locationRepository = locationRepository;
         this.eventPublisher = eventPublisher;
         this.profileLockService = profileLockService;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -181,150 +185,6 @@ public class DonorServiceImpl implements DonorService {
     }
 
     @Override
-    public void createDonationHistory(CreateDonationHistoryRequest request) {
-        DonorSnapshotHistory donorSnapshot = new DonorSnapshotHistory();
-        donorSnapshot.setOriginalDonorId(request.getDonorId());
-        donorSnapshot.setUserId(request.getDonorUserId());
-        donorSnapshot.setRegistrationDate(request.getRegistrationDate());
-        donorSnapshot.setStatus(DonorStatus.valueOf(request.getDonorStatus()));
-
-        donorSnapshot.setHemoglobinLevel(request.getHemoglobinLevel());
-        donorSnapshot.setBloodPressure(request.getBloodPressure());
-        donorSnapshot.setHasDiseases(request.getHasDiseases());
-        donorSnapshot.setTakingMedication(request.getTakingMedication());
-        donorSnapshot.setDiseaseDescription(request.getDiseaseDescription());
-        donorSnapshot.setCurrentMedications(request.getCurrentMedications());
-        donorSnapshot.setLastMedicalCheckup(request.getLastMedicalCheckup());
-        donorSnapshot.setMedicalHistory(request.getMedicalHistory());
-        donorSnapshot.setHasInfectiousDiseases(request.getHasInfectiousDiseases());
-        donorSnapshot.setInfectiousDiseaseDetails(request.getInfectiousDiseaseDetails());
-        donorSnapshot.setCreatinineLevel(request.getCreatinineLevel());
-        donorSnapshot.setLiverFunctionTests(request.getLiverFunctionTests());
-        donorSnapshot.setCardiacStatus(request.getCardiacStatus());
-        donorSnapshot.setPulmonaryFunction(request.getPulmonaryFunction());
-        donorSnapshot.setOverallHealthStatus(request.getOverallHealthStatus());
-
-        donorSnapshot.setAge(request.getAge());
-        donorSnapshot.setDob(request.getDob());
-        donorSnapshot.setWeight(request.getWeight());
-        donorSnapshot.setMedicalClearance(request.getMedicalClearance());
-        donorSnapshot.setRecentTattooOrPiercing(request.getRecentTattooOrPiercing());
-        donorSnapshot.setRecentTravelDetails(request.getRecentTravelDetails());
-        donorSnapshot.setRecentVaccination(request.getRecentVaccination());
-        donorSnapshot.setRecentSurgery(request.getRecentSurgery());
-        donorSnapshot.setChronicDiseases(request.getChronicDiseases());
-        donorSnapshot.setAllergies(request.getAllergies());
-        donorSnapshot.setLastDonationDate(request.getLastDonationDate());
-        donorSnapshot.setHeight(request.getHeight());
-        donorSnapshot.setBodyMassIndex(request.getBodyMassIndex());
-        donorSnapshot.setBodySize(request.getBodySize());
-        donorSnapshot.setIsLivingDonor(request.getIsLivingDonor());
-
-        HLAProfileSnapshotHistory hlaSnapshot = new HLAProfileSnapshotHistory();
-        hlaSnapshot.setHlaA1(request.getHlaA1());
-        hlaSnapshot.setHlaA2(request.getHlaA2());
-        hlaSnapshot.setHlaB1(request.getHlaB1());
-        hlaSnapshot.setHlaB2(request.getHlaB2());
-        hlaSnapshot.setHlaC1(request.getHlaC1());
-        hlaSnapshot.setHlaC2(request.getHlaC2());
-        hlaSnapshot.setHlaDr1(request.getHlaDR1());
-        hlaSnapshot.setHlaDr2(request.getHlaDR2());
-        hlaSnapshot.setHlaDq1(request.getHlaDQ1());
-        hlaSnapshot.setHlaDq2(request.getHlaDQ2());
-        hlaSnapshot.setHlaDP1(request.getHlaDP1());
-        hlaSnapshot.setHlaDP2(request.getHlaDP2());
-        hlaSnapshot.setTestingDate(request.getTestingDate());
-        hlaSnapshot.setTestMethod(request.getTestingMethod());
-        hlaSnapshot.setLaboratoryName(request.getLaboratoryName());
-        hlaSnapshot.setCertificationNumber(request.getCertificationNumber());
-        hlaSnapshot.setHlaString(request.getHlaString());
-        hlaSnapshot.setIsHighResolution(request.getIsHighResolution());
-
-        List<LocationSnapshotHistory> locationSnapshots = parseLocationData(request.getLocationData());
-
-        DonationSnapshotHistory donationSnapshot = new DonationSnapshotHistory();
-        donationSnapshot.setOriginalDonationId(request.getDonationId());
-        donationSnapshot.setDonorId(request.getDonorId());
-        donationSnapshot.setUserId(request.getDonorUserId());
-        donationSnapshot.setDonationDate(request.getDonationDate());
-        donationSnapshot.setStatus(DonationStatus.valueOf(request.getDonationStatus()));
-
-        if (request.getBloodType() != null) {
-            donationSnapshot.setBloodType(BloodType.valueOf(request.getBloodType()));
-        }
-        donationSnapshot.setDonationType(DonationType.valueOf(request.getDonationType()));
-        donationSnapshot.setQuantity(request.getQuantity());
-
-        if (request.getOrganType() != null) {
-            donationSnapshot.setOrganType(OrganType.valueOf(request.getOrganType()));
-            donationSnapshot.setIsCompatible(request.getIsCompatible());
-            donationSnapshot.setOrganQuality(request.getOrganQuality());
-            donationSnapshot.setOrganViabilityExpiry(request.getOrganViabilityExpiry());
-            donationSnapshot.setColdIschemiaTime(request.getColdIschemiaTime());
-            donationSnapshot.setOrganPerfused(request.getOrganPerfused());
-            donationSnapshot.setOrganWeight(request.getOrganWeight());
-            donationSnapshot.setOrganSize(request.getOrganSize());
-            donationSnapshot.setFunctionalAssessment(request.getFunctionalAssessment());
-            donationSnapshot.setHasAbnormalities(request.getHasAbnormalities());
-            donationSnapshot.setAbnormalityDescription(request.getAbnormalityDescription());
-        }
-        if (request.getTissueType() != null) {
-            donationSnapshot.setTissueType(TissueType.valueOf(request.getTissueType()));
-        }
-        if (request.getStemCellType() != null) {
-            donationSnapshot.setStemCellType(StemCellType.valueOf(request.getStemCellType()));
-        }
-
-        System.out.println("Creating donation history for donation: " + request.getDonationId());
-
-        DonorHistory history = new DonorHistory();
-        history.setDonorSnapshot(donorSnapshot);
-        history.setHlaProfileSnapshot(hlaSnapshot);
-        history.setLocationSnapshots(locationSnapshots);
-        history.setDonationSnapshot(donationSnapshot);
-        history.setMatchId(request.getMatchId());
-        history.setReceiveRequestId(request.getReceiveRequestId());
-        history.setRecipientUserId(request.getRecipientUserId());
-        history.setMatchedAt(request.getMatchedAt());
-        history.setCompletedAt(request.getCompletedAt());
-
-        donorHistoryRepository.save(history);
-    }
-
-    private List<LocationSnapshotHistory> parseLocationData(String locationData) {
-        List<LocationSnapshotHistory> locationSnapshots = new ArrayList<>();
-
-        if (locationData != null && !locationData.trim().equals("[]")) {
-            try {
-                ObjectMapper objectMapper = new ObjectMapper();
-                JsonNode locationsNode = objectMapper.readTree(locationData);
-
-                if (locationsNode.isArray()) {
-                    for (JsonNode locationNode : locationsNode) {
-                        LocationSnapshotHistory locationSnapshot = new LocationSnapshotHistory();
-                        locationSnapshot.setAddressLine(locationNode.path("addressLine").asText());
-                        locationSnapshot.setLandmark(locationNode.path("landmark").asText());
-                        locationSnapshot.setArea(locationNode.path("area").asText());
-                        locationSnapshot.setCity(locationNode.path("city").asText());
-                        locationSnapshot.setDistrict(locationNode.path("district").asText());
-                        locationSnapshot.setState(locationNode.path("state").asText());
-                        locationSnapshot.setCountry(locationNode.path("country").asText());
-                        locationSnapshot.setPincode(locationNode.path("pincode").asText());
-                        locationSnapshot.setLatitude(locationNode.path("latitude").asDouble());
-                        locationSnapshot.setLongitude(locationNode.path("longitude").asDouble());
-
-                        locationSnapshots.add(locationSnapshot);
-                    }
-                }
-            } catch (Exception e) {
-                System.err.println("Failed to parse location data: " + e.getMessage());
-            }
-        }
-
-        return locationSnapshots;
-    }
-
-    @Override
     public List<DonorHistoryDTO> getDonorHistory(UUID userId) {
         Donor donor = donorRepository.findByUserId(userId);
         if (donor == null) {
@@ -335,42 +195,6 @@ public class DonorServiceImpl implements DonorService {
         return histories.stream()
                 .map(this::convertToHistoryDTO)
                 .collect(Collectors.toList());
-    }
-    
-    @Override
-    public boolean hasAccessToDonation(UUID donationId, UUID userId) {
-        Donation donation = donationRepository.findById(donationId).orElse(null);
-        if (donation == null) return false;
-        
-        Donor donor = donorRepository.findByUserId(userId);
-        if (donor != null && donation.getDonor().getId().equals(donor.getId())) {
-            return true;
-        }
-        
-        return donorHistoryRepository.findByDonorSnapshot_UserId(userId)
-                .stream()
-                .anyMatch(history -> donationId.equals(history.getDonationSnapshot().getOriginalDonationId()));
-    }
-    
-    private DonorHistoryDTO convertToHistoryDTO(DonorHistory history) {
-        DonorHistoryDTO dto = new DonorHistoryDTO();
-        dto.setMatchId(history.getMatchId());
-        dto.setReceiveRequestId(history.getReceiveRequestId());
-        dto.setRecipientUserId(history.getRecipientUserId());
-        dto.setMatchedAt(history.getMatchedAt());
-        dto.setCompletedAt(history.getCompletedAt());
-        
-        if (history.getDonationSnapshot() != null) {
-            DonationDTO donationDTO = new DonationDTO();
-            donationDTO.setId(history.getDonationSnapshot().getOriginalDonationId());
-            donationDTO.setDonationDate(history.getDonationSnapshot().getDonationDate());
-            donationDTO.setStatus(history.getDonationSnapshot().getStatus());
-            donationDTO.setBloodType(history.getDonationSnapshot().getBloodType());
-            donationDTO.setDonationType(history.getDonationSnapshot().getDonationType());
-            dto.setDonationSnapshot(donationDTO);
-        }
-        
-        return dto;
     }
 
     private DonorDTO getDonorDTO(Donor savedDonor) {
@@ -684,4 +508,247 @@ public class DonorServiceImpl implements DonorService {
             );
         }
     }
+    @Transactional
+    public void createDonationHistory(CreateDonationHistoryRequest request) {
+        DonorHistory donorHistory = new DonorHistory();
+
+        donorHistory.setMatchId(request.getMatchId());
+        donorHistory.setReceiveRequestId(request.getReceiveRequestId());
+        donorHistory.setRecipientUserId(request.getRecipientUserId());
+        donorHistory.setMatchedAt(request.getMatchedAt());
+        donorHistory.setCompletedAt(request.getCompletedAt());
+
+        DonorSnapshotHistory donorSnapshot = createDonorSnapshot(request);
+        donorHistory.setDonorSnapshot(donorSnapshot);
+
+        MedicalDetailsSnapshotHistory medicalSnapshot = createMedicalDetailsSnapshot(request);
+        donorHistory.setMedicalDetailsSnapshot(medicalSnapshot);
+
+        EligibilityCriteriaSnapshotHistory eligibilitySnapshot = createEligibilitySnapshot(request);
+        donorHistory.setEligibilityCriteriaSnapshot(eligibilitySnapshot);
+
+        HLAProfileSnapshotHistory hlaSnapshot = createHLASnapshot(request);
+        donorHistory.setHlaProfileSnapshot(hlaSnapshot);
+
+        List<LocationSnapshotHistory> locationSnapshots = createLocationSnapshots(request);
+        donorHistory.setLocationSnapshots(locationSnapshots);
+
+        DonationSnapshotHistory donationSnapshot = createDonationSnapshot(request);
+        donorHistory.setDonationSnapshot(donationSnapshot);
+
+        donorHistoryRepository.save(donorHistory);
+    }
+
+    private DonorSnapshotHistory createDonorSnapshot(CreateDonationHistoryRequest request) {
+        DonorSnapshotHistory snapshot = new DonorSnapshotHistory();
+
+        snapshot.setOriginalDonorId(request.getDonorId());
+        snapshot.setUserId(request.getDonorUserId());
+        snapshot.setRegistrationDate(request.getRegistrationDate());
+        snapshot.setStatus(request.getDonorStatus() != null ? DonorStatus.valueOf(request.getDonorStatus()) : null);
+
+        return snapshot;
+    }
+
+    private MedicalDetailsSnapshotHistory createMedicalDetailsSnapshot(CreateDonationHistoryRequest request) {
+        MedicalDetailsSnapshotHistory snapshot = new MedicalDetailsSnapshotHistory();
+
+        snapshot.setDonorId(request.getDonorId());
+        snapshot.setHemoglobinLevel(request.getHemoglobinLevel());
+        snapshot.setBloodPressure(request.getBloodPressure());
+        snapshot.setHasDiseases(request.getHasDiseases());
+        snapshot.setTakingMedication(request.getTakingMedication());
+        snapshot.setDiseaseDescription(request.getDiseaseDescription());
+        snapshot.setCurrentMedications(request.getCurrentMedications());
+        snapshot.setLastMedicalCheckup(request.getLastMedicalCheckup());
+        snapshot.setMedicalHistory(request.getMedicalHistory());
+        snapshot.setHasInfectiousDiseases(request.getHasInfectiousDiseases());
+        snapshot.setInfectiousDiseaseDetails(request.getInfectiousDiseaseDetails());
+        snapshot.setCreatinineLevel(request.getCreatinineLevel());
+        snapshot.setLiverFunctionTests(request.getLiverFunctionTests());
+        snapshot.setCardiacStatus(request.getCardiacStatus());
+        snapshot.setPulmonaryFunction(request.getPulmonaryFunction());
+        snapshot.setOverallHealthStatus(request.getOverallHealthStatus());
+
+        return snapshot;
+    }
+
+    private EligibilityCriteriaSnapshotHistory createEligibilitySnapshot(CreateDonationHistoryRequest request) {
+        EligibilityCriteriaSnapshotHistory snapshot = new EligibilityCriteriaSnapshotHistory();
+
+        snapshot.setDonorId(request.getDonorId());
+        snapshot.setAge(request.getAge());
+        snapshot.setAgeEligible(request.getAge() != null && request.getAge() >= 18 && request.getAge() <= 65);
+        snapshot.setWeight(request.getWeight());
+        snapshot.setDob(request.getDob());
+        snapshot.setMedicalClearance(request.getMedicalClearance());
+        snapshot.setRecentTattooOrPiercing(request.getRecentTattooOrPiercing());
+        snapshot.setRecentTravelDetails(request.getRecentTravelDetails());
+        snapshot.setRecentVaccination(request.getRecentVaccination());
+        snapshot.setRecentSurgery(request.getRecentSurgery());
+        snapshot.setChronicDiseases(request.getChronicDiseases());
+        snapshot.setAllergies(request.getAllergies());
+        snapshot.setLastDonationDate(request.getLastDonationDate());
+        snapshot.setHeight(request.getHeight());
+        snapshot.setBodyMassIndex(request.getBodyMassIndex());
+        snapshot.setBodySize(request.getBodySize());
+        snapshot.setIsLivingDonor(request.getIsLivingDonor());
+
+        return snapshot;
+    }
+
+    private HLAProfileSnapshotHistory createHLASnapshot(CreateDonationHistoryRequest request) {
+        HLAProfileSnapshotHistory snapshot = new HLAProfileSnapshotHistory();
+
+        snapshot.setHlaA1(request.getHlaA1());
+        snapshot.setHlaA2(request.getHlaA2());
+        snapshot.setHlaB1(request.getHlaB1());
+        snapshot.setHlaB2(request.getHlaB2());
+        snapshot.setHlaC1(request.getHlaC1());
+        snapshot.setHlaC2(request.getHlaC2());
+        snapshot.setHlaDr1(request.getHlaDR1());
+        snapshot.setHlaDr2(request.getHlaDR2());
+        snapshot.setHlaDq1(request.getHlaDQ1());
+        snapshot.setHlaDq2(request.getHlaDQ2());
+        snapshot.setHlaDP1(request.getHlaDP1());
+        snapshot.setHlaDP2(request.getHlaDP2());
+        snapshot.setTestingDate(request.getTestingDate());
+        snapshot.setTestMethod(request.getTestingMethod());
+        snapshot.setLaboratoryName(request.getLaboratoryName());
+        snapshot.setCertificationNumber(request.getCertificationNumber());
+        snapshot.setHlaString(request.getHlaString());
+        snapshot.setIsHighResolution(request.getIsHighResolution());
+
+        return snapshot;
+    }
+
+    private List<LocationSnapshotHistory> createLocationSnapshots(CreateDonationHistoryRequest request) {
+        List<LocationSnapshotHistory> snapshots = new ArrayList<>();
+
+        if (request.getLocationData() != null && !request.getLocationData().equals("[]")) {
+            try {
+                List<Map<String, Object>> locations = objectMapper.readValue(
+                        request.getLocationData(),
+                        new TypeReference<List<Map<String, Object>>>() {}
+                );
+
+                for (Map<String, Object> locationData : locations) {
+                    LocationSnapshotHistory snapshot = new LocationSnapshotHistory();
+                    snapshot.setAddressLine((String) locationData.get("addressLine"));
+                    snapshot.setLandmark((String) locationData.get("landmark"));
+                    snapshot.setArea((String) locationData.get("area"));
+                    snapshot.setCity((String) locationData.get("city"));
+                    snapshot.setDistrict((String) locationData.get("district"));
+                    snapshot.setState((String) locationData.get("state"));
+                    snapshot.setCountry((String) locationData.get("country"));
+                    snapshot.setPincode((String) locationData.get("pincode"));
+                    snapshot.setLatitude(parseDouble(locationData.get("latitude")));
+                    snapshot.setLongitude(parseDouble(locationData.get("longitude")));
+                    snapshots.add(snapshot);
+                }
+            } catch (Exception e) {
+                System.err.println("Failed to parse location data: " + e.getMessage());
+            }
+        }
+
+        return snapshots;
+    }
+
+    private DonationSnapshotHistory createDonationSnapshot(CreateDonationHistoryRequest request) {
+        DonationSnapshotHistory snapshot = new DonationSnapshotHistory();
+
+        snapshot.setOriginalDonationId(request.getDonationId());
+        snapshot.setDonorId(request.getDonorId());
+        snapshot.setUserId(request.getDonorUserId());
+        snapshot.setDonationDate(request.getDonationDate());
+        snapshot.setStatus(request.getDonationStatus() != null ? DonationStatus.valueOf(request.getDonationStatus()) : null);
+        snapshot.setBloodType(request.getBloodType() != null ? BloodType.valueOf(request.getBloodType()) : null);
+        snapshot.setDonationType(request.getDonationType() != null ? DonationType.valueOf(request.getDonationType()) : null);
+
+        snapshot.setQuantity(request.getQuantity());
+
+        if (request.getOrganType() != null) {
+            snapshot.setOrganType(OrganType.valueOf(request.getOrganType()));
+            snapshot.setIsCompatible(request.getIsCompatible());
+            snapshot.setOrganQuality(request.getOrganQuality());
+            snapshot.setOrganViabilityExpiry(request.getOrganViabilityExpiry());
+            snapshot.setColdIschemiaTime(request.getColdIschemiaTime());
+            snapshot.setOrganPerfused(request.getOrganPerfused());
+            snapshot.setOrganWeight(request.getOrganWeight());
+            snapshot.setOrganSize(request.getOrganSize());
+            snapshot.setFunctionalAssessment(request.getFunctionalAssessment());
+            snapshot.setHasAbnormalities(request.getHasAbnormalities());
+            snapshot.setAbnormalityDescription(request.getAbnormalityDescription());
+        }
+
+        if (request.getTissueType() != null) {
+            snapshot.setTissueType(TissueType.valueOf(request.getTissueType()));
+        }
+
+        if (request.getStemCellType() != null) {
+            snapshot.setStemCellType(StemCellType.valueOf(request.getStemCellType()));
+        }
+
+        return snapshot;
+    }
+
+    private Double parseDouble(Object value) {
+        if (value == null) return null;
+        if (value instanceof Number) {
+            return ((Number) value).doubleValue();
+        }
+        if (value instanceof String) {
+            try {
+                return Double.parseDouble((String) value);
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
+    }
+    private DonorHistoryDTO convertToHistoryDTO(DonorHistory history) {
+        DonorHistoryDTO dto = new DonorHistoryDTO();
+        dto.setMatchId(history.getMatchId());
+        dto.setReceiveRequestId(history.getReceiveRequestId());
+        dto.setRecipientUserId(history.getRecipientUserId());
+        dto.setMatchedAt(history.getMatchedAt());
+        dto.setCompletedAt(history.getCompletedAt());
+
+        if (history.getDonationSnapshot() != null) {
+            DonationDTO donationDTO = new DonationDTO();
+            donationDTO.setId(history.getDonationSnapshot().getOriginalDonationId());
+            donationDTO.setDonationDate(history.getDonationSnapshot().getDonationDate());
+            donationDTO.setStatus(history.getDonationSnapshot().getStatus());
+            donationDTO.setBloodType(history.getDonationSnapshot().getBloodType());
+            donationDTO.setDonationType(history.getDonationSnapshot().getDonationType());
+            donationDTO.setQuantity(history.getDonationSnapshot().getQuantity());
+
+            if (history.getDonationSnapshot().getOrganType() != null) {
+                donationDTO.setOrganType(history.getDonationSnapshot().getOrganType());
+                donationDTO.setIsCompatible(history.getDonationSnapshot().getIsCompatible());
+                donationDTO.setOrganQuality(history.getDonationSnapshot().getOrganQuality());
+                donationDTO.setOrganViabilityExpiry(history.getDonationSnapshot().getOrganViabilityExpiry());
+                donationDTO.setColdIschemiaTime(history.getDonationSnapshot().getColdIschemiaTime());
+                donationDTO.setOrganPerfused(history.getDonationSnapshot().getOrganPerfused());
+                donationDTO.setOrganWeight(history.getDonationSnapshot().getOrganWeight());
+                donationDTO.setOrganSize(history.getDonationSnapshot().getOrganSize());
+                donationDTO.setFunctionalAssessment(history.getDonationSnapshot().getFunctionalAssessment());
+                donationDTO.setHasAbnormalities(history.getDonationSnapshot().getHasAbnormalities());
+                donationDTO.setAbnormalityDescription(history.getDonationSnapshot().getAbnormalityDescription());
+            }
+
+            if (history.getDonationSnapshot().getTissueType() != null) {
+                donationDTO.setTissueType(history.getDonationSnapshot().getTissueType());
+            }
+
+            if (history.getDonationSnapshot().getStemCellType() != null) {
+                donationDTO.setStemCellType(history.getDonationSnapshot().getStemCellType());
+            }
+
+            dto.setDonationSnapshot(donationDTO);
+        }
+
+        return dto;
+    }
+
 }

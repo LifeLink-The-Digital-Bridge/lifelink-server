@@ -59,6 +59,14 @@ public class DonorController {
         return ResponseEntity.ok(donor);
     }
 
+    @GetMapping("/by-userId/{userId}")
+    public ResponseEntity<DonorDTO> getDonorByUser(@PathVariable UUID userId) {
+        DonorDTO donor = donorService.getDonorByUserId(userId);
+        if (donor == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(donor);
+    }
 
     @RequireRole("DONOR")
     @GetMapping("/{id}")
@@ -92,18 +100,19 @@ public class DonorController {
         return ResponseEntity.ok(status);
     }
 
-    @GetMapping("/donations/{donationId}")
-    public ResponseEntity<DonationDTO> getDonationDetails(@PathVariable UUID donationId) {
-        DonationDTO donation = donorService.getDonationById(donationId);
-        return ResponseEntity.ok(donation);
-    }
 
     @InternalOnly
     @PostMapping("/history/create")
     public ResponseEntity<String> createDonationHistory(@RequestBody CreateDonationHistoryRequest request) {
-        donorService.createDonationHistory(request);
-        return ResponseEntity.ok("Donation history created");
+        try {
+            donorService.createDonationHistory(request);
+            return ResponseEntity.ok("Donation history created successfully");
+        } catch (Exception e) {
+            System.err.println("Error creating donation history: " + e.getMessage());
+            return ResponseEntity.badRequest().body("Failed to create donation history: " + e.getMessage());
+        }
     }
+
     
     @GetMapping("/user/{userId}/history")
     public ResponseEntity<List<DonorHistoryDTO>> getDonorHistory(@PathVariable UUID userId) {
