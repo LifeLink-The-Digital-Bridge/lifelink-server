@@ -9,5 +9,14 @@ import java.util.UUID;
 
 @Repository
 public interface RecipientHistoryRepository extends JpaRepository<RecipientHistory, UUID> {
-    List<RecipientHistory> findByRecipientSnapshot_UserId(UUID userId);
+
+    boolean existsByMatchIdAndDonorUserId(UUID matchId, UUID donorUserId);
+
+    List<RecipientHistory> findByMatchId(UUID matchId);
+
+    List<RecipientHistory> findByDonorUserId(UUID donorUserId);
+
+    List<RecipientHistory> findByRecipientUserIdAndDonorUserId(UUID recipientUserId, UUID donorUserId);
+
+    List<RecipientHistory> findByRecipientUserId(UUID userId);
 }

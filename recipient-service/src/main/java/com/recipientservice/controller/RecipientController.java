@@ -6,6 +6,7 @@ import com.recipientservice.client.UserClient;
 import com.recipientservice.dto.*;
 import com.recipientservice.dto.CreateRecipientHistoryRequest;
 import com.recipientservice.enums.RequestStatus;
+import com.recipientservice.exceptions.AccessDeniedException;
 import com.recipientservice.service.RecipientService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -101,12 +102,6 @@ public class RecipientController {
         return ResponseEntity.ok(status);
     }
 
-    @GetMapping("/requests/{requestId}")
-    public ResponseEntity<ReceiveRequestDTO> getRequestDetails(@PathVariable UUID requestId) {
-        ReceiveRequestDTO request = recipientService.getRequestById(requestId);
-        return ResponseEntity.ok(request);
-    }
-
     @InternalOnly
     @PostMapping("/history/create")
     public ResponseEntity<String> createRecipientHistory(@RequestBody CreateRecipientHistoryRequest request) {
@@ -119,5 +114,32 @@ public class RecipientController {
         List<RecipientHistoryDTO> history = recipientService.getRecipientHistory(userId);
         return ResponseEntity.ok(history);
     }
+
+    @GetMapping("/history/match/{matchId}")
+    public ResponseEntity<List<RecipientHistoryDTO>> getRecipientHistoryByMatch(
+            @PathVariable UUID matchId,
+            @RequestHeader("id") UUID requestingUserId) {
+
+        try {
+            List<RecipientHistoryDTO> history = recipientService.getRecipientHistoryByMatchId(matchId, requestingUserId);
+            return ResponseEntity.ok(history);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).build();
+        }
+    }
+
+    @GetMapping("/history/for-donor/{recipientUserId}")
+    public ResponseEntity<List<RecipientHistoryDTO>> getRecipientHistoryForDonor(
+            @PathVariable UUID recipientUserId,
+            @RequestHeader("id") UUID donorUserId) {
+
+        try {
+            List<RecipientHistoryDTO> history = recipientService.getRecipientHistoryForDonor(recipientUserId, donorUserId);
+            return ResponseEntity.ok(history);
+        } catch (Exception e) {
+            return ResponseEntity.status(403).build();
+        }
+    }
+
 
 }

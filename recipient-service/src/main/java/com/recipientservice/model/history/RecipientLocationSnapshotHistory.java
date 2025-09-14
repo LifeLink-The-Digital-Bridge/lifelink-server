@@ -11,7 +11,7 @@ import java.util.UUID;
 public class RecipientLocationSnapshotHistory {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    // UPDATED - No @GeneratedValue, use locationId from matching service
     private UUID id;
 
     @Column(name = "address_line")

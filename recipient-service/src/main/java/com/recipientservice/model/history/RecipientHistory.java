@@ -2,9 +2,7 @@ package com.recipientservice.model.history;
 
 import jakarta.persistence.*;
 import lombok.Data;
-
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -21,12 +19,16 @@ public class RecipientHistory {
     private RecipientSnapshotHistory recipientSnapshot;
 
     @OneToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "recipient_medical_details_snapshot_id")
+    private RecipientMedicalDetailsSnapshotHistory medicalDetailsSnapshot;
+
+    @OneToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "recipient_eligibility_criteria_snapshot_id")
+    private RecipientEligibilityCriteriaSnapshotHistory eligibilityCriteriaSnapshot;
+
+    @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "hla_profile_snapshot_id")
     private RecipientHLAProfileSnapshotHistory hlaProfileSnapshot;
-
-    @OneToMany(cascade = CascadeType.ALL)
-    @JoinColumn(name = "recipient_history_id")
-    private List<RecipientLocationSnapshotHistory> locationSnapshots;
 
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "receive_request_snapshot_id")

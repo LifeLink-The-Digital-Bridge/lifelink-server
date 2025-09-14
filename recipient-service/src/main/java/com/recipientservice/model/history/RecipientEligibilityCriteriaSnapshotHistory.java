@@ -15,6 +15,34 @@ public class RecipientEligibilityCriteriaSnapshotHistory {
     @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
 
+    // Age/weight flags present in matching DTO
+    @Column(name = "age_eligible")
+    private Boolean ageEligible;
+
+    @Column(name = "age")
+    private Integer age;
+
+    @Column(name = "dob")
+    private LocalDate dob;
+
+    @Column(name = "weight_eligible")
+    private Boolean weightEligible;
+
+    @Column(name = "weight")
+    private Double weight;
+
+    @Column(name = "height")
+    private Double height;
+
+    @Column(name = "body_mass_index")
+    private Double bodyMassIndex;
+
+    @Column(name = "body_size")
+    private String bodySize;
+
+    @Column(name = "is_living_donor")
+    private Boolean isLivingDonor;
+
     @Column(name = "medically_eligible")
     private Boolean medicallyEligible;
 
