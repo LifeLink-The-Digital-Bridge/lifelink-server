@@ -6,6 +6,7 @@ import com.donorservice.client.UserClient;
 import com.donorservice.dto.*;
 import com.donorservice.dto.CreateDonationHistoryRequest;
 import com.donorservice.enums.DonationStatus;
+import com.donorservice.exception.AccessDeniedException;
 import com.donorservice.service.DonorService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -119,4 +120,31 @@ public class DonorController {
         List<DonorHistoryDTO> history = donorService.getDonorHistory(userId);
         return ResponseEntity.ok(history);
     }
+
+    @GetMapping("/history/match/{matchId}")
+    public ResponseEntity<List<DonorHistoryDTO>> getDonorHistoryByMatch(
+            @PathVariable UUID matchId,
+            @RequestHeader("id") UUID requestingUserId) {
+
+        try {
+            List<DonorHistoryDTO> history = donorService.getDonorHistoryByMatchId(matchId, requestingUserId);
+            return ResponseEntity.ok(history);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).build();
+        }
+    }
+
+    @GetMapping("/history/for-recipient/{donorUserId}")
+    public ResponseEntity<List<DonorHistoryDTO>> getDonorHistoryForRecipient(
+            @PathVariable UUID donorUserId,
+            @RequestHeader("id") UUID recipientUserId) {
+
+        try {
+            List<DonorHistoryDTO> history = donorService.getDonorHistoryForRecipient(donorUserId, recipientUserId);
+            return ResponseEntity.ok(history);
+        } catch (Exception e) {
+            return ResponseEntity.status(403).build();
+        }
+    }
+
 }

@@ -3,10 +3,7 @@ package com.donorservice.service;
 import com.donorservice.client.UserClient;
 import com.donorservice.dto.*;
 import com.donorservice.enums.*;
-import com.donorservice.exception.InvalidDonorProfileException;
-import com.donorservice.exception.InvalidLocationException;
-import com.donorservice.exception.ResourceNotFoundException;
-import com.donorservice.exception.UnsupportedDonationTypeException;
+import com.donorservice.exception.*;
 import com.donorservice.kafka.EventPublisher;
 import com.donorservice.kafka.event.DonationEvent;
 import com.donorservice.kafka.event.DonorEvent;
@@ -34,22 +31,23 @@ public class DonorServiceImpl implements DonorService {
     private final LocationRepository locationRepository;
     private final EventPublisher eventPublisher;
     private final ProfileLockService profileLockService;
-    private final ObjectMapper objectMapper;
+    private final LocationSnapshotHistoryRepository locationSnapshotHistoryRepository;
 
     public DonorServiceImpl(DonorRepository donorRepository,
                             DonationRepository donationRepository,
                             DonorHistoryRepository donorHistoryRepository,
                             UserClient userClient,
                             LocationRepository locationRepository,
+                            LocationSnapshotHistoryRepository locationSnapshotHistoryRepository,
                             EventPublisher eventPublisher,
-                            ProfileLockService profileLockService, ObjectMapper objectMapper) {
+                            ProfileLockService profileLockService) {
         this.donorRepository = donorRepository;
         this.donationRepository = donationRepository;
         this.donorHistoryRepository = donorHistoryRepository;
         this.locationRepository = locationRepository;
+        this.locationSnapshotHistoryRepository = locationSnapshotHistoryRepository;
         this.eventPublisher = eventPublisher;
         this.profileLockService = profileLockService;
-        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -182,19 +180,6 @@ public class DonorServiceImpl implements DonorService {
         Donation donation = donationRepository.findById(donationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Donation not found"));
         return convertToDTO(donation);
-    }
-
-    @Override
-    public List<DonorHistoryDTO> getDonorHistory(UUID userId) {
-        Donor donor = donorRepository.findByUserId(userId);
-        if (donor == null) {
-            throw new ResourceNotFoundException("Donor not found");
-        }
-        
-        List<DonorHistory> histories = donorHistoryRepository.findByDonorSnapshot_UserId(userId);
-        return histories.stream()
-                .map(this::convertToHistoryDTO)
-                .collect(Collectors.toList());
     }
 
     private DonorDTO getDonorDTO(Donor savedDonor) {
@@ -508,6 +493,8 @@ public class DonorServiceImpl implements DonorService {
             );
         }
     }
+
+    @Override
     @Transactional
     public void createDonationHistory(CreateDonationHistoryRequest request) {
         DonorHistory donorHistory = new DonorHistory();
@@ -529,9 +516,6 @@ public class DonorServiceImpl implements DonorService {
 
         HLAProfileSnapshotHistory hlaSnapshot = createHLASnapshot(request);
         donorHistory.setHlaProfileSnapshot(hlaSnapshot);
-
-        List<LocationSnapshotHistory> locationSnapshots = createLocationSnapshots(request);
-        donorHistory.setLocationSnapshots(locationSnapshots);
 
         DonationSnapshotHistory donationSnapshot = createDonationSnapshot(request);
         donorHistory.setDonationSnapshot(donationSnapshot);
@@ -622,38 +606,6 @@ public class DonorServiceImpl implements DonorService {
         return snapshot;
     }
 
-    private List<LocationSnapshotHistory> createLocationSnapshots(CreateDonationHistoryRequest request) {
-        List<LocationSnapshotHistory> snapshots = new ArrayList<>();
-
-        if (request.getLocationData() != null && !request.getLocationData().equals("[]")) {
-            try {
-                List<Map<String, Object>> locations = objectMapper.readValue(
-                        request.getLocationData(),
-                        new TypeReference<List<Map<String, Object>>>() {}
-                );
-
-                for (Map<String, Object> locationData : locations) {
-                    LocationSnapshotHistory snapshot = new LocationSnapshotHistory();
-                    snapshot.setAddressLine((String) locationData.get("addressLine"));
-                    snapshot.setLandmark((String) locationData.get("landmark"));
-                    snapshot.setArea((String) locationData.get("area"));
-                    snapshot.setCity((String) locationData.get("city"));
-                    snapshot.setDistrict((String) locationData.get("district"));
-                    snapshot.setState((String) locationData.get("state"));
-                    snapshot.setCountry((String) locationData.get("country"));
-                    snapshot.setPincode((String) locationData.get("pincode"));
-                    snapshot.setLatitude(parseDouble(locationData.get("latitude")));
-                    snapshot.setLongitude(parseDouble(locationData.get("longitude")));
-                    snapshots.add(snapshot);
-                }
-            } catch (Exception e) {
-                System.err.println("Failed to parse location data: " + e.getMessage());
-            }
-        }
-
-        return snapshots;
-    }
-
     private DonationSnapshotHistory createDonationSnapshot(CreateDonationHistoryRequest request) {
         DonationSnapshotHistory snapshot = new DonationSnapshotHistory();
 
@@ -664,6 +616,11 @@ public class DonorServiceImpl implements DonorService {
         snapshot.setStatus(request.getDonationStatus() != null ? DonationStatus.valueOf(request.getDonationStatus()) : null);
         snapshot.setBloodType(request.getBloodType() != null ? BloodType.valueOf(request.getBloodType()) : null);
         snapshot.setDonationType(request.getDonationType() != null ? DonationType.valueOf(request.getDonationType()) : null);
+
+        if (request.getUsedLocationId() != null) {
+            LocationSnapshotHistory location = findOrCreateLocationSnapshot(request);
+            snapshot.setUsedLocation(location);
+        }
 
         snapshot.setQuantity(request.getQuantity());
 
@@ -692,20 +649,33 @@ public class DonorServiceImpl implements DonorService {
         return snapshot;
     }
 
-    private Double parseDouble(Object value) {
-        if (value == null) return null;
-        if (value instanceof Number) {
-            return ((Number) value).doubleValue();
+    private LocationSnapshotHistory findOrCreateLocationSnapshot(CreateDonationHistoryRequest request) {
+        Optional<LocationSnapshotHistory> existing = locationSnapshotHistoryRepository
+                .findById(request.getUsedLocationId());
+
+        if (existing.isPresent()) {
+            System.out.println("Reusing existing location snapshot for locationId: " + request.getUsedLocationId());
+            return existing.get();
+        } else {
+            LocationSnapshotHistory location = new LocationSnapshotHistory();
+            location.setId(request.getUsedLocationId());
+            location.setAddressLine(request.getUsedAddressLine());
+            location.setLandmark(request.getUsedLandmark());
+            location.setArea(request.getUsedArea());
+            location.setCity(request.getUsedCity());
+            location.setDistrict(request.getUsedDistrict());
+            location.setState(request.getUsedState());
+            location.setCountry(request.getUsedCountry());
+            location.setPincode(request.getUsedPincode());
+            location.setLatitude(request.getUsedLatitude());
+            location.setLongitude(request.getUsedLongitude());
+
+            LocationSnapshotHistory savedLocation = locationSnapshotHistoryRepository.save(location);
+            System.out.println("Created new location snapshot for locationId: " + request.getUsedLocationId());
+            return savedLocation;
         }
-        if (value instanceof String) {
-            try {
-                return Double.parseDouble((String) value);
-            } catch (NumberFormatException e) {
-                return null;
-            }
-        }
-        return null;
     }
+
     private DonorHistoryDTO convertToHistoryDTO(DonorHistory history) {
         DonorHistoryDTO dto = new DonorHistoryDTO();
         dto.setMatchId(history.getMatchId());
@@ -714,14 +684,55 @@ public class DonorServiceImpl implements DonorService {
         dto.setMatchedAt(history.getMatchedAt());
         dto.setCompletedAt(history.getCompletedAt());
 
+        if (history.getDonorSnapshot() != null) {
+            DonorSnapshotDTO donorSnapshotDTO = new DonorSnapshotDTO();
+            BeanUtils.copyProperties(history.getDonorSnapshot(), donorSnapshotDTO);
+            dto.setDonorSnapshot(donorSnapshotDTO);
+        }
+
+        if (history.getMedicalDetailsSnapshot() != null) {
+            MedicalDetailsDTO medicalDTO = new MedicalDetailsDTO();
+            BeanUtils.copyProperties(history.getMedicalDetailsSnapshot(), medicalDTO);
+            dto.setMedicalDetailsSnapshot(medicalDTO);
+        }
+
+        if (history.getEligibilityCriteriaSnapshot() != null) {
+            EligibilityCriteriaDTO eligibilityDTO = new EligibilityCriteriaDTO();
+            BeanUtils.copyProperties(history.getEligibilityCriteriaSnapshot(), eligibilityDTO);
+            dto.setEligibilityCriteriaSnapshot(eligibilityDTO);
+        }
+
+        if (history.getHlaProfileSnapshot() != null) {
+            HLAProfileDTO hlaDTO = new HLAProfileDTO();
+            BeanUtils.copyProperties(history.getHlaProfileSnapshot(), hlaDTO);
+            dto.setHlaProfileSnapshot(hlaDTO);
+        }
+
         if (history.getDonationSnapshot() != null) {
-            DonationDTO donationDTO = new DonationDTO();
+            DonationHistoryDTO donationDTO = new DonationHistoryDTO();
+
             donationDTO.setId(history.getDonationSnapshot().getOriginalDonationId());
+            donationDTO.setDonorId(history.getDonationSnapshot().getDonorId());
             donationDTO.setDonationDate(history.getDonationSnapshot().getDonationDate());
             donationDTO.setStatus(history.getDonationSnapshot().getStatus());
             donationDTO.setBloodType(history.getDonationSnapshot().getBloodType());
             donationDTO.setDonationType(history.getDonationSnapshot().getDonationType());
             donationDTO.setQuantity(history.getDonationSnapshot().getQuantity());
+
+            if (history.getDonationSnapshot().getUsedLocation() != null) {
+                LocationSnapshotHistory location = history.getDonationSnapshot().getUsedLocation();
+                donationDTO.setLocationId(location.getId());
+                donationDTO.setUsedLocationAddressLine(location.getAddressLine());
+                donationDTO.setUsedLocationLandmark(location.getLandmark());
+                donationDTO.setUsedLocationArea(location.getArea());
+                donationDTO.setUsedLocationCity(location.getCity());
+                donationDTO.setUsedLocationDistrict(location.getDistrict());
+                donationDTO.setUsedLocationState(location.getState());
+                donationDTO.setUsedLocationCountry(location.getCountry());
+                donationDTO.setUsedLocationPincode(location.getPincode());
+                donationDTO.setUsedLocationLatitude(location.getLatitude());
+                donationDTO.setUsedLocationLongitude(location.getLongitude());
+            }
 
             if (history.getDonationSnapshot().getOrganType() != null) {
                 donationDTO.setOrganType(history.getDonationSnapshot().getOrganType());
@@ -749,6 +760,33 @@ public class DonorServiceImpl implements DonorService {
         }
 
         return dto;
+    }
+
+    @Override
+    public List<DonorHistoryDTO> getDonorHistory(UUID userId) {
+        List<DonorHistory> histories = donorHistoryRepository.findByDonorUserId(userId);
+        return histories.stream()
+                .map(this::convertToHistoryDTO)
+                .collect(Collectors.toList());
+    }
+    @Override
+    public List<DonorHistoryDTO> getDonorHistoryByMatchId(UUID matchId, UUID requestingUserId) {
+        if (!donorHistoryRepository.existsByMatchIdAndRecipientUserId(matchId, requestingUserId)) {
+            throw new AccessDeniedException("Access denied to this donor history");
+        }
+
+        List<DonorHistory> histories = donorHistoryRepository.findByMatchId(matchId);
+        return histories.stream()
+                .map(this::convertToHistoryDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<DonorHistoryDTO> getDonorHistoryForRecipient(UUID donorUserId, UUID recipientUserId) {
+        List<DonorHistory> histories = donorHistoryRepository.findByDonorUserIdAndRecipientUserId(donorUserId, recipientUserId);
+        return histories.stream()
+                .map(this::convertToHistoryDTO)
+                .collect(Collectors.toList());
     }
 
 }

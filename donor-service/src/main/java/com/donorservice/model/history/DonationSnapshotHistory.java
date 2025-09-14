@@ -26,8 +26,9 @@ public class DonationSnapshotHistory {
     @Column(name = "user_id")
     private UUID userId;
 
-    @Column(name = "location_id")
-    private UUID locationId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "used_location_id")
+    private LocationSnapshotHistory usedLocation;
 
     @Column(name = "donation_date")
     private LocalDate donationDate;

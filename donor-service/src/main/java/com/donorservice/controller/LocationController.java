@@ -6,6 +6,7 @@ import com.donorservice.service.LocationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 
@@ -20,19 +21,23 @@ public class LocationController {
 
     @RequireRole("DONOR")
     @PostMapping
-    public ResponseEntity<LocationDTO> addAddress(@PathVariable UUID donorId, @RequestBody LocationDTO locationDTO) {
+    public ResponseEntity<LocationDTO> addAddress(@PathVariable UUID donorId,
+                                                  @RequestBody @Valid LocationDTO locationDTO) {
         return ResponseEntity.ok(locationService.addAddress(donorId, locationDTO));
     }
 
     @RequireRole("DONOR")
     @PutMapping("/{addressId}")
-    public ResponseEntity<LocationDTO> updateAddress(@PathVariable UUID donorId, @PathVariable UUID addressId, @RequestBody LocationDTO locationDTO) {
+    public ResponseEntity<LocationDTO> updateAddress(@PathVariable UUID donorId,
+                                                     @PathVariable UUID addressId,
+                                                     @RequestBody @Valid LocationDTO locationDTO) {
         return ResponseEntity.ok(locationService.updateAddress(donorId, addressId, locationDTO));
     }
 
     @RequireRole("DONOR")
     @DeleteMapping("/{addressId}")
-    public ResponseEntity<Void> deleteAddress(@PathVariable UUID donorId, @PathVariable UUID addressId) {
+    public ResponseEntity<Void> deleteAddress(@PathVariable UUID donorId,
+                                              @PathVariable UUID addressId) {
         locationService.deleteAddress(donorId, addressId);
         return ResponseEntity.noContent().build();
     }
@@ -45,7 +50,8 @@ public class LocationController {
 
     @RequireRole("DONOR")
     @GetMapping("/{addressId}")
-    public ResponseEntity<LocationDTO> getAddress(@PathVariable UUID donorId, @PathVariable UUID addressId) {
+    public ResponseEntity<LocationDTO> getAddress(@PathVariable UUID donorId,
+                                                  @PathVariable UUID addressId) {
         return ResponseEntity.ok(locationService.getAddress(donorId, addressId));
     }
 }

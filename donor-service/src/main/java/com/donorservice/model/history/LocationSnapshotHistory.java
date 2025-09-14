@@ -2,7 +2,6 @@ package com.donorservice.model.history;
 
 import jakarta.persistence.*;
 import lombok.Data;
-
 import java.util.UUID;
 
 @Data
@@ -11,7 +10,6 @@ import java.util.UUID;
 public class LocationSnapshotHistory {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
 
     @Column(name = "address_line")

@@ -17,19 +17,19 @@ public class CreateDonationHistoryRequest {
     private UUID recipientUserId;
     private LocalDateTime matchedAt;
     private LocalDateTime completedAt;
-    
+
     private UUID donorId;
     private UUID donorUserId;
-    private LocalDate registrationDate;
+    private java.time.LocalDate registrationDate;
     private String donorStatus;
-    
+
     private Double hemoglobinLevel;
     private String bloodPressure;
     private Boolean hasDiseases;
     private Boolean takingMedication;
     private String diseaseDescription;
     private String currentMedications;
-    private LocalDate lastMedicalCheckup;
+    private java.time.LocalDate lastMedicalCheckup;
     private String medicalHistory;
     private Boolean hasInfectiousDiseases;
     private String infectiousDiseaseDetails;
@@ -38,9 +38,9 @@ public class CreateDonationHistoryRequest {
     private String cardiacStatus;
     private Double pulmonaryFunction;
     private String overallHealthStatus;
-    
+
     private Integer age;
-    private LocalDate dob;
+    private java.time.LocalDate dob;
     private Double weight;
     private Boolean medicalClearance;
     private Boolean recentTattooOrPiercing;
@@ -54,7 +54,7 @@ public class CreateDonationHistoryRequest {
     private Double bodyMassIndex;
     private String bodySize;
     private Boolean isLivingDonor;
-    
+
     private String hlaA1;
     private String hlaA2;
     private String hlaB1;
@@ -67,25 +67,32 @@ public class CreateDonationHistoryRequest {
     private String hlaDQ2;
     private String hlaDP1;
     private String hlaDP2;
-    private LocalDate testingDate;
+    private java.time.LocalDate testingDate;
     private String testingMethod;
     private String laboratoryName;
     private String certificationNumber;
     private String hlaString;
     private Boolean isHighResolution;
-    
-    private Boolean isConsented;
-    private LocalDateTime consentedAt;
-    
-    private String locationData;
-    
+
+    private UUID usedLocationId;
+    private String usedAddressLine;
+    private String usedLandmark;
+    private String usedArea;
+    private String usedCity;
+    private String usedDistrict;
+    private String usedState;
+    private String usedCountry;
+    private String usedPincode;
+    private Double usedLatitude;
+    private Double usedLongitude;
+
     private UUID donationId;
-    private LocalDate donationDate;
+    private java.time.LocalDate donationDate;
     private String donationStatus;
     private String bloodType;
     private String donationType;
     private Double quantity;
-    
+
     private String organType;
     private Boolean isCompatible;
     private String organQuality;
@@ -97,7 +104,7 @@ public class CreateDonationHistoryRequest {
     private String functionalAssessment;
     private Boolean hasAbnormalities;
     private String abnormalityDescription;
-    
+
     private String tissueType;
     private String stemCellType;
 }

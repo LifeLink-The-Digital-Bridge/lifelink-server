@@ -11,18 +11,22 @@ import com.donorservice.repository.DonorRepository;
 import com.donorservice.repository.LocationRepository;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional
 public class LocationServiceImpl implements LocationService {
 
     private final DonorRepository donorRepository;
     private final LocationRepository locationRepository;
     private final EventPublisher eventPublisher;
 
-    public LocationServiceImpl(DonorRepository donorRepository, LocationRepository locationRepository, EventPublisher eventPublisher) {
+    public LocationServiceImpl(DonorRepository donorRepository,
+                               LocationRepository locationRepository,
+                               EventPublisher eventPublisher) {
         this.donorRepository = donorRepository;
         this.locationRepository = locationRepository;
         this.eventPublisher = eventPublisher;
@@ -37,21 +41,13 @@ public class LocationServiceImpl implements LocationService {
 
         Location location = new Location();
         BeanUtils.copyProperties(locationDTO, location);
-        location.setId(UUID.randomUUID());
         location.setDonor(donor);
 
         Location saved = locationRepository.save(location);
 
-        if (donor.getAddresses() == null)
-            donor.setAddresses(new ArrayList<>());
-        donor.getAddresses().add(saved);
-        donorRepository.save(donor);
+        publishLocationEventSafely(saved, donor.getId());
 
-        eventPublisher.publishLocationEvent(getLocationEvent(saved, donor.getId()));
-
-        LocationDTO result = new LocationDTO();
-        BeanUtils.copyProperties(saved, result);
-        return result;
+        return convertToDTO(saved);
     }
 
     @Override
@@ -59,71 +55,131 @@ public class LocationServiceImpl implements LocationService {
         Donor donor = donorRepository.findById(donorId)
                 .orElseThrow(() -> new ResourceNotFoundException("Donor not found"));
 
-        Location address = locationRepository.findById(addressId)
+        Location location = locationRepository.findById(addressId)
                 .orElseThrow(() -> new ResourceNotFoundException("Address not found"));
 
-        if (address.getDonor() == null || !address.getDonor().getId().equals(donorId)) {
-            throw new InvalidLocationException("This address does not belong to the donor.");
-        }
+        validateOwnership(location, donorId);
         validateLocationDTO(locationDTO);
 
-        BeanUtils.copyProperties(locationDTO, address, "id", "donor");
-        Location saved = locationRepository.save(address);
+        BeanUtils.copyProperties(locationDTO, location, "id", "donor");
+        Location saved = locationRepository.save(location);
 
-        eventPublisher.publishLocationEvent(getLocationEvent(saved, donor.getId()));
+        publishLocationEventSafely(saved, donor.getId());
 
-        LocationDTO result = new LocationDTO();
-        BeanUtils.copyProperties(saved, result);
-        return result;
+        return convertToDTO(saved);
     }
 
     @Override
     public void deleteAddress(UUID donorId, UUID addressId) {
-        Location address = locationRepository.findById(addressId)
+        Location location = locationRepository.findById(addressId)
                 .orElseThrow(() -> new ResourceNotFoundException("Address not found"));
 
-        if (address.getDonor() == null || !address.getDonor().getId().equals(donorId)) {
-            throw new InvalidLocationException("This address does not belong to the donor.");
-        }
-        locationRepository.delete(address);
+        validateOwnership(location, donorId);
+
+        locationRepository.delete(location);
     }
 
     @Override
     public List<LocationDTO> getAddresses(UUID donorId) {
         Donor donor = donorRepository.findById(donorId)
                 .orElseThrow(() -> new ResourceNotFoundException("Donor not found"));
-        List<LocationDTO> dtos = new ArrayList<>();
-        if (donor.getAddresses() != null) {
-            for (Location location : donor.getAddresses()) {
-                LocationDTO dto = new LocationDTO();
-                BeanUtils.copyProperties(location, dto);
-                dtos.add(dto);
-            }
+
+        if (donor.getAddresses() == null || donor.getAddresses().isEmpty()) {
+            return Collections.emptyList();
         }
-        return dtos;
+
+        return donor.getAddresses().stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
     }
 
     @Override
     public LocationDTO getAddress(UUID donorId, UUID addressId) {
-        Location address = locationRepository.findById(addressId)
+        Location location = locationRepository.findById(addressId)
                 .orElseThrow(() -> new ResourceNotFoundException("Address not found"));
 
-        if (address.getDonor() == null || !address.getDonor().getId().equals(donorId)) {
-            throw new InvalidLocationException("This address does not belong to the donor.");
-        }
-        LocationDTO dto = new LocationDTO();
-        BeanUtils.copyProperties(address, dto);
-        return dto;
+        validateOwnership(location, donorId);
+
+        return convertToDTO(location);
     }
 
-    private void validateLocationDTO(LocationDTO locDTO) {
-        if (locDTO.getAddressLine() == null || locDTO.getLandmark() == null ||
-                locDTO.getArea() == null || locDTO.getCity() == null ||
-                locDTO.getDistrict() == null || locDTO.getState() == null ||
-                locDTO.getCountry() == null || locDTO.getPincode() == null ||
-                locDTO.getLatitude() == null || locDTO.getLongitude() == null) {
-            throw new InvalidLocationException("All location fields must be provided and non-null.");
+    private void validateLocationDTO(LocationDTO locationDTO) {
+        if (locationDTO == null) {
+            throw new InvalidLocationException("Location data cannot be null");
         }
+
+        validateRequiredFields(locationDTO);
+
+        validateCoordinates(locationDTO);
+
+        validateFormats(locationDTO);
+    }
+
+    private void validateRequiredFields(LocationDTO locationDTO) {
+        if (isNullOrBlank(locationDTO.getAddressLine()) ||
+                isNullOrBlank(locationDTO.getLandmark()) ||
+                isNullOrBlank(locationDTO.getArea()) ||
+                isNullOrBlank(locationDTO.getCity()) ||
+                isNullOrBlank(locationDTO.getDistrict()) ||
+                isNullOrBlank(locationDTO.getState()) ||
+                isNullOrBlank(locationDTO.getCountry()) ||
+                isNullOrBlank(locationDTO.getPincode()) ||
+                locationDTO.getLatitude() == null ||
+                locationDTO.getLongitude() == null) {
+            throw new InvalidLocationException("All location fields must be provided and non-null");
+        }
+    }
+
+    private void validateCoordinates(LocationDTO locationDTO) {
+        if (locationDTO.getLatitude() < -90 || locationDTO.getLatitude() > 90) {
+            throw new InvalidLocationException("Latitude must be between -90 and 90 degrees");
+        }
+        if (locationDTO.getLongitude() < -180 || locationDTO.getLongitude() > 180) {
+            throw new InvalidLocationException("Longitude must be between -180 and 180 degrees");
+        }
+    }
+
+    private void validateFormats(LocationDTO locationDTO) {
+        if (!locationDTO.getPincode().matches("\\d{4,10}")) {
+            throw new InvalidLocationException("Pincode must be 4-10 digits");
+        }
+
+
+        if (locationDTO.getAddressLine().length() > 255) {
+            throw new InvalidLocationException("Address line cannot exceed 255 characters");
+        }
+        if (locationDTO.getCity().length() > 100) {
+            throw new InvalidLocationException("City name cannot exceed 100 characters");
+        }
+        if (locationDTO.getState().length() > 100) {
+            throw new InvalidLocationException("State name cannot exceed 100 characters");
+        }
+    }
+
+    private void validateOwnership(Location location, UUID donorId) {
+        if (location.getDonor() == null || !location.getDonor().getId().equals(donorId)) {
+            throw new InvalidLocationException("This address does not belong to the specified donor");
+        }
+    }
+
+    private boolean isNullOrBlank(String str) {
+        return str == null || str.trim().isEmpty();
+    }
+
+    private void publishLocationEventSafely(Location location, UUID donorId) {
+        try {
+            LocationEvent event = getLocationEvent(location, donorId);
+            eventPublisher.publishLocationEvent(event);
+        } catch (Exception e) {
+            System.err.println("Failed to publish location event for location " +
+                    location.getId() + ": " + e.getMessage());
+        }
+    }
+
+    private LocationDTO convertToDTO(Location location) {
+        LocationDTO dto = new LocationDTO();
+        BeanUtils.copyProperties(location, dto);
+        return dto;
     }
 
     private LocationEvent getLocationEvent(Location location, UUID donorId) {

@@ -3,7 +3,6 @@ package com.donorservice.model.history;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -30,10 +29,6 @@ public class DonorHistory {
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "medical_details_snapshot_id")
     private MedicalDetailsSnapshotHistory medicalDetailsSnapshot;
-
-    @OneToMany(cascade = CascadeType.ALL)
-    @JoinColumn(name = "donor_history_id")
-    private List<LocationSnapshotHistory> locationSnapshots;
 
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "donation_snapshot_id")

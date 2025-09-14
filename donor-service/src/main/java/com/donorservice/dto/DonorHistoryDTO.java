@@ -11,10 +11,10 @@ public class DonorHistoryDTO {
     private UUID recipientUserId;
     private LocalDateTime matchedAt;
     private LocalDateTime completedAt;
-    
+
     private DonorSnapshotDTO donorSnapshot;
     private MedicalDetailsDTO medicalDetailsSnapshot;
     private EligibilityCriteriaDTO eligibilityCriteriaSnapshot;
     private HLAProfileDTO hlaProfileSnapshot;
-    private DonationDTO donationSnapshot;
+    private DonationHistoryDTO donationSnapshot;
 }
