@@ -1,4 +1,4 @@
-package com.matchingservice.model.donor;
+package com.matchingservice.model;
 
 import jakarta.persistence.*;
 import lombok.Data;

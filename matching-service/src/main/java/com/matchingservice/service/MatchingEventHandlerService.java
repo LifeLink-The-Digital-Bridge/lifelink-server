@@ -212,16 +212,36 @@ public class MatchingEventHandlerService {
 
         recipient.setUserId(event.getUserId());
         recipient.setAvailability(event.getAvailability());
+
         recipient.setMedicalDetailsId(event.getMedicalDetailsId());
+        recipient.setHemoglobinLevel(event.getHemoglobinLevel());
+        recipient.setBloodPressure(event.getBloodPressure());
         recipient.setDiagnosis(event.getDiagnosis());
         recipient.setAllergies(event.getAllergies());
         recipient.setCurrentMedications(event.getCurrentMedications());
         recipient.setAdditionalNotes(event.getAdditionalNotes());
+        recipient.setHasInfectiousDiseases(event.getHasInfectiousDiseases());
+        recipient.setInfectiousDiseaseDetails(event.getInfectiousDiseaseDetails());
+        recipient.setCreatinineLevel(event.getCreatinineLevel());
+        recipient.setLiverFunctionTests(event.getLiverFunctionTests());
+        recipient.setCardiacStatus(event.getCardiacStatus());
+        recipient.setPulmonaryFunction(event.getPulmonaryFunction());
+        recipient.setOverallHealthStatus(event.getOverallHealthStatus());
+
         recipient.setEligibilityCriteriaId(event.getEligibilityCriteriaId());
+        recipient.setAgeEligible(event.getAgeEligible());
+        recipient.setAge(event.getAge());
+        recipient.setDob(event.getDob());
+        recipient.setWeightEligible(event.getWeightEligible());
+        recipient.setWeight(event.getWeight());
         recipient.setMedicallyEligible(event.getMedicallyEligible());
         recipient.setLegalClearance(event.getLegalClearance());
         recipient.setEligibilityNotes(event.getEligibilityNotes());
         recipient.setLastReviewed(event.getLastReviewed());
+        recipient.setHeight(event.getHeight());
+        recipient.setBodyMassIndex(event.getBodyMassIndex());
+        recipient.setBodySize(event.getBodySize());
+        recipient.setIsLivingDonor(event.getIsLivingDonor());
 
         System.out.println("Inside handleRecipientEvent: " + recipient.getRecipientId());
         recipientRepository.save(recipient);
@@ -231,6 +251,7 @@ public class MatchingEventHandlerService {
             pending.forEach(this::safeRun);
         }
     }
+
 
     public void handleRecipientLocationEvent(RecipientLocationEvent event) {
         RecipientLocation location = recipientLocationRepository.findById(event.getLocationId()).orElse(null);

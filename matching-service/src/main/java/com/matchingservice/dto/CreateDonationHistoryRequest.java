@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -38,10 +39,8 @@ public class CreateDonationHistoryRequest {
     private Double pulmonaryFunction;
     private String overallHealthStatus;
     
-    private Boolean ageEligible;
     private Integer age;
     private java.time.LocalDate dob;
-    private Boolean weightEligible;
     private Double weight;
     private Boolean medicalClearance;
     private Boolean recentTattooOrPiercing;
@@ -74,14 +73,21 @@ public class CreateDonationHistoryRequest {
     private String certificationNumber;
     private String hlaString;
     private Boolean isHighResolution;
-    
-    private Boolean isConsented;
-    private LocalDateTime consentedAt;
-    
-    private String locationData;
-    
+
+    private UUID usedLocationId;
+    private String usedAddressLine;
+    private String usedLandmark;
+    private String usedArea;
+    private String usedCity;
+    private String usedDistrict;
+    private String usedState;
+    private String usedCountry;
+    private String usedPincode;
+    private Double usedLatitude;
+    private Double usedLongitude;
+
     private UUID donationId;
-    private java.time.LocalDate donationDate;
+    private LocalDate donationDate;
     private String donationStatus;
     private String bloodType;
     private String donationType;

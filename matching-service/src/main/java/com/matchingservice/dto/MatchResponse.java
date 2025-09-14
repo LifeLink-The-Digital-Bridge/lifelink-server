@@ -1,6 +1,6 @@
 package com.matchingservice.dto;
 
-import com.matchingservice.model.donor.MatchResult;
+import com.matchingservice.model.MatchResult;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

@@ -1,6 +1,6 @@
 package com.matchingservice.repository;
 
-import com.matchingservice.model.donor.MatchResult;
+import com.matchingservice.model.MatchResult;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

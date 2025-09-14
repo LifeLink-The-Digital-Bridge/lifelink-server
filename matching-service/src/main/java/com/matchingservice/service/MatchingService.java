@@ -1,8 +1,6 @@
 package com.matchingservice.service;
 
-import com.matchingservice.dto.ManualMatchRequest;
-import com.matchingservice.dto.ManualMatchResponse;
-import com.matchingservice.dto.MatchResponse;
+import com.matchingservice.dto.*;
 
 import java.util.List;
 import java.util.UUID;
@@ -23,4 +21,12 @@ public interface MatchingService {
     List<MatchResponse> getMatchesByDonation(UUID donationId);
 
     List<MatchResponse> getMatchesByRequest(UUID receiveRequestId);
+
+    boolean hasAccessToDonation(UUID donationId, UUID userId);
+
+    boolean hasAccessToRequest(UUID requestId, UUID userId);
+
+    ReceiveRequestDTO getRequestById(UUID requestId);
+
+    DonationDTO getDonationById(UUID donationId);
 }

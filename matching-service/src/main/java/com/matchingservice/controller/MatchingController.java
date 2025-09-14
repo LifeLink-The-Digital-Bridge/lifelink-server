@@ -1,9 +1,7 @@
 package com.matchingservice.controller;
 
 import com.matchingservice.aop.RequireRole;
-import com.matchingservice.dto.ManualMatchRequest;
-import com.matchingservice.dto.ManualMatchResponse;
-import com.matchingservice.dto.MatchResponse;
+import com.matchingservice.dto.*;
 import com.matchingservice.exceptions.ResourceNotFoundException;
 import com.matchingservice.repository.MatchResultRepository;
 import com.matchingservice.service.MatchingService;
@@ -81,4 +79,32 @@ public class MatchingController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
+
+    @RequireRole("DONOR")
+    @GetMapping("/requests/{requestId}")
+    public ResponseEntity<ReceiveRequestDTO> getRequestDetails(@PathVariable UUID requestId, @RequestHeader("id") UUID userId) {
+        if (!matchingService.hasAccessToRequest(requestId, userId)) {
+            System.out.println("In getRequestDetails Denied " + userId);
+            return ResponseEntity.status(403).build();
+        }
+        System.out.println("In getRequestDetails");
+
+        ReceiveRequestDTO requestDTO = matchingService.getRequestById(requestId);
+        System.out.println(requestDTO);
+        return ResponseEntity.ok(requestDTO);
+    }
+
+    @RequireRole("RECIPIENT")
+    @GetMapping("/donations/{donationId}")
+    public ResponseEntity<DonationDTO> getDonationDetails(@PathVariable UUID donationId, @RequestHeader("id") UUID userId) {
+        if (!matchingService.hasAccessToDonation(donationId, userId)) {
+            System.out.println("In getDonationDetails Denied " + userId);
+            return ResponseEntity.status(403).build();
+        }
+        System.out.println("In getDonationDetails");
+        DonationDTO donationDTO = matchingService.getDonationById(donationId);
+        System.out.println(donationDTO);
+        return ResponseEntity.ok(donationDTO);
+    }
+
 }
