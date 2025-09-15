@@ -502,6 +502,7 @@ public class DonorServiceImpl implements DonorService {
         donorHistory.setMatchId(request.getMatchId());
         donorHistory.setReceiveRequestId(request.getReceiveRequestId());
         donorHistory.setRecipientUserId(request.getRecipientUserId());
+        donorHistory.setDonorUserId(request.getDonorUserId());
         donorHistory.setMatchedAt(request.getMatchedAt());
         donorHistory.setCompletedAt(request.getCompletedAt());
 
@@ -764,7 +765,7 @@ public class DonorServiceImpl implements DonorService {
 
     @Override
     public List<DonorHistoryDTO> getDonorHistory(UUID userId) {
-        List<DonorHistory> histories = donorHistoryRepository.findByDonorUserId(userId);
+        List<DonorHistory> histories = donorHistoryRepository.findByDonorSnapshot_UserId(userId);
         return histories.stream()
                 .map(this::convertToHistoryDTO)
                 .collect(Collectors.toList());
@@ -783,7 +784,7 @@ public class DonorServiceImpl implements DonorService {
 
     @Override
     public List<DonorHistoryDTO> getDonorHistoryForRecipient(UUID donorUserId, UUID recipientUserId) {
-        List<DonorHistory> histories = donorHistoryRepository.findByDonorUserIdAndRecipientUserId(donorUserId, recipientUserId);
+        List<DonorHistory> histories = donorHistoryRepository.findByDonorSnapshot_UserIdAndRecipientUserId(donorUserId, recipientUserId);
         return histories.stream()
                 .map(this::convertToHistoryDTO)
                 .collect(Collectors.toList());

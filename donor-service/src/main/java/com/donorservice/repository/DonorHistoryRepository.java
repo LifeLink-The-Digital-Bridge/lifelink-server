@@ -16,7 +16,7 @@ public interface DonorHistoryRepository extends JpaRepository<DonorHistory, UUID
 
     List<DonorHistory> findByRecipientUserId(UUID recipientUserId);
 
-    List<DonorHistory> findByDonorUserIdAndRecipientUserId(UUID donorUserId, UUID recipientUserId);
+    List<DonorHistory> findByDonorSnapshot_UserIdAndRecipientUserId(UUID donorUserId, UUID recipientUserId);
 
-    List<DonorHistory> findByDonorUserId(UUID userId);
+    List<DonorHistory> findByDonorSnapshot_UserId(UUID userId);
 }
