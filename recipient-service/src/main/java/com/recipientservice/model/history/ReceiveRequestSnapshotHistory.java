@@ -25,7 +25,6 @@ public class ReceiveRequestSnapshotHistory {
     @Column(name = "recipient_user_id")
     private UUID recipientUserId;
 
-    // UPDATED - Reference to normalized location instead of storing all fields
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "used_location_id")
     private RecipientLocationSnapshotHistory usedLocation;

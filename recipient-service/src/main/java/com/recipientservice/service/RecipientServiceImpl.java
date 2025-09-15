@@ -460,6 +460,7 @@ public class RecipientServiceImpl implements RecipientService {
         history.setMatchId(request.getMatchId());
         history.setDonationId(request.getDonationId());
         history.setDonorUserId(request.getDonorUserId());
+        history.setRecipientUserId(request.getRecipientUserId());
         history.setMatchedAt(request.getMatchedAt());
         history.setCompletedAt(request.getCompletedAt());
 
@@ -706,6 +707,5 @@ public class RecipientServiceImpl implements RecipientService {
                 .map(this::convertToHistoryDTO)
                 .collect(Collectors.toList());
     }
-
 
 }

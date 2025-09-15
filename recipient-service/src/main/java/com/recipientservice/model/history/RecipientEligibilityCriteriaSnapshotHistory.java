@@ -15,7 +15,6 @@ public class RecipientEligibilityCriteriaSnapshotHistory {
     @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
 
-    // Age/weight flags present in matching DTO
     @Column(name = "age_eligible")
     private Boolean ageEligible;
 

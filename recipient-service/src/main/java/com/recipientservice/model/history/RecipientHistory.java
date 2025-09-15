@@ -14,6 +14,9 @@ public class RecipientHistory {
     @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
 
+    @Column(name = "recipient_user_id")
+    private UUID recipientUserId;
+
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "recipient_snapshot_id")
     private RecipientSnapshotHistory recipientSnapshot;
