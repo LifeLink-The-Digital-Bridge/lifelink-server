@@ -643,5 +643,12 @@ public class MatchingServiceImpl implements MatchingService {
         return dto;
     }
 
+    @Override
+    public boolean isMatchConfirmed(UUID matchId) {
+        return matchResultRepository.findById(matchId)
+                .map(matchResult -> Boolean.TRUE.equals(matchResult.getIsConfirmed()))
+                .orElse(false);
+    }
+
 
 }

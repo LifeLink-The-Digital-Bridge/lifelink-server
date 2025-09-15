@@ -3,6 +3,7 @@ package com.matchingservice.controller;
 import com.matchingservice.aop.RequireRole;
 import com.matchingservice.dto.*;
 import com.matchingservice.exceptions.ResourceNotFoundException;
+import com.matchingservice.model.MatchResult;
 import com.matchingservice.repository.MatchResultRepository;
 import com.matchingservice.service.MatchingService;
 import lombok.RequiredArgsConstructor;
@@ -107,4 +108,9 @@ public class MatchingController {
         return ResponseEntity.ok(donationDTO);
     }
 
+    @GetMapping("/match/{matchId}/status")
+    public ResponseEntity<Boolean> getMatchConfirmationStatus(@PathVariable UUID matchId) {
+        boolean isConfirmed = matchingService.isMatchConfirmed(matchId);
+        return ResponseEntity.ok(isConfirmed);
+    }
 }

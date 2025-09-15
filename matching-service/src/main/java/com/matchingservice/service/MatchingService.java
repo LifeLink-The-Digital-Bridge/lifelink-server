@@ -29,4 +29,6 @@ public interface MatchingService {
     ReceiveRequestDTO getRequestById(UUID requestId);
 
     DonationDTO getDonationById(UUID donationId);
+
+    boolean isMatchConfirmed(UUID matchId);
 }
