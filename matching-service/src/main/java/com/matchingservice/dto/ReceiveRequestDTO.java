@@ -23,5 +23,16 @@ public class ReceiveRequestDTO {
     private LocalDate requestDate;
     private RequestStatus status;
     private String notes;
+
+    private String usedLocationAddressLine;
+    private String usedLocationLandmark;
+    private String usedLocationArea;
+    private String usedLocationCity;
+    private String usedLocationDistrict;
+    private String usedLocationState;
+    private String usedLocationCountry;
+    private String usedLocationPincode;
+    private Double usedLocationLatitude;
+    private Double usedLocationLongitude;
 }
 

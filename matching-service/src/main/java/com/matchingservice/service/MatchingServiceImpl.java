@@ -412,8 +412,6 @@ public class MatchingServiceImpl implements MatchingService {
 
     }
 
-
-
     private void populateDonorHLAData(CreateDonationHistoryRequest request, DonorHLAProfile hla) {
         request.setHlaA1(hla.getHlaA1());
         request.setHlaA2(hla.getHlaA2());
@@ -477,8 +475,6 @@ public class MatchingServiceImpl implements MatchingService {
         }
     }
 
-
-
     private void populateRequestData(CreateRecipientHistoryRequest request, ReceiveRequest receiveRequest) {
         request.setReceiveRequestId(receiveRequest.getReceiveRequestId());
         request.setRequestType(receiveRequest.getRequestType().name());
@@ -537,7 +533,6 @@ public class MatchingServiceImpl implements MatchingService {
         request.setIsLivingDonor(recipient.getIsLivingDonor());
     }
 
-
     private void populateRecipientHLAData(CreateRecipientHistoryRequest request, RecipientHLAProfile hla) {
         request.setHlaA1(hla.getHlaA1());
         request.setHlaA2(hla.getHlaA2());
@@ -559,6 +554,7 @@ public class MatchingServiceImpl implements MatchingService {
         request.setIsHighResolution(hla.getIsHighResolution());
     }
 
+    @Override
     public boolean hasAccessToDonation(UUID donationId, UUID recipientUserId) {
         List<MatchResult> matchResults = matchResultRepository.findByDonationIdAndRecipientUserId(donationId, recipientUserId);
         System.out.println("Match results for donation " + donationId + " and recipient " + recipientUserId + ": " + matchResults.toString());
@@ -566,6 +562,7 @@ public class MatchingServiceImpl implements MatchingService {
         return !matchResults.isEmpty();
     }
 
+    @Override
     public boolean hasAccessToRequest(UUID requestId, UUID donorUserId) {
         List<MatchResult> matchResults = matchResultRepository.findByReceiveRequestIdAndDonorUserId(requestId, donorUserId);
         System.out.println("Match results for request " + requestId + " and donor " + donorUserId + ": " + matchResults.toString());
@@ -573,20 +570,66 @@ public class MatchingServiceImpl implements MatchingService {
         return !matchResults.isEmpty();
     }
 
-
+    @Override
     public DonationDTO getDonationById(UUID donationId) {
         Donation donation = donationRepository.findById(donationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Donation not found"));
 
-        return convertToDTO(donation);
+        DonationDTO dto = convertToDTO(donation);
+
+        if (donation.getLocationId() != null) {
+            populateDonationLocationData(dto, donation.getLocationId());
+        }
+
+        return dto;
     }
 
+    @Override
     public ReceiveRequestDTO getRequestById(UUID requestId) {
         ReceiveRequest request = receiveRequestRepository.findById(requestId)
                 .orElseThrow(() -> new ResourceNotFoundException("Request not found"));
 
-        return convertToDTO(request);
+        ReceiveRequestDTO dto = convertToDTO(request);
+
+        if (request.getLocationId() != null) {
+            populateRequestLocationData(dto, request.getLocationId());
+        }
+
+        return dto;
     }
+
+    private void populateDonationLocationData(DonationDTO dto, UUID locationId) {
+        donorLocationRepository.findById(locationId)
+                .ifPresent(location -> {
+                    dto.setUsedLocationAddressLine(location.getAddressLine());
+                    dto.setUsedLocationLandmark(location.getLandmark());
+                    dto.setUsedLocationArea(location.getArea());
+                    dto.setUsedLocationCity(location.getCity());
+                    dto.setUsedLocationDistrict(location.getDistrict());
+                    dto.setUsedLocationState(location.getState());
+                    dto.setUsedLocationCountry(location.getCountry());
+                    dto.setUsedLocationPincode(location.getPincode());
+                    dto.setUsedLocationLatitude(location.getLatitude());
+                    dto.setUsedLocationLongitude(location.getLongitude());
+                });
+    }
+
+    private void populateRequestLocationData(ReceiveRequestDTO dto, UUID locationId) {
+        recipientLocationRepository.findById(locationId)
+                .ifPresent(location -> {
+                    dto.setUsedLocationAddressLine(location.getAddressLine());
+                    dto.setUsedLocationLandmark(location.getLandmark());
+                    dto.setUsedLocationArea(location.getArea());
+                    dto.setUsedLocationCity(location.getCity());
+                    dto.setUsedLocationDistrict(location.getDistrict());
+                    dto.setUsedLocationState(location.getState());
+                    dto.setUsedLocationCountry(location.getCountry());
+                    dto.setUsedLocationPincode(location.getPincode());
+                    dto.setUsedLocationLatitude(location.getLatitude());
+                    dto.setUsedLocationLongitude(location.getLongitude());
+                });
+    }
+
     private DonationDTO convertToDTO(Donation donation) {
         DonationDTO dto = new DonationDTO();
         dto.setId(donation.getDonationId());
@@ -624,6 +667,7 @@ public class MatchingServiceImpl implements MatchingService {
 
         return dto;
     }
+
     private ReceiveRequestDTO convertToDTO(ReceiveRequest receiveRequest) {
         ReceiveRequestDTO dto = new ReceiveRequestDTO();
         dto.setId(receiveRequest.getReceiveRequestId());
@@ -649,6 +693,4 @@ public class MatchingServiceImpl implements MatchingService {
                 .map(matchResult -> Boolean.TRUE.equals(matchResult.getIsConfirmed()))
                 .orElse(false);
     }
-
-
 }
