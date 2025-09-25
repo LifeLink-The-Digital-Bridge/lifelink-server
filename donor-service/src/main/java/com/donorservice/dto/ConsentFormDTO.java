@@ -10,6 +10,7 @@ import java.util.UUID;
 public class ConsentFormDTO {
     private Long id;
     private UUID userId;
+    private UUID donorId;
     private Boolean isConsented;
     private LocalDateTime consentedAt;
     private String consentType;

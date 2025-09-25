@@ -25,11 +25,4 @@ public interface DonorService {
     
     DonationDTO getDonationById(UUID donationId);
 
-    void createDonationHistory(CreateDonationHistoryRequest request);
-
-    List<DonorHistoryDTO> getDonorHistory(UUID userId);
-
-    List<DonorHistoryDTO> getDonorHistoryForRecipient(UUID donorUserId, UUID recipientUserId);
-
-    List<DonorHistoryDTO> getDonorHistoryByMatchId(UUID matchId, UUID requestingUserId);
 }

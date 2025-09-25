@@ -12,6 +12,7 @@ public class DonorEvent {
     private LocalDate registrationDate;
     private String status;
 
+    private Long eligibilityCriteriaId;
     private Double weight;
     private Integer age;
     private LocalDate dob;
@@ -28,6 +29,17 @@ public class DonorEvent {
     private String bodySize;
     private Boolean isLivingDonor;
 
+    private String smokingStatus;
+    private Integer packYears;
+    private LocalDate quitSmokingDate;
+
+    private String alcoholStatus;
+    private Integer drinksPerWeek;
+    private LocalDate quitAlcoholDate;
+    private Integer alcoholAbstinenceMonths;
+
+
+    private Long medicalDetailsId;
     private Double hemoglobinLevel;
     private String bloodPressure;
     private Boolean hasDiseases;

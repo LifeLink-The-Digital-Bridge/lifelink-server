@@ -2,10 +2,12 @@ package com.donorservice.dto;
 
 import lombok.Data;
 import java.time.LocalDate;
+import java.util.UUID;
 
 @Data
 public class MedicalDetailsDTO {
     private Long id;
+    private UUID donorId;
     private Double hemoglobinLevel;
     private String bloodPressure;
     private Boolean hasDiseases;

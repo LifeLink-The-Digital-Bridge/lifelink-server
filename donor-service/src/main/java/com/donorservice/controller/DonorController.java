@@ -4,9 +4,7 @@ import com.donorservice.aop.InternalOnly;
 import com.donorservice.aop.RequireRole;
 import com.donorservice.client.UserClient;
 import com.donorservice.dto.*;
-import com.donorservice.dto.CreateDonationHistoryRequest;
 import com.donorservice.enums.DonationStatus;
-import com.donorservice.exception.AccessDeniedException;
 import com.donorservice.service.DonorService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -99,52 +97,6 @@ public class DonorController {
     public ResponseEntity<String> getDonationStatus(@PathVariable UUID donationId) {
         String status = donorService.getDonationStatus(donationId);
         return ResponseEntity.ok(status);
-    }
-
-
-    @InternalOnly
-    @PostMapping("/history/create")
-    public ResponseEntity<String> createDonationHistory(@RequestBody CreateDonationHistoryRequest request) {
-        try {
-            donorService.createDonationHistory(request);
-            return ResponseEntity.ok("Donation history created successfully");
-        } catch (Exception e) {
-            System.err.println("Error creating donation history: " + e.getMessage());
-            return ResponseEntity.badRequest().body("Failed to create donation history: " + e.getMessage());
-        }
-    }
-
-    
-    @GetMapping("/user/{userId}/history")
-    public ResponseEntity<List<DonorHistoryDTO>> getDonorHistory(@PathVariable UUID userId) {
-        List<DonorHistoryDTO> history = donorService.getDonorHistory(userId);
-        return ResponseEntity.ok(history);
-    }
-
-    @GetMapping("/history/match/{matchId}")
-    public ResponseEntity<List<DonorHistoryDTO>> getDonorHistoryByMatch(
-            @PathVariable UUID matchId,
-            @RequestHeader("id") UUID requestingUserId) {
-
-        try {
-            List<DonorHistoryDTO> history = donorService.getDonorHistoryByMatchId(matchId, requestingUserId);
-            return ResponseEntity.ok(history);
-        } catch (AccessDeniedException e) {
-            return ResponseEntity.status(403).build();
-        }
-    }
-
-    @GetMapping("/history/for-recipient/{donorUserId}")
-    public ResponseEntity<List<DonorHistoryDTO>> getDonorHistoryForRecipient(
-            @PathVariable UUID donorUserId,
-            @RequestHeader("id") UUID recipientUserId) {
-
-        try {
-            List<DonorHistoryDTO> history = donorService.getDonorHistoryForRecipient(donorUserId, recipientUserId);
-            return ResponseEntity.ok(history);
-        } catch (Exception e) {
-            return ResponseEntity.status(403).build();
-        }
     }
 
 }

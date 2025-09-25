@@ -10,12 +10,7 @@ import com.donorservice.kafka.event.DonorEvent;
 import com.donorservice.kafka.event.HLAProfileEvent;
 import com.donorservice.kafka.event.LocationEvent;
 import com.donorservice.model.*;
-import com.donorservice.model.history.*;
 import com.donorservice.repository.*;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.transaction.Transactional;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
@@ -27,37 +22,29 @@ public class DonorServiceImpl implements DonorService {
 
     private final DonorRepository donorRepository;
     private final DonationRepository donationRepository;
-    private final DonorHistoryRepository donorHistoryRepository;
     private final LocationRepository locationRepository;
     private final EventPublisher eventPublisher;
     private final ProfileLockService profileLockService;
-    private final LocationSnapshotHistoryRepository locationSnapshotHistoryRepository;
 
     public DonorServiceImpl(DonorRepository donorRepository,
                             DonationRepository donationRepository,
-                            DonorHistoryRepository donorHistoryRepository,
-                            UserClient userClient,
                             LocationRepository locationRepository,
-                            LocationSnapshotHistoryRepository locationSnapshotHistoryRepository,
                             EventPublisher eventPublisher,
                             ProfileLockService profileLockService) {
         this.donorRepository = donorRepository;
         this.donationRepository = donationRepository;
-        this.donorHistoryRepository = donorHistoryRepository;
         this.locationRepository = locationRepository;
-        this.locationSnapshotHistoryRepository = locationSnapshotHistoryRepository;
         this.eventPublisher = eventPublisher;
         this.profileLockService = profileLockService;
     }
 
     @Override
     public DonorDTO saveOrUpdateDonor(UUID userId, RegisterDonor donorDTO) {
-        Donor existingDonor = donorRepository.findByUserId(userId);
-        
-        if (existingDonor != null && profileLockService.isDonorProfileLocked(existingDonor.getId())) {
-            throw new IllegalStateException(profileLockService.getProfileLockReason(existingDonor.getId()));
-        }
         Donor donor = donorRepository.findByUserId(userId);
+
+        if (donor != null && profileLockService.isDonorProfileLocked(donor.getId())) {
+            throw new IllegalStateException(profileLockService.getProfileLockReason(donor.getId()));
+        }
 
         if (donor == null) {
             donor = new Donor();
@@ -192,18 +179,23 @@ public class DonorServiceImpl implements DonorService {
         if (savedDonor.getMedicalDetails() != null) {
             MedicalDetailsDTO mdDTO = new MedicalDetailsDTO();
             BeanUtils.copyProperties(savedDonor.getMedicalDetails(), mdDTO);
+            mdDTO.setDonorId(savedDonor.getId());
             responseDTO.setMedicalDetails(mdDTO);
         }
+
         if (savedDonor.getEligibilityCriteria() != null) {
             EligibilityCriteriaDTO ecDTO = new EligibilityCriteriaDTO();
             BeanUtils.copyProperties(savedDonor.getEligibilityCriteria(), ecDTO);
+            ecDTO.setDonorId(savedDonor.getId());
             responseDTO.setEligibilityCriteria(ecDTO);
         }
+
         if (savedDonor.getConsentForm() != null) {
             ConsentFormDTO cfDTO = new ConsentFormDTO();
             BeanUtils.copyProperties(savedDonor.getConsentForm(), cfDTO);
             responseDTO.setConsentForm(cfDTO);
         }
+
         if (savedDonor.getAddresses() != null && !savedDonor.getAddresses().isEmpty()) {
             List<LocationDTO> locDTOList = savedDonor.getAddresses().stream().map(location -> {
                 LocationDTO locDTO = new LocationDTO();
@@ -214,11 +206,13 @@ public class DonorServiceImpl implements DonorService {
         } else {
             responseDTO.setAddresses(new ArrayList<>());
         }
+
         if (savedDonor.getHlaProfile() != null) {
             HLAProfileDTO hlaProfileDTO = new HLAProfileDTO();
             BeanUtils.copyProperties(savedDonor.getHlaProfile(), hlaProfileDTO);
             responseDTO.setHlaProfile(hlaProfileDTO);
         }
+
         return responseDTO;
     }
 
@@ -362,6 +356,7 @@ public class DonorServiceImpl implements DonorService {
 
         if (donor.getMedicalDetails() != null) {
             MedicalDetails md = donor.getMedicalDetails();
+            donorEvent.setMedicalDetailsId(md.getId());
             donorEvent.setHemoglobinLevel(md.getHemoglobinLevel());
             donorEvent.setBloodPressure(md.getBloodPressure());
             donorEvent.setHasDiseases(md.getHasDiseases());
@@ -382,6 +377,7 @@ public class DonorServiceImpl implements DonorService {
 
         if (donor.getEligibilityCriteria() != null) {
             EligibilityCriteria ec = donor.getEligibilityCriteria();
+            donorEvent.setEligibilityCriteriaId(ec.getId());
             donorEvent.setMedicalClearance(ec.getMedicalClearance());
             donorEvent.setRecentSurgery(ec.getRecentSurgery());
             donorEvent.setChronicDiseases(ec.getChronicDiseases());
@@ -397,6 +393,19 @@ public class DonorServiceImpl implements DonorService {
             donorEvent.setBodyMassIndex(ec.getBodyMassIndex());
             donorEvent.setBodySize(ec.getBodySize());
             donorEvent.setIsLivingDonor(ec.getIsLivingDonor());
+
+            if (ec.getSmokingStatus() != null) {
+                donorEvent.setSmokingStatus(ec.getSmokingStatus().name());
+            }
+            donorEvent.setPackYears(ec.getPackYears());
+            donorEvent.setQuitSmokingDate(ec.getQuitSmokingDate());
+
+            if (ec.getAlcoholStatus() != null) {
+                donorEvent.setAlcoholStatus(ec.getAlcoholStatus().name());
+            }
+            donorEvent.setDrinksPerWeek(ec.getDrinksPerWeek());
+            donorEvent.setQuitAlcoholDate(ec.getQuitAlcoholDate());
+            donorEvent.setAlcoholAbstinenceMonths(ec.getAlcoholAbstinenceMonths());
         }
 
         return donorEvent;
@@ -492,302 +501,6 @@ public class DonorServiceImpl implements DonorService {
                     "Donor profile is incomplete. Please complete all details including medical details, eligibility criteria, and consent form before donating."
             );
         }
-    }
-
-    @Override
-    @Transactional
-    public void createDonationHistory(CreateDonationHistoryRequest request) {
-        DonorHistory donorHistory = new DonorHistory();
-
-        donorHistory.setMatchId(request.getMatchId());
-        donorHistory.setReceiveRequestId(request.getReceiveRequestId());
-        donorHistory.setRecipientUserId(request.getRecipientUserId());
-        donorHistory.setDonorUserId(request.getDonorUserId());
-        donorHistory.setMatchedAt(request.getMatchedAt());
-        donorHistory.setCompletedAt(request.getCompletedAt());
-
-        DonorSnapshotHistory donorSnapshot = createDonorSnapshot(request);
-        donorHistory.setDonorSnapshot(donorSnapshot);
-
-        MedicalDetailsSnapshotHistory medicalSnapshot = createMedicalDetailsSnapshot(request);
-        donorHistory.setMedicalDetailsSnapshot(medicalSnapshot);
-
-        EligibilityCriteriaSnapshotHistory eligibilitySnapshot = createEligibilitySnapshot(request);
-        donorHistory.setEligibilityCriteriaSnapshot(eligibilitySnapshot);
-
-        HLAProfileSnapshotHistory hlaSnapshot = createHLASnapshot(request);
-        donorHistory.setHlaProfileSnapshot(hlaSnapshot);
-
-        DonationSnapshotHistory donationSnapshot = createDonationSnapshot(request);
-        donorHistory.setDonationSnapshot(donationSnapshot);
-
-        donorHistoryRepository.save(donorHistory);
-    }
-
-    private DonorSnapshotHistory createDonorSnapshot(CreateDonationHistoryRequest request) {
-        DonorSnapshotHistory snapshot = new DonorSnapshotHistory();
-
-        snapshot.setOriginalDonorId(request.getDonorId());
-        snapshot.setUserId(request.getDonorUserId());
-        snapshot.setRegistrationDate(request.getRegistrationDate());
-        snapshot.setStatus(request.getDonorStatus() != null ? DonorStatus.valueOf(request.getDonorStatus()) : null);
-
-        return snapshot;
-    }
-
-    private MedicalDetailsSnapshotHistory createMedicalDetailsSnapshot(CreateDonationHistoryRequest request) {
-        MedicalDetailsSnapshotHistory snapshot = new MedicalDetailsSnapshotHistory();
-
-        snapshot.setDonorId(request.getDonorId());
-        snapshot.setHemoglobinLevel(request.getHemoglobinLevel());
-        snapshot.setBloodPressure(request.getBloodPressure());
-        snapshot.setHasDiseases(request.getHasDiseases());
-        snapshot.setTakingMedication(request.getTakingMedication());
-        snapshot.setDiseaseDescription(request.getDiseaseDescription());
-        snapshot.setCurrentMedications(request.getCurrentMedications());
-        snapshot.setLastMedicalCheckup(request.getLastMedicalCheckup());
-        snapshot.setMedicalHistory(request.getMedicalHistory());
-        snapshot.setHasInfectiousDiseases(request.getHasInfectiousDiseases());
-        snapshot.setInfectiousDiseaseDetails(request.getInfectiousDiseaseDetails());
-        snapshot.setCreatinineLevel(request.getCreatinineLevel());
-        snapshot.setLiverFunctionTests(request.getLiverFunctionTests());
-        snapshot.setCardiacStatus(request.getCardiacStatus());
-        snapshot.setPulmonaryFunction(request.getPulmonaryFunction());
-        snapshot.setOverallHealthStatus(request.getOverallHealthStatus());
-
-        return snapshot;
-    }
-
-    private EligibilityCriteriaSnapshotHistory createEligibilitySnapshot(CreateDonationHistoryRequest request) {
-        EligibilityCriteriaSnapshotHistory snapshot = new EligibilityCriteriaSnapshotHistory();
-
-        snapshot.setDonorId(request.getDonorId());
-        snapshot.setAge(request.getAge());
-        snapshot.setAgeEligible(request.getAge() != null && request.getAge() >= 18 && request.getAge() <= 65);
-        snapshot.setWeight(request.getWeight());
-        snapshot.setDob(request.getDob());
-        snapshot.setMedicalClearance(request.getMedicalClearance());
-        snapshot.setRecentTattooOrPiercing(request.getRecentTattooOrPiercing());
-        snapshot.setRecentTravelDetails(request.getRecentTravelDetails());
-        snapshot.setRecentVaccination(request.getRecentVaccination());
-        snapshot.setRecentSurgery(request.getRecentSurgery());
-        snapshot.setChronicDiseases(request.getChronicDiseases());
-        snapshot.setAllergies(request.getAllergies());
-        snapshot.setLastDonationDate(request.getLastDonationDate());
-        snapshot.setHeight(request.getHeight());
-        snapshot.setBodyMassIndex(request.getBodyMassIndex());
-        snapshot.setBodySize(request.getBodySize());
-        snapshot.setIsLivingDonor(request.getIsLivingDonor());
-
-        return snapshot;
-    }
-
-    private HLAProfileSnapshotHistory createHLASnapshot(CreateDonationHistoryRequest request) {
-        HLAProfileSnapshotHistory snapshot = new HLAProfileSnapshotHistory();
-
-        snapshot.setHlaA1(request.getHlaA1());
-        snapshot.setHlaA2(request.getHlaA2());
-        snapshot.setHlaB1(request.getHlaB1());
-        snapshot.setHlaB2(request.getHlaB2());
-        snapshot.setHlaC1(request.getHlaC1());
-        snapshot.setHlaC2(request.getHlaC2());
-        snapshot.setHlaDr1(request.getHlaDR1());
-        snapshot.setHlaDr2(request.getHlaDR2());
-        snapshot.setHlaDq1(request.getHlaDQ1());
-        snapshot.setHlaDq2(request.getHlaDQ2());
-        snapshot.setHlaDP1(request.getHlaDP1());
-        snapshot.setHlaDP2(request.getHlaDP2());
-        snapshot.setTestingDate(request.getTestingDate());
-        snapshot.setTestMethod(request.getTestingMethod());
-        snapshot.setLaboratoryName(request.getLaboratoryName());
-        snapshot.setCertificationNumber(request.getCertificationNumber());
-        snapshot.setHlaString(request.getHlaString());
-        snapshot.setIsHighResolution(request.getIsHighResolution());
-
-        return snapshot;
-    }
-
-    private DonationSnapshotHistory createDonationSnapshot(CreateDonationHistoryRequest request) {
-        DonationSnapshotHistory snapshot = new DonationSnapshotHistory();
-
-        snapshot.setOriginalDonationId(request.getDonationId());
-        snapshot.setDonorId(request.getDonorId());
-        snapshot.setUserId(request.getDonorUserId());
-        snapshot.setDonationDate(request.getDonationDate());
-        snapshot.setStatus(request.getDonationStatus() != null ? DonationStatus.valueOf(request.getDonationStatus()) : null);
-        snapshot.setBloodType(request.getBloodType() != null ? BloodType.valueOf(request.getBloodType()) : null);
-        snapshot.setDonationType(request.getDonationType() != null ? DonationType.valueOf(request.getDonationType()) : null);
-
-        if (request.getUsedLocationId() != null) {
-            LocationSnapshotHistory location = findOrCreateLocationSnapshot(request);
-            snapshot.setUsedLocation(location);
-        }
-
-        snapshot.setQuantity(request.getQuantity());
-
-        if (request.getOrganType() != null) {
-            snapshot.setOrganType(OrganType.valueOf(request.getOrganType()));
-            snapshot.setIsCompatible(request.getIsCompatible());
-            snapshot.setOrganQuality(request.getOrganQuality());
-            snapshot.setOrganViabilityExpiry(request.getOrganViabilityExpiry());
-            snapshot.setColdIschemiaTime(request.getColdIschemiaTime());
-            snapshot.setOrganPerfused(request.getOrganPerfused());
-            snapshot.setOrganWeight(request.getOrganWeight());
-            snapshot.setOrganSize(request.getOrganSize());
-            snapshot.setFunctionalAssessment(request.getFunctionalAssessment());
-            snapshot.setHasAbnormalities(request.getHasAbnormalities());
-            snapshot.setAbnormalityDescription(request.getAbnormalityDescription());
-        }
-
-        if (request.getTissueType() != null) {
-            snapshot.setTissueType(TissueType.valueOf(request.getTissueType()));
-        }
-
-        if (request.getStemCellType() != null) {
-            snapshot.setStemCellType(StemCellType.valueOf(request.getStemCellType()));
-        }
-
-        return snapshot;
-    }
-
-    private LocationSnapshotHistory findOrCreateLocationSnapshot(CreateDonationHistoryRequest request) {
-        Optional<LocationSnapshotHistory> existing = locationSnapshotHistoryRepository
-                .findById(request.getUsedLocationId());
-
-        if (existing.isPresent()) {
-            System.out.println("Reusing existing location snapshot for locationId: " + request.getUsedLocationId());
-            return existing.get();
-        } else {
-            LocationSnapshotHistory location = new LocationSnapshotHistory();
-            location.setId(request.getUsedLocationId());
-            location.setAddressLine(request.getUsedAddressLine());
-            location.setLandmark(request.getUsedLandmark());
-            location.setArea(request.getUsedArea());
-            location.setCity(request.getUsedCity());
-            location.setDistrict(request.getUsedDistrict());
-            location.setState(request.getUsedState());
-            location.setCountry(request.getUsedCountry());
-            location.setPincode(request.getUsedPincode());
-            location.setLatitude(request.getUsedLatitude());
-            location.setLongitude(request.getUsedLongitude());
-
-            LocationSnapshotHistory savedLocation = locationSnapshotHistoryRepository.save(location);
-            System.out.println("Created new location snapshot for locationId: " + request.getUsedLocationId());
-            return savedLocation;
-        }
-    }
-
-    private DonorHistoryDTO convertToHistoryDTO(DonorHistory history) {
-        DonorHistoryDTO dto = new DonorHistoryDTO();
-        dto.setMatchId(history.getMatchId());
-        dto.setReceiveRequestId(history.getReceiveRequestId());
-        dto.setRecipientUserId(history.getRecipientUserId());
-        dto.setMatchedAt(history.getMatchedAt());
-        dto.setCompletedAt(history.getCompletedAt());
-
-        if (history.getDonorSnapshot() != null) {
-            DonorSnapshotDTO donorSnapshotDTO = new DonorSnapshotDTO();
-            BeanUtils.copyProperties(history.getDonorSnapshot(), donorSnapshotDTO);
-            dto.setDonorSnapshot(donorSnapshotDTO);
-        }
-
-        if (history.getMedicalDetailsSnapshot() != null) {
-            MedicalDetailsDTO medicalDTO = new MedicalDetailsDTO();
-            BeanUtils.copyProperties(history.getMedicalDetailsSnapshot(), medicalDTO);
-            dto.setMedicalDetailsSnapshot(medicalDTO);
-        }
-
-        if (history.getEligibilityCriteriaSnapshot() != null) {
-            EligibilityCriteriaDTO eligibilityDTO = new EligibilityCriteriaDTO();
-            BeanUtils.copyProperties(history.getEligibilityCriteriaSnapshot(), eligibilityDTO);
-            dto.setEligibilityCriteriaSnapshot(eligibilityDTO);
-        }
-
-        if (history.getHlaProfileSnapshot() != null) {
-            HLAProfileDTO hlaDTO = new HLAProfileDTO();
-            BeanUtils.copyProperties(history.getHlaProfileSnapshot(), hlaDTO);
-            dto.setHlaProfileSnapshot(hlaDTO);
-        }
-
-        if (history.getDonationSnapshot() != null) {
-            DonationHistoryDTO donationDTO = new DonationHistoryDTO();
-
-            donationDTO.setId(history.getDonationSnapshot().getOriginalDonationId());
-            donationDTO.setDonorId(history.getDonationSnapshot().getDonorId());
-            donationDTO.setDonationDate(history.getDonationSnapshot().getDonationDate());
-            donationDTO.setStatus(history.getDonationSnapshot().getStatus());
-            donationDTO.setBloodType(history.getDonationSnapshot().getBloodType());
-            donationDTO.setDonationType(history.getDonationSnapshot().getDonationType());
-            donationDTO.setQuantity(history.getDonationSnapshot().getQuantity());
-
-            if (history.getDonationSnapshot().getUsedLocation() != null) {
-                LocationSnapshotHistory location = history.getDonationSnapshot().getUsedLocation();
-                donationDTO.setLocationId(location.getId());
-                donationDTO.setUsedLocationAddressLine(location.getAddressLine());
-                donationDTO.setUsedLocationLandmark(location.getLandmark());
-                donationDTO.setUsedLocationArea(location.getArea());
-                donationDTO.setUsedLocationCity(location.getCity());
-                donationDTO.setUsedLocationDistrict(location.getDistrict());
-                donationDTO.setUsedLocationState(location.getState());
-                donationDTO.setUsedLocationCountry(location.getCountry());
-                donationDTO.setUsedLocationPincode(location.getPincode());
-                donationDTO.setUsedLocationLatitude(location.getLatitude());
-                donationDTO.setUsedLocationLongitude(location.getLongitude());
-            }
-
-            if (history.getDonationSnapshot().getOrganType() != null) {
-                donationDTO.setOrganType(history.getDonationSnapshot().getOrganType());
-                donationDTO.setIsCompatible(history.getDonationSnapshot().getIsCompatible());
-                donationDTO.setOrganQuality(history.getDonationSnapshot().getOrganQuality());
-                donationDTO.setOrganViabilityExpiry(history.getDonationSnapshot().getOrganViabilityExpiry());
-                donationDTO.setColdIschemiaTime(history.getDonationSnapshot().getColdIschemiaTime());
-                donationDTO.setOrganPerfused(history.getDonationSnapshot().getOrganPerfused());
-                donationDTO.setOrganWeight(history.getDonationSnapshot().getOrganWeight());
-                donationDTO.setOrganSize(history.getDonationSnapshot().getOrganSize());
-                donationDTO.setFunctionalAssessment(history.getDonationSnapshot().getFunctionalAssessment());
-                donationDTO.setHasAbnormalities(history.getDonationSnapshot().getHasAbnormalities());
-                donationDTO.setAbnormalityDescription(history.getDonationSnapshot().getAbnormalityDescription());
-            }
-
-            if (history.getDonationSnapshot().getTissueType() != null) {
-                donationDTO.setTissueType(history.getDonationSnapshot().getTissueType());
-            }
-
-            if (history.getDonationSnapshot().getStemCellType() != null) {
-                donationDTO.setStemCellType(history.getDonationSnapshot().getStemCellType());
-            }
-
-            dto.setDonationSnapshot(donationDTO);
-        }
-
-        return dto;
-    }
-
-    @Override
-    public List<DonorHistoryDTO> getDonorHistory(UUID userId) {
-        List<DonorHistory> histories = donorHistoryRepository.findByDonorSnapshot_UserId(userId);
-        return histories.stream()
-                .map(this::convertToHistoryDTO)
-                .collect(Collectors.toList());
-    }
-    @Override
-    public List<DonorHistoryDTO> getDonorHistoryByMatchId(UUID matchId, UUID requestingUserId) {
-        if (!donorHistoryRepository.existsByMatchIdAndRecipientUserId(matchId, requestingUserId)) {
-            throw new AccessDeniedException("Access denied to this donor history");
-        }
-
-        List<DonorHistory> histories = donorHistoryRepository.findByMatchId(matchId);
-        return histories.stream()
-                .map(this::convertToHistoryDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public List<DonorHistoryDTO> getDonorHistoryForRecipient(UUID donorUserId, UUID recipientUserId) {
-        List<DonorHistory> histories = donorHistoryRepository.findByDonorSnapshot_UserIdAndRecipientUserId(donorUserId, recipientUserId);
-        return histories.stream()
-                .map(this::convertToHistoryDTO)
-                .collect(Collectors.toList());
     }
 
 }
