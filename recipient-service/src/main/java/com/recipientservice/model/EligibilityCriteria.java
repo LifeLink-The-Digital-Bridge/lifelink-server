@@ -1,5 +1,7 @@
 package com.recipientservice.model;
 
+import com.recipientservice.enums.SmokingStatus;
+import com.recipientservice.enums.AlcoholStatus;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -54,7 +56,29 @@ public class EligibilityCriteria {
     @Column
     private String bodySize;
 
-    @Column(nullable = false)
+    @Column
     private Boolean isLivingDonor;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "smoking_status")
+    private SmokingStatus smokingStatus;
+
+    @Column(name = "pack_years")
+    private Integer packYears;
+
+    @Column(name = "quit_smoking_date")
+    private LocalDate quitSmokingDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "alcohol_status")
+    private AlcoholStatus alcoholStatus;
+
+    @Column(name = "drinks_per_week")
+    private Integer drinksPerWeek;
+
+    @Column(name = "quit_alcohol_date")
+    private LocalDate quitAlcoholDate;
+
+    @Column(name = "alcohol_abstinence_months")
+    private Integer alcoholAbstinenceMonths;
 }

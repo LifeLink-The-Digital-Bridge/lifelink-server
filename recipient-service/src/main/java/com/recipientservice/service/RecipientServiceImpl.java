@@ -13,7 +13,6 @@ import com.recipientservice.kafka.events.LocationEvent;
 import com.recipientservice.kafka.events.ReceiveRequestEvent;
 import com.recipientservice.kafka.events.RecipientEvent;
 import com.recipientservice.model.*;
-import com.recipientservice.model.history.*;
 import com.recipientservice.repository.*;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
@@ -30,19 +29,15 @@ public class RecipientServiceImpl implements RecipientService {
     private final RecipientRepository recipientRepository;
     private final LocationRepository locationRepository;
     private final ReceiveRequestRepository receiveRequestRepository;
-    private final RecipientHistoryRepository recipientHistoryRepository;
     private final EventPublisher eventPublisher;
     private final ProfileLockService profileLockService;
     private final ObjectMapper objectMapper;
 
-    private final RecipientLocationSnapshotHistoryRepository recipientLocationSnapshotHistoryRepository;
 
     public RecipientServiceImpl(
             RecipientRepository recipientRepository,
             LocationRepository locationRepository,
             ReceiveRequestRepository receiveRequestRepository,
-            RecipientHistoryRepository recipientHistoryRepository,
-            RecipientLocationSnapshotHistoryRepository recipientLocationSnapshotHistoryRepository,
             EventPublisher eventPublisher,
             ProfileLockService profileLockService,
             ObjectMapper objectMapper
@@ -50,8 +45,6 @@ public class RecipientServiceImpl implements RecipientService {
         this.recipientRepository = recipientRepository;
         this.locationRepository = locationRepository;
         this.receiveRequestRepository = receiveRequestRepository;
-        this.recipientHistoryRepository = recipientHistoryRepository;
-        this.recipientLocationSnapshotHistoryRepository = recipientLocationSnapshotHistoryRepository;
         this.eventPublisher = eventPublisher;
         this.profileLockService = profileLockService;
         this.objectMapper = objectMapper;
@@ -183,7 +176,7 @@ public class RecipientServiceImpl implements RecipientService {
         if (location != null) {
             eventPublisher.publishRecipientLocationEvent(getLocationEvent(location, recipient.getId()));
         }
-        if (recipient.getHlaProfile() != null && requestDTO.getRequestType() == RequestType.ORGAN) {
+        if (recipient.getHlaProfile() != null) {
             eventPublisher.publishHLAProfileEvent(getHLAProfileEvent(recipient.getHlaProfile(), recipient.getId()));
         }
         System.out.println("Event published successfully.");
@@ -394,6 +387,19 @@ public class RecipientServiceImpl implements RecipientService {
             recipientEvent.setBodyMassIndex(eligibility.getBodyMassIndex());
             recipientEvent.setBodySize(eligibility.getBodySize());
             recipientEvent.setIsLivingDonor(eligibility.getIsLivingDonor());
+
+            if (eligibility.getSmokingStatus() != null) {
+                recipientEvent.setSmokingStatus(eligibility.getSmokingStatus().name());
+            }
+            recipientEvent.setPackYears(eligibility.getPackYears());
+            recipientEvent.setQuitSmokingDate(eligibility.getQuitSmokingDate());
+
+            if (eligibility.getAlcoholStatus() != null) {
+                recipientEvent.setAlcoholStatus(eligibility.getAlcoholStatus().name());
+            }
+            recipientEvent.setDrinksPerWeek(eligibility.getDrinksPerWeek());
+            recipientEvent.setQuitAlcoholDate(eligibility.getQuitAlcoholDate());
+            recipientEvent.setAlcoholAbstinenceMonths(eligibility.getAlcoholAbstinenceMonths());
         }
 
         return recipientEvent;
@@ -451,261 +457,6 @@ public class RecipientServiceImpl implements RecipientService {
                     "Recipient profile is incomplete. Please complete all details including medical details, eligibility criteria, and consent form before creating requests."
             );
         }
-    }
-
-    @Override
-    public void createRecipientHistory(CreateRecipientHistoryRequest request) {
-        RecipientHistory history = new RecipientHistory();
-
-        history.setMatchId(request.getMatchId());
-        history.setDonationId(request.getDonationId());
-        history.setDonorUserId(request.getDonorUserId());
-        history.setRecipientUserId(request.getRecipientUserId());
-        history.setMatchedAt(request.getMatchedAt());
-        history.setCompletedAt(request.getCompletedAt());
-
-        RecipientSnapshotHistory recipientSnapshot = createRecipientSnapshot(request);
-        history.setRecipientSnapshot(recipientSnapshot);
-
-        RecipientMedicalDetailsSnapshotHistory medicalSnapshot = createMedicalDetailsSnapshot(request);
-        history.setMedicalDetailsSnapshot(medicalSnapshot);
-
-        RecipientEligibilityCriteriaSnapshotHistory eligibilitySnapshot = createEligibilitySnapshot(request);
-        history.setEligibilityCriteriaSnapshot(eligibilitySnapshot);
-
-        RecipientHLAProfileSnapshotHistory hlaSnapshot = createHLASnapshot(request);
-        history.setHlaProfileSnapshot(hlaSnapshot);
-
-        ReceiveRequestSnapshotHistory requestSnapshot = createReceiveRequestSnapshot(request);
-        history.setReceiveRequestSnapshot(requestSnapshot);
-
-        recipientHistoryRepository.save(history);
-        System.out.println("Created recipient history for match: " + request.getMatchId());
-    }
-
-    private RecipientSnapshotHistory createRecipientSnapshot(CreateRecipientHistoryRequest request) {
-        RecipientSnapshotHistory snapshot = new RecipientSnapshotHistory();
-
-        snapshot.setOriginalRecipientId(request.getRecipientId());
-        snapshot.setUserId(request.getRecipientUserId());
-        snapshot.setAvailability(request.getAvailability() != null ?
-                Availability.valueOf(request.getAvailability()) : null);
-
-        return snapshot;
-    }
-    private RecipientMedicalDetailsSnapshotHistory createMedicalDetailsSnapshot(CreateRecipientHistoryRequest request) {
-        RecipientMedicalDetailsSnapshotHistory snapshot = new RecipientMedicalDetailsSnapshotHistory();
-
-        snapshot.setHemoglobinLevel(request.getHemoglobinLevel());
-        snapshot.setBloodPressure(request.getBloodPressure());
-        snapshot.setDiagnosis(request.getDiagnosis());
-        snapshot.setAllergies(request.getAllergies());
-        snapshot.setCurrentMedications(request.getCurrentMedications());
-        snapshot.setAdditionalNotes(request.getAdditionalNotes());
-        snapshot.setHasInfectiousDiseases(request.getHasInfectiousDiseases());
-        snapshot.setInfectiousDiseaseDetails(request.getInfectiousDiseaseDetails());
-        snapshot.setCreatinineLevel(request.getCreatinineLevel());
-        snapshot.setLiverFunctionTests(request.getLiverFunctionTests());
-        snapshot.setCardiacStatus(request.getCardiacStatus());
-        snapshot.setPulmonaryFunction(request.getPulmonaryFunction());
-        snapshot.setOverallHealthStatus(request.getOverallHealthStatus());
-
-        return snapshot;
-    }
-    private RecipientEligibilityCriteriaSnapshotHistory createEligibilitySnapshot(CreateRecipientHistoryRequest request) {
-        RecipientEligibilityCriteriaSnapshotHistory snapshot = new RecipientEligibilityCriteriaSnapshotHistory();
-
-        snapshot.setAgeEligible(request.getAgeEligible());
-        snapshot.setAge(request.getAge());
-        snapshot.setDob(request.getDob());
-        snapshot.setWeightEligible(request.getWeightEligible());
-        snapshot.setWeight(request.getWeight());
-        snapshot.setHeight(request.getHeight());
-        snapshot.setBodyMassIndex(request.getBodyMassIndex());
-        snapshot.setBodySize(request.getBodySize());
-        snapshot.setIsLivingDonor(request.getIsLivingDonor());
-        snapshot.setMedicallyEligible(request.getMedicallyEligible());
-        snapshot.setLegalClearance(request.getLegalClearance());
-        snapshot.setNotes(request.getNotes());
-        snapshot.setLastReviewed(request.getLastReviewed());
-
-        return snapshot;
-    }
-    private RecipientHLAProfileSnapshotHistory createHLASnapshot(CreateRecipientHistoryRequest request) {
-        RecipientHLAProfileSnapshotHistory snapshot = new RecipientHLAProfileSnapshotHistory();
-
-        snapshot.setHlaA1(request.getHlaA1());
-        snapshot.setHlaA2(request.getHlaA2());
-        snapshot.setHlaB1(request.getHlaB1());
-        snapshot.setHlaB2(request.getHlaB2());
-        snapshot.setHlaC1(request.getHlaC1());
-        snapshot.setHlaC2(request.getHlaC2());
-        snapshot.setHlaDr1(request.getHlaDR1());
-        snapshot.setHlaDr2(request.getHlaDR2());
-        snapshot.setHlaDq1(request.getHlaDQ1());
-        snapshot.setHlaDq2(request.getHlaDQ2());
-        snapshot.setHlaDP1(request.getHlaDP1());
-        snapshot.setHlaDP2(request.getHlaDP2());
-        snapshot.setTestingDate(request.getTestingDate());
-        snapshot.setTestMethod(request.getTestingMethod());
-        snapshot.setLaboratoryName(request.getLaboratoryName());
-        snapshot.setCertificationNumber(request.getCertificationNumber());
-        snapshot.setHlaString(request.getHlaString());
-        snapshot.setIsHighResolution(request.getIsHighResolution());
-
-        return snapshot;
-    }
-
-    private ReceiveRequestSnapshotHistory createReceiveRequestSnapshot(CreateRecipientHistoryRequest request) {
-        ReceiveRequestSnapshotHistory snapshot = new ReceiveRequestSnapshotHistory();
-
-        snapshot.setOriginalRequestId(request.getReceiveRequestId());
-        snapshot.setRecipientId(request.getRecipientId());
-        snapshot.setRecipientUserId(request.getRecipientUserId());
-
-        if (request.getUsedLocationId() != null) {
-            RecipientLocationSnapshotHistory location = findOrCreateRecipientLocationSnapshot(request);
-            snapshot.setUsedLocation(location);
-        }
-
-        snapshot.setRequestType(request.getRequestType() != null ? RequestType.valueOf(request.getRequestType()) : null);
-        snapshot.setRequestedBloodType(request.getRequestedBloodType() != null ? BloodType.valueOf(request.getRequestedBloodType()) : null);
-        snapshot.setRequestedOrgan(request.getRequestedOrgan() != null ? OrganType.valueOf(request.getRequestedOrgan()) : null);
-        snapshot.setRequestedTissue(request.getRequestedTissue() != null ? TissueType.valueOf(request.getRequestedTissue()) : null);
-        snapshot.setRequestedStemCellType(request.getRequestedStemCellType() != null ? StemCellType.valueOf(request.getRequestedStemCellType()) : null);
-        snapshot.setUrgencyLevel(request.getUrgencyLevel() != null ? UrgencyLevel.valueOf(request.getUrgencyLevel()) : null);
-        snapshot.setQuantity(request.getQuantity());
-        snapshot.setRequestDate(request.getRequestDate());
-        snapshot.setStatus(request.getRequestStatus() != null ? RequestStatus.valueOf(request.getRequestStatus()) : null);
-        snapshot.setNotes(request.getRequestNotes());
-
-        return snapshot;
-    }
-    private RecipientLocationSnapshotHistory findOrCreateRecipientLocationSnapshot(CreateRecipientHistoryRequest request) {
-        Optional<RecipientLocationSnapshotHistory> existing = recipientLocationSnapshotHistoryRepository
-                .findById(request.getUsedLocationId());
-
-        if (existing.isPresent()) {
-            System.out.println("Reusing existing recipient location snapshot for locationId: " + request.getUsedLocationId());
-            return existing.get();
-        } else {
-            RecipientLocationSnapshotHistory location = new RecipientLocationSnapshotHistory();
-            location.setId(request.getUsedLocationId());
-            location.setAddressLine(request.getUsedAddressLine());
-            location.setLandmark(request.getUsedLandmark());
-            location.setArea(request.getUsedArea());
-            location.setCity(request.getUsedCity());
-            location.setDistrict(request.getUsedDistrict());
-            location.setState(request.getUsedState());
-            location.setCountry(request.getUsedCountry());
-            location.setPincode(request.getUsedPincode());
-            location.setLatitude(request.getUsedLatitude());
-            location.setLongitude(request.getUsedLongitude());
-
-            RecipientLocationSnapshotHistory savedLocation = recipientLocationSnapshotHistoryRepository.save(location);
-            System.out.println("Created new recipient location snapshot for locationId: " + request.getUsedLocationId());
-            return savedLocation;
-        }
-    }
-    private RecipientHistoryDTO convertToHistoryDTO(RecipientHistory history) {
-        RecipientHistoryDTO dto = new RecipientHistoryDTO();
-        dto.setMatchId(history.getMatchId());
-        dto.setDonationId(history.getDonationId());
-        dto.setDonorUserId(history.getDonorUserId());
-        dto.setMatchedAt(history.getMatchedAt());
-        dto.setCompletedAt(history.getCompletedAt());
-
-        if (history.getRecipientSnapshot() != null) {
-            RecipientSnapshotDTO snap = new RecipientSnapshotDTO();
-            snap.setOriginalRecipientId(history.getRecipientSnapshot().getOriginalRecipientId());
-            snap.setUserId(history.getRecipientSnapshot().getUserId());
-            snap.setAvailability(history.getRecipientSnapshot().getAvailability());
-            dto.setRecipientSnapshot(snap);
-        }
-
-        if (history.getMedicalDetailsSnapshot() != null) {
-            MedicalDetailsDTO md = new MedicalDetailsDTO();
-            BeanUtils.copyProperties(history.getMedicalDetailsSnapshot(), md);
-            dto.setMedicalDetailsSnapshot(md);
-        }
-
-        if (history.getEligibilityCriteriaSnapshot() != null) {
-            EligibilityCriteriaDTO ec = new EligibilityCriteriaDTO();
-            BeanUtils.copyProperties(history.getEligibilityCriteriaSnapshot(), ec);
-            dto.setEligibilityCriteriaSnapshot(ec);
-        }
-
-        if (history.getHlaProfileSnapshot() != null) {
-            HLAProfileDTO hla = new HLAProfileDTO();
-            BeanUtils.copyProperties(history.getHlaProfileSnapshot(), hla);
-            dto.setHlaProfileSnapshot(hla);
-        }
-
-        if (history.getReceiveRequestSnapshot() != null) {
-            ReceiveRequestHistoryDTO rr = new ReceiveRequestHistoryDTO();
-
-            rr.setId(history.getReceiveRequestSnapshot().getOriginalRequestId());
-            rr.setOriginalRequestId(history.getReceiveRequestSnapshot().getOriginalRequestId());
-            rr.setRecipientId(history.getReceiveRequestSnapshot().getRecipientId());
-            rr.setRecipientUserId(history.getReceiveRequestSnapshot().getRecipientUserId());
-            rr.setRequestType(history.getReceiveRequestSnapshot().getRequestType());
-            rr.setRequestedBloodType(history.getReceiveRequestSnapshot().getRequestedBloodType());
-            rr.setRequestedOrgan(history.getReceiveRequestSnapshot().getRequestedOrgan());
-            rr.setRequestedTissue(history.getReceiveRequestSnapshot().getRequestedTissue());
-            rr.setRequestedStemCellType(history.getReceiveRequestSnapshot().getRequestedStemCellType());
-            rr.setUrgencyLevel(history.getReceiveRequestSnapshot().getUrgencyLevel());
-            rr.setQuantity(history.getReceiveRequestSnapshot().getQuantity());
-            rr.setRequestDate(history.getReceiveRequestSnapshot().getRequestDate());
-            rr.setStatus(history.getReceiveRequestSnapshot().getStatus());
-            rr.setNotes(history.getReceiveRequestSnapshot().getNotes());
-
-            if (history.getReceiveRequestSnapshot().getUsedLocation() != null) {
-                RecipientLocationSnapshotHistory location = history.getReceiveRequestSnapshot().getUsedLocation();
-                rr.setLocationId(location.getId());
-                rr.setUsedLocationAddressLine(location.getAddressLine());
-                rr.setUsedLocationLandmark(location.getLandmark());
-                rr.setUsedLocationArea(location.getArea());
-                rr.setUsedLocationCity(location.getCity());
-                rr.setUsedLocationDistrict(location.getDistrict());
-                rr.setUsedLocationState(location.getState());
-                rr.setUsedLocationCountry(location.getCountry());
-                rr.setUsedLocationPincode(location.getPincode());
-                rr.setUsedLocationLatitude(location.getLatitude());
-                rr.setUsedLocationLongitude(location.getLongitude());
-            }
-
-            dto.setReceiveRequestSnapshot(rr);
-        }
-
-        return dto;
-    }
-
-    @Override
-    public List<RecipientHistoryDTO> getRecipientHistory(UUID userId) {
-        List<RecipientHistory> histories = recipientHistoryRepository.findByRecipientUserId(userId);
-        return histories.stream()
-                .map(this::convertToHistoryDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public List<RecipientHistoryDTO> getRecipientHistoryByMatchId(UUID matchId, UUID requestingUserId) {
-        if (!recipientHistoryRepository.existsByMatchIdAndDonorUserId(matchId, requestingUserId)) {
-            throw new AccessDeniedException("Access denied to this recipient history");
-        }
-
-        List<RecipientHistory> histories = recipientHistoryRepository.findByMatchId(matchId);
-        return histories.stream()
-                .map(this::convertToHistoryDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public List<RecipientHistoryDTO> getRecipientHistoryForDonor(UUID recipientUserId, UUID donorUserId) {
-        List<RecipientHistory> histories = recipientHistoryRepository.findByRecipientUserIdAndDonorUserId(recipientUserId, donorUserId);
-        return histories.stream()
-                .map(this::convertToHistoryDTO)
-                .collect(Collectors.toList());
     }
 
 }

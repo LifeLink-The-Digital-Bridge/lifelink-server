@@ -41,4 +41,13 @@ public class RecipientEvent {
     private Double bodyMassIndex;
     private String bodySize;
     private Boolean isLivingDonor;
+
+    private String smokingStatus;
+    private Integer packYears;
+    private LocalDate quitSmokingDate;
+
+    private String alcoholStatus;
+    private Integer drinksPerWeek;
+    private LocalDate quitAlcoholDate;
+    private Integer alcoholAbstinenceMonths;
 }

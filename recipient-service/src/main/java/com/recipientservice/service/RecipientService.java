@@ -27,11 +27,6 @@ public interface RecipientService {
     
     ReceiveRequestDTO getRequestById(UUID requestId);
     
-    void createRecipientHistory(CreateRecipientHistoryRequest request);
-    
-    List<RecipientHistoryDTO> getRecipientHistory(UUID userId);
 
-    List<RecipientHistoryDTO> getRecipientHistoryByMatchId(UUID matchId, UUID requestingUserId);
 
-    List<RecipientHistoryDTO> getRecipientHistoryForDonor(UUID recipientUserId, UUID donorUserId);
 }
