@@ -81,18 +81,14 @@ public class MatchingController {
         }
     }
 
-    @RequireRole("DONOR")
-    @GetMapping("/requests/{requestId}")
-    public ResponseEntity<ReceiveRequestDTO> getRequestDetails(@PathVariable UUID requestId, @RequestHeader("id") UUID userId) {
-        if (!matchingService.hasAccessToRequest(requestId, userId)) {
-            System.out.println("In getRequestDetails Denied " + userId);
-            return ResponseEntity.status(403).build();
+    @RequireRole("RECIPIENT")
+    @GetMapping("/by-userId/{userId}")
+    public ResponseEntity<DonorDTO> getDonorDetails(@PathVariable UUID userId){
+        DonorDTO donorDTO = matchingService.getDonorByUserId(userId);
+        if (donorDTO == null){
+            return ResponseEntity.notFound().build();
         }
-        System.out.println("In getRequestDetails");
-
-        ReceiveRequestDTO requestDTO = matchingService.getRequestById(requestId);
-        System.out.println(requestDTO);
-        return ResponseEntity.ok(requestDTO);
+        return ResponseEntity.ok(donorDTO);
     }
 
     @RequireRole("RECIPIENT")
@@ -107,6 +103,32 @@ public class MatchingController {
         System.out.println(donationDTO);
         return ResponseEntity.ok(donationDTO);
     }
+
+    @RequireRole("DONOR")
+    @GetMapping("/by-userId/{userId}")
+    public ResponseEntity<RecipientDTO> getRecipientByUserId(@PathVariable UUID userId){
+        RecipientDTO recipientDTO = matchingService.getRecipientByUserId(userId);
+        if (recipientDTO == null){
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(recipientDTO);
+    }
+
+    @RequireRole("DONOR")
+    @GetMapping("/requests/{requestId}")
+    public ResponseEntity<ReceiveRequestDTO> getRequestDetails(@PathVariable UUID requestId, @RequestHeader("id") UUID userId) {
+        if (!matchingService.hasAccessToRequest(requestId, userId)) {
+            System.out.println("In getRequestDetails Denied " + userId);
+            return ResponseEntity.status(403).build();
+        }
+        System.out.println("In getRequestDetails");
+
+        ReceiveRequestDTO requestDTO = matchingService.getRequestById(requestId);
+        System.out.println(requestDTO);
+        return ResponseEntity.ok(requestDTO);
+    }
+
+
 
     @GetMapping("/match/{matchId}/status")
     public ResponseEntity<Boolean> getMatchConfirmationStatus(@PathVariable UUID matchId) {

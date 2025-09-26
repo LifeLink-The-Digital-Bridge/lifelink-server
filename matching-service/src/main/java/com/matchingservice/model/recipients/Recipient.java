@@ -1,53 +1,48 @@
 package com.matchingservice.model.recipients;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.matchingservice.enums.Availability;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Data
 @Entity
-@Table(name = "recipient")
+@Table(name = "recipients")
 public class Recipient {
 
     @Id
-    private UUID recipientId;
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private Long id;
 
     @Column(nullable = false)
+    private UUID recipientId;
+
+    @Column(name = "user_id", nullable = false)
     private UUID userId;
 
+    @Column(name = "event_timestamp", nullable = false)
+    private LocalDateTime eventTimestamp;
+
     @Enumerated(EnumType.STRING)
-    private Availability availability;
+    private Availability availability = Availability.AVAILABLE;
 
-    private Long medicalDetailsId;
-    private Double hemoglobinLevel;
-    private String bloodPressure;
-    private String diagnosis;
-    private String allergies;
-    private String currentMedications;
-    private String additionalNotes;
-    private Boolean hasInfectiousDiseases;
-    private String infectiousDiseaseDetails;
-    private Double creatinineLevel;
-    private String liverFunctionTests;
-    private String cardiacStatus;
-    private Double pulmonaryFunction;
-    private String overallHealthStatus;
+    @OneToOne(mappedBy = "recipient", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    private RecipientEligibilityCriteria eligibilityCriteria;
 
-    private Long eligibilityCriteriaId;
-    private Boolean ageEligible;
-    private Integer age;
-    private LocalDate dob;
-    private Boolean weightEligible;
-    private Double weight;
-    private Boolean medicallyEligible;
-    private Boolean legalClearance;
-    private String eligibilityNotes;
-    private LocalDate lastReviewed;
-    private Double height;
-    private Double bodyMassIndex;
-    private String bodySize;
-    private Boolean isLivingDonor;
+    @OneToOne(mappedBy = "recipient", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    private RecipientMedicalDetails medicalDetails;
+
+    @OneToMany(mappedBy = "recipient", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonManagedReference
+    @ToString.Exclude
+    private List<RecipientLocation> addresses = new ArrayList<>();
+
+    @OneToMany(mappedBy = "recipient", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    private List<ReceiveRequest> receiveRequests = new ArrayList<>();
 }

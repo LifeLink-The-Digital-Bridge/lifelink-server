@@ -12,7 +12,6 @@ import java.util.UUID;
 public class ReceiveRequestDTO {
     private UUID id;
     private UUID recipientId;
-    private UUID locationId;
     private RequestType requestType;
     private BloodType requestedBloodType;
     private OrganType requestedOrgan;
@@ -24,15 +23,5 @@ public class ReceiveRequestDTO {
     private RequestStatus status;
     private String notes;
 
-    private String usedLocationAddressLine;
-    private String usedLocationLandmark;
-    private String usedLocationArea;
-    private String usedLocationCity;
-    private String usedLocationDistrict;
-    private String usedLocationState;
-    private String usedLocationCountry;
-    private String usedLocationPincode;
-    private Double usedLocationLatitude;
-    private Double usedLocationLongitude;
+    private LocationDTO location;
 }
-

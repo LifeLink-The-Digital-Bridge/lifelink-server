@@ -4,17 +4,22 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 import java.time.LocalDate;
-import java.util.UUID;
+import java.time.LocalDateTime;
 
 @Data
 @Entity
 @Table(name = "donor_hla_profiles")
 public class DonorHLAProfile {
+
     @Id
     private Long id;
 
-    @Column(nullable = false)
-    private UUID donorId;
+    @ManyToOne
+    @JoinColumn(name = "donor_db_id", referencedColumnName = "id")
+    private Donor donor;
+
+    @Column(name = "event_timestamp", nullable = false)
+    private LocalDateTime eventTimestamp;
 
     @Column(name = "hla_a1")
     private String hlaA1;

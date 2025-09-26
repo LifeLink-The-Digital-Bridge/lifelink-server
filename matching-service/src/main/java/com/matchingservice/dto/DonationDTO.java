@@ -1,7 +1,7 @@
 package com.matchingservice.dto;
 
-import com.matchingservice.enums.*;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.matchingservice.enums.*;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -13,7 +13,6 @@ import java.util.UUID;
 public class DonationDTO {
     private UUID id;
     private UUID donorId;
-    private UUID locationId;
     private DonationType donationType;
     private LocalDate donationDate;
     private DonationStatus status;
@@ -35,14 +34,5 @@ public class DonationDTO {
     private TissueType tissueType;
     private StemCellType stemCellType;
 
-    private String usedLocationAddressLine;
-    private String usedLocationLandmark;
-    private String usedLocationArea;
-    private String usedLocationCity;
-    private String usedLocationDistrict;
-    private String usedLocationState;
-    private String usedLocationCountry;
-    private String usedLocationPincode;
-    private Double usedLocationLatitude;
-    private Double usedLocationLongitude;
+    private LocationDTO location;
 }

@@ -14,36 +14,36 @@ import java.time.LocalDateTime;
 public class OrganDonation extends Donation {
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "organ_type")
     private OrganType organType;
 
-    @Column(nullable = false)
+    @Column(name = "is_compatible")
     private Boolean isCompatible;
 
-    @Column
+    @Column(name = "organ_quality")
     private String organQuality;
 
-    @Column
+    @Column(name = "organ_viability_expiry")
     private LocalDateTime organViabilityExpiry;
 
-    @Column
+    @Column(name = "cold_ischemia_time")
     private Integer coldIschemiaTime;
 
-    @Column
+    @Column(name = "organ_perfused")
     private Boolean organPerfused;
 
-    @Column
+    @Column(name = "organ_weight")
     private Double organWeight;
 
-    @Column
+    @Column(name = "organ_size")
     private String organSize;
 
-    @Column
+    @Column(name = "functional_assessment")
     private String functionalAssessment;
 
-    @Column
+    @Column(name = "has_abnormalities")
     private Boolean hasAbnormalities;
 
-    @Column
+    @Column(name = "abnormality_description")
     private String abnormalityDescription;
 }

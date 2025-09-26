@@ -1,21 +1,25 @@
 package com.matchingservice.model.recipients;
 
-
 import jakarta.persistence.*;
 import lombok.Data;
 
 import java.time.LocalDate;
-import java.util.UUID;
+import java.time.LocalDateTime;
 
 @Data
 @Entity
 @Table(name = "recipient_hla_profiles")
 public class RecipientHLAProfile {
+
     @Id
     private Long id;
 
-    @Column(nullable = false)
-    private UUID recipientId;
+    @ManyToOne
+    @JoinColumn(name = "recipient_db_id", referencedColumnName = "id")
+    private Recipient recipient;
+
+    @Column(name = "event_timestamp", nullable = false)
+    private LocalDateTime eventTimestamp;
 
     @Column(name = "hla_a1")
     private String hlaA1;

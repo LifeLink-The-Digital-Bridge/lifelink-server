@@ -42,15 +42,15 @@ public class DetailedStatusResponse {
                 .bloodType(donation.getBloodType() != null ? donation.getBloodType().toString() : null)
                 .donationType(donation.getDonationType() != null ? donation.getDonationType().toString() : null)
                 .donationDate(donation.getDonationDate())
-                .city(donation.getLocationSummary() != null ? donation.getLocationSummary().getCity() : null)
-                .state(donation.getLocationSummary() != null ? donation.getLocationSummary().getState() : null)
+                .city(donation.getLocation() != null ? donation.getLocation().getCity() : null)
+                .state(donation.getLocation() != null ? donation.getLocation().getState() : null)
                 .build();
     }
 
     public static DetailedStatusResponse fromReceiveRequest(ReceiveRequest request) {
         return DetailedStatusResponse.builder()
                 .id(request.getReceiveRequestId())
-                .userId(request.getUserId())
+                .userId(request.getRecipient().getUserId())
                 .status(request.getStatus() != null ? request.getStatus().toString() : null)
                 .type("RECEIVE_REQUEST")
                 .bloodType(request.getRequestedBloodType() != null ? request.getRequestedBloodType().toString() : null)
@@ -62,6 +62,8 @@ public class DetailedStatusResponse {
                 .quantity(request.getQuantity())
                 .requestDate(request.getRequestDate())
                 .notes(request.getNotes())
+                .city(request.getLocation() != null ? request.getLocation().getCity() : null)
+                .state(request.getLocation() != null ? request.getLocation().getState() : null)
                 .build();
     }
 }

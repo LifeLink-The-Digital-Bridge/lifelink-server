@@ -1,10 +1,13 @@
 package com.matchingservice.model.donor;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.matchingservice.enums.DonorStatus;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -15,49 +18,36 @@ import java.util.UUID;
 public class Donor {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private Long id;
+
+    @Column(nullable = false)
     private UUID donorId;
 
     @Column(nullable = false)
     private UUID userId;
 
+    @Column(nullable = false)
     private LocalDate registrationDate;
 
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private DonorStatus status;
 
-    private Double weight;
-    private Integer age;
-    private LocalDate dob;
-    private Boolean medicalClearance;
-    private Boolean recentTattooOrPiercing;
-    private String recentTravelDetails;
-    private Boolean recentVaccination;
-    private Boolean recentSurgery;
-    private String chronicDiseases;
-    private String allergies;
-    private LocalDate lastDonationDate;
-    private Double height;
-    private Double bodyMassIndex;
-    private String bodySize;
-    private Boolean isLivingDonor;
+    @Column(name = "event_timestamp", nullable = false)
+    private LocalDateTime eventTimestamp;
 
-    private Double hemoglobinLevel;
-    private String bloodPressure;
-    private Boolean hasDiseases;
-    private Boolean takingMedication;
-    private String diseaseDescription;
+    @OneToOne(mappedBy = "donor", cascade = CascadeType.ALL)
+    private DonorMedicalDetails medicalDetails;
 
-    private String currentMedications;
-    private LocalDate lastMedicalCheckup;
-    private String medicalHistory;
-    private Boolean hasInfectiousDiseases;
-    private String infectiousDiseaseDetails;
-    private Double creatinineLevel;
-    private String liverFunctionTests;
-    private String cardiacStatus;
-    private Double pulmonaryFunction;
-    private String overallHealthStatus;
+    @OneToOne(mappedBy = "donor", cascade = CascadeType.ALL)
+    private DonorEligibilityCriteria eligibilityCriteria;
 
+    @OneToMany(mappedBy = "donor", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonManagedReference
+    @ToString.Exclude
+    private List<DonorLocation> addresses = new ArrayList<>();
 
-
+    @OneToMany(mappedBy = "donor", cascade = CascadeType.ALL)
+    private List<Donation> donations = new ArrayList<>();
 }

@@ -1,19 +1,21 @@
 package com.matchingservice.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.matchingservice.dto.*;
 import com.matchingservice.enums.DonationStatus;
+import com.matchingservice.enums.MatchStatus;
 import com.matchingservice.enums.RequestStatus;
 import com.matchingservice.exceptions.ResourceNotFoundException;
 import com.matchingservice.model.MatchResult;
 import com.matchingservice.model.donor.*;
 import com.matchingservice.model.recipients.ReceiveRequest;
+import com.matchingservice.model.recipients.RecipientHLAProfile;
 import com.matchingservice.model.recipients.RecipientLocation;
 import com.matchingservice.model.recipients.Recipient;
 import com.matchingservice.repository.*;
-import com.matchingservice.model.recipients.RecipientHLAProfile;
 import com.matchingservice.client.DonorServiceClient;
 import com.matchingservice.client.RecipientServiceClient;
+import com.matchingservice.repository.donor.*;
+import com.matchingservice.repository.recipient.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,32 +54,38 @@ public class MatchingServiceImpl implements MatchingService {
             ReceiveRequest receiveRequest = receiveRequestRepository.findById(request.getReceiveRequestId())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "ReceiveRequest not found with ID: " + request.getReceiveRequestId()));
+
             DonorLocation donorLocation = null;
             if (request.getDonorLocationId() != null) {
-                donorLocation = donorLocationRepository.findById(request.getDonorLocationId())
+                donorLocation = donorLocationRepository
+                        .findTopByLocationIdOrderByEventTimestampDesc(request.getDonorLocationId())
                         .orElseThrow(() -> new ResourceNotFoundException(
                                 "Donor location not found with ID: " + request.getDonorLocationId()));
             }
+
             RecipientLocation recipientLocation = null;
             if (request.getRecipientLocationId() != null) {
-                recipientLocation = recipientLocationRepository.findById(request.getRecipientLocationId())
+                recipientLocation = recipientLocationRepository
+                        .findTopByLocationIdOrderByEventTimestampDesc(request.getRecipientLocationId())
                         .orElseThrow(() -> new ResourceNotFoundException(
                                 "Recipient location not found with ID: " + request.getRecipientLocationId()));
             }
 
-            Recipient recipient = recipientRepository.findById(receiveRequest.getRecipientId())
+            Recipient recipient = recipientRepository
+                    .findTopByRecipientIdOrderByEventTimestampDesc(receiveRequest.getRecipientId())
                     .orElseThrow(() -> new ResourceNotFoundException("Recipient not found"));
 
             MatchResult matchResult = new MatchResult();
             matchResult.setDonationId(donation.getDonationId());
             matchResult.setReceiveRequestId(receiveRequest.getReceiveRequestId());
-            matchResult.setDonorUserId(donation.getUserId());
+            matchResult.setDonorUserId(donation.getDonor().getUserId());
             matchResult.setRecipientUserId(recipient.getUserId());
             matchResult.setDonorLocationId(donorLocation != null ? donorLocation.getLocationId() : null);
             matchResult.setRecipientLocationId(recipientLocation != null ? recipientLocation.getLocationId() : null);
             matchResult.setMatchedAt(LocalDateTime.now());
+            matchResult.setStatus(MatchStatus.PENDING);
             matchResult.setIsConfirmed(false);
-            matchResult.setDistance(0.0);
+            matchResult.setDistance(calculateDistance(donorLocation, recipientLocation));
 
             MatchResult savedMatchResult = matchResultRepository.save(matchResult);
 
@@ -85,7 +93,7 @@ public class MatchingServiceImpl implements MatchingService {
             ManualMatchResponse.MatchDetails matchDetails = ManualMatchResponse.MatchDetails.builder()
                     .donationId(donation.getDonationId())
                     .receiveRequestId(receiveRequest.getReceiveRequestId())
-                    .donorUserId(donation.getUserId())
+                    .donorUserId(donation.getDonor().getUserId())
                     .recipientUserId(recipient.getUserId())
                     .donationType(donation.getDonationType() != null ? donation.getDonationType().toString() : null)
                     .requestType(receiveRequest.getRequestType() != null ? receiveRequest.getRequestType().toString() : null)
@@ -121,7 +129,7 @@ public class MatchingServiceImpl implements MatchingService {
 
     @Override
     public List<MatchResponse> getMatchesForDonor(UUID donorUserId) {
-        return matchResultRepository.findByDonorUserId(donorUserId)
+        return matchResultRepository.findByDonorUserIdOrderByMatchedAtDesc(donorUserId)
                 .stream()
                 .map(matchResult -> enrichMatchResponse(matchResult, "DONOR_TO_RECIPIENT"))
                 .collect(Collectors.toList());
@@ -129,7 +137,7 @@ public class MatchingServiceImpl implements MatchingService {
 
     @Override
     public List<MatchResponse> getMatchesForRecipient(UUID recipientUserId) {
-        return matchResultRepository.findByRecipientUserId(recipientUserId)
+        return matchResultRepository.findByRecipientUserIdOrderByMatchedAtDesc(recipientUserId)
                 .stream()
                 .map(matchResult -> enrichMatchResponse(matchResult, "RECIPIENT_TO_DONOR"))
                 .collect(Collectors.toList());
@@ -146,24 +154,24 @@ public class MatchingServiceImpl implements MatchingService {
     private MatchResponse enrichMatchResponse(MatchResult matchResult, String matchType) {
         MatchResponse response = MatchResponse.fromMatchResult(matchResult);
         response.setMatchType(matchType);
-        
+
         donationRepository.findById(matchResult.getDonationId())
                 .ifPresent(donation -> {
                     response.setDonationType(donation.getDonationType() != null ? donation.getDonationType().toString() : null);
                     response.setBloodType(donation.getBloodType() != null ? donation.getBloodType().toString() : null);
                 });
-        
+
         receiveRequestRepository.findById(matchResult.getReceiveRequestId())
                 .ifPresent(request -> {
                     response.setRequestType(request.getRequestType() != null ? request.getRequestType().toString() : null);
                 });
-        
+
         return response;
     }
 
     @Override
     public List<MatchResponse> getMatchesByDonation(UUID donationId) {
-        return matchResultRepository.findByDonationId(donationId)
+        return matchResultRepository.findByDonationIdOrderByCompatibilityScoreDesc(donationId)
                 .stream()
                 .map(matchResult -> enrichMatchResponse(matchResult, "DONOR_TO_RECIPIENT"))
                 .collect(Collectors.toList());
@@ -171,7 +179,7 @@ public class MatchingServiceImpl implements MatchingService {
 
     @Override
     public List<MatchResponse> getMatchesByRequest(UUID receiveRequestId) {
-        return matchResultRepository.findByReceiveRequestId(receiveRequestId)
+        return matchResultRepository.findByReceiveRequestIdOrderByCompatibilityScoreDesc(receiveRequestId)
                 .stream()
                 .map(matchResult -> enrichMatchResponse(matchResult, "RECIPIENT_TO_DONOR"))
                 .collect(Collectors.toList());
@@ -182,15 +190,15 @@ public class MatchingServiceImpl implements MatchingService {
     public String donorConfirmMatch(UUID matchId, UUID userId) {
         MatchResult matchResult = matchResultRepository.findById(matchId)
                 .orElseThrow(() -> new ResourceNotFoundException("Match not found with ID: " + matchId));
-        
+
         if (!matchResult.getDonorUserId().equals(userId)) {
             throw new IllegalStateException("Only the donor can confirm this match");
         }
-        
+
         if (matchResult.getDonorConfirmed()) {
             return "Donor has already confirmed this match";
         }
-        
+
         matchResult.setDonorConfirmed(true);
         matchResult.setDonorConfirmedAt(LocalDateTime.now());
 
@@ -199,7 +207,7 @@ public class MatchingServiceImpl implements MatchingService {
             matchResultRepository.save(matchResult);
             return "Match fully confirmed! Both donor and recipient have agreed. Donation process initiated.";
         }
-        
+
         matchResultRepository.save(matchResult);
         return "Donor confirmation recorded. Waiting for recipient confirmation.";
     }
@@ -209,15 +217,15 @@ public class MatchingServiceImpl implements MatchingService {
     public String recipientConfirmMatch(UUID matchId, UUID userId) {
         MatchResult matchResult = matchResultRepository.findById(matchId)
                 .orElseThrow(() -> new ResourceNotFoundException("Match not found with ID: " + matchId));
-        
+
         if (!matchResult.getRecipientUserId().equals(userId)) {
             throw new IllegalStateException("Only the recipient can confirm this match");
         }
-        
+
         if (matchResult.getRecipientConfirmed()) {
             return "Recipient has already confirmed this match";
         }
-        
+
         matchResult.setRecipientConfirmed(true);
         matchResult.setRecipientConfirmedAt(LocalDateTime.now());
 
@@ -226,38 +234,21 @@ public class MatchingServiceImpl implements MatchingService {
             matchResultRepository.save(matchResult);
             return "Match fully confirmed! Both donor and recipient have agreed. Donation process initiated.";
         }
-        
+
         matchResultRepository.save(matchResult);
         return "Recipient confirmation recorded. Waiting for donor confirmation.";
     }
 
     private void finalizeMatch(MatchResult matchResult) {
         matchResult.setIsConfirmed(true);
-        LocalDateTime completedAt = LocalDateTime.now();
-        
-        try {
-            CreateDonationHistoryRequest donationHistoryRequest = buildDonationHistoryRequest(
-                    matchResult, completedAt);
-            donorServiceClient.createDonationHistory(donationHistoryRequest);
-            System.out.println("Donation history created successfully");
-        } catch (Exception e) {
-            System.err.println("Failed to create donation history: " + e.getMessage());
-        }
+        matchResult.setStatus(MatchStatus.CONFIRMED);
 
-        try {
-            CreateRecipientHistoryRequest recipientHistoryRequest = buildRecipientHistoryRequest(matchResult, completedAt);
-            recipientServiceClient.createRecipientHistory(recipientHistoryRequest);
-            System.out.println("Recipient history created successfully");
-        } catch (Exception e) {
-            System.err.println("Failed to create recipient history: " + e.getMessage());
-        }
-        
         donationRepository.findById(matchResult.getDonationId())
                 .ifPresent(donation -> {
                     donation.setStatus(DonationStatus.COMPLETED);
                     donationRepository.save(donation);
                 });
-        
+
         receiveRequestRepository.findById(matchResult.getReceiveRequestId())
                 .ifPresent(request -> {
                     request.setStatus(RequestStatus.FULFILLED);
@@ -269,7 +260,7 @@ public class MatchingServiceImpl implements MatchingService {
         } catch (Exception e) {
             System.err.println("Failed to update donation status in donor-service: " + e.getMessage());
         }
-        
+
         try {
             recipientServiceClient.updateRequestStatusToFulfilled(matchResult.getReceiveRequestId());
         } catch (Exception e) {
@@ -277,297 +268,14 @@ public class MatchingServiceImpl implements MatchingService {
         }
     }
 
-    private CreateDonationHistoryRequest buildDonationHistoryRequest(MatchResult matchResult, LocalDateTime completedAt) {
-        CreateDonationHistoryRequest request = new CreateDonationHistoryRequest();
-
-        request.setMatchId(matchResult.getId());
-        request.setReceiveRequestId(matchResult.getReceiveRequestId());
-        request.setRecipientUserId(matchResult.getRecipientUserId());
-        request.setMatchedAt(matchResult.getMatchedAt());
-        request.setCompletedAt(completedAt);
-
-        donationRepository.findById(matchResult.getDonationId())
-                .ifPresent(donation -> populateDonationData(request, donation));
-
-        donorRepository.findByUserId(matchResult.getDonorUserId())
-                .ifPresent(donor -> {
-                    populateDonorData(request, donor);
-                    populateLocationData(request, donor);
-                });
-
-        donorRepository.findByUserId(matchResult.getDonorUserId())
-                .ifPresent(donor -> donorHLAProfileRepository.findByDonorId(donor.getDonorId())
-                        .ifPresent(hla -> populateDonorHLAData(request, hla)));
-
-        return request;
-    }
-
-    private void populateDonationData(CreateDonationHistoryRequest request, Donation donation) {
-        request.setDonationId(donation.getDonationId());
-        request.setDonationDate(donation.getDonationDate());
-        request.setDonationStatus(donation.getStatus().name());
-        request.setBloodType(donation.getBloodType() != null ? donation.getBloodType().name() : null);
-        request.setDonationType(donation.getDonationType().name());
-        request.setUsedLocationId(donation.getLocationId());
-        switch (donation.getDonationType()) {
-            case BLOOD:
-                if (donation instanceof BloodDonation) {
-                    BloodDonation bloodDonation = (BloodDonation) donation;
-                    request.setQuantity(bloodDonation.getQuantity());
-                }
-                break;
-
-            case ORGAN:
-                if (donation instanceof OrganDonation) {
-                    OrganDonation organDonation = (OrganDonation) donation;
-                    request.setOrganType(organDonation.getOrganType() != null ? organDonation.getOrganType().name() : null);
-                    request.setIsCompatible(organDonation.getIsCompatible());
-                    request.setOrganQuality(organDonation.getOrganQuality());
-                    request.setOrganViabilityExpiry(organDonation.getOrganViabilityExpiry());
-                    request.setColdIschemiaTime(organDonation.getColdIschemiaTime());
-                    request.setOrganPerfused(organDonation.getOrganPerfused());
-                    request.setOrganWeight(organDonation.getOrganWeight());
-                    request.setOrganSize(organDonation.getOrganSize());
-                    request.setFunctionalAssessment(organDonation.getFunctionalAssessment());
-                    request.setHasAbnormalities(organDonation.getHasAbnormalities());
-                    request.setAbnormalityDescription(organDonation.getAbnormalityDescription());
-                }
-                break;
-
-            case TISSUE:
-                if (donation instanceof TissueDonation) {
-                    TissueDonation tissueDonation = (TissueDonation) donation;
-                    request.setTissueType(tissueDonation.getTissueType() != null ? tissueDonation.getTissueType().name() : null);
-                    request.setQuantity(tissueDonation.getQuantity());
-                }
-                break;
-
-            case STEM_CELL:
-                if (donation instanceof StemCellDonation) {
-                    StemCellDonation stemCellDonation = (StemCellDonation) donation;
-                    request.setStemCellType(stemCellDonation.getStemCellType() != null ? stemCellDonation.getStemCellType().name() : null);
-                    request.setQuantity(stemCellDonation.getQuantity());
-                }
-                break;
-        }
-    }
-
-    private void populateDonorData(CreateDonationHistoryRequest request, Donor donor) {
-        request.setDonorId(donor.getDonorId());
-        request.setDonorUserId(donor.getUserId());
-        request.setRegistrationDate(donor.getRegistrationDate());
-        request.setDonorStatus(donor.getStatus() != null ? donor.getStatus().name() : null);
-
-            request.setHemoglobinLevel(donor.getHemoglobinLevel());
-            request.setBloodPressure(donor.getBloodPressure());
-            request.setHasDiseases(donor.getHasDiseases());
-            request.setTakingMedication(donor.getTakingMedication());
-            request.setDiseaseDescription(donor.getDiseaseDescription());
-            request.setCurrentMedications(donor.getCurrentMedications());
-            request.setLastMedicalCheckup(donor.getLastMedicalCheckup());
-            request.setMedicalHistory(donor.getMedicalHistory());
-            request.setHasInfectiousDiseases(donor.getHasInfectiousDiseases());
-            request.setInfectiousDiseaseDetails(donor.getInfectiousDiseaseDetails());
-            request.setCreatinineLevel(donor.getCreatinineLevel());
-            request.setLiverFunctionTests(donor.getLiverFunctionTests());
-            request.setCardiacStatus(donor.getCardiacStatus());
-            request.setPulmonaryFunction(donor.getPulmonaryFunction());
-            request.setOverallHealthStatus(donor.getOverallHealthStatus());
-
-
-            request.setAge(donor.getAge());
-            request.setDob(donor.getDob());
-            request.setWeight(donor.getWeight());
-            request.setMedicalClearance(donor.getMedicalClearance());
-            request.setRecentTattooOrPiercing(donor.getRecentTattooOrPiercing());
-            request.setRecentTravelDetails(donor.getRecentTravelDetails());
-            request.setRecentVaccination(donor.getRecentVaccination());
-            request.setRecentSurgery(donor.getRecentSurgery());
-            request.setChronicDiseases(donor.getChronicDiseases());
-            request.setAllergies(donor.getAllergies());
-            request.setLastDonationDate(donor.getLastDonationDate());
-            request.setHeight(donor.getHeight());
-            request.setBodyMassIndex(donor.getBodyMassIndex());
-            request.setBodySize(donor.getBodySize());
-            request.setIsLivingDonor(donor.getIsLivingDonor());
-
-    }
-
-    private void populateLocationData(CreateDonationHistoryRequest request, Donor donor) {
-        if (request.getUsedLocationId() != null) {
-            donorLocationRepository.findById(request.getUsedLocationId())
-                    .ifPresent(location -> {
-                        request.setUsedAddressLine(location.getAddressLine());
-                        request.setUsedLandmark(location.getLandmark());
-                        request.setUsedArea(location.getArea());
-                        request.setUsedCity(location.getCity());
-                        request.setUsedDistrict(location.getDistrict());
-                        request.setUsedState(location.getState());
-                        request.setUsedCountry(location.getCountry());
-                        request.setUsedPincode(location.getPincode());
-                        request.setUsedLatitude(location.getLatitude());
-                        request.setUsedLongitude(location.getLongitude());
-                    });
-        }
-
-    }
-
-    private void populateDonorHLAData(CreateDonationHistoryRequest request, DonorHLAProfile hla) {
-        request.setHlaA1(hla.getHlaA1());
-        request.setHlaA2(hla.getHlaA2());
-        request.setHlaB1(hla.getHlaB1());
-        request.setHlaB2(hla.getHlaB2());
-        request.setHlaC1(hla.getHlaC1());
-        request.setHlaC2(hla.getHlaC2());
-        request.setHlaDR1(hla.getHlaDR1());
-        request.setHlaDR2(hla.getHlaDR2());
-        request.setHlaDQ1(hla.getHlaDQ1());
-        request.setHlaDQ2(hla.getHlaDQ2());
-        request.setHlaDP1(hla.getHlaDP1());
-        request.setHlaDP2(hla.getHlaDP2());
-        request.setTestingDate(hla.getTestingDate());
-        request.setTestingMethod(hla.getTestingMethod());
-        request.setLaboratoryName(hla.getLaboratoryName());
-        request.setCertificationNumber(hla.getCertificationNumber());
-        request.setHlaString(hla.getHlaString());
-        request.setIsHighResolution(hla.getIsHighResolution());
-    }
-
-    private CreateRecipientHistoryRequest buildRecipientHistoryRequest(MatchResult matchResult, LocalDateTime completedAt) {
-        CreateRecipientHistoryRequest request = new CreateRecipientHistoryRequest();
-        request.setMatchId(matchResult.getId());
-        request.setDonationId(matchResult.getDonationId());
-        request.setDonorUserId(matchResult.getDonorUserId());
-        request.setMatchedAt(matchResult.getMatchedAt());
-        request.setCompletedAt(completedAt);
-
-        receiveRequestRepository.findById(matchResult.getReceiveRequestId())
-                .ifPresent(receiveRequest -> populateRequestData(request, receiveRequest));
-
-        recipientRepository.findByUserId(matchResult.getRecipientUserId())
-                .ifPresent(recipient -> {
-                    populateRecipientData(request, recipient);
-                    populateRecipientLocationData(request, recipient);
-                });
-
-        recipientRepository.findByUserId(matchResult.getRecipientUserId())
-                .ifPresent(recipient -> recipientHLAProfileRepository.findByRecipientId(recipient.getRecipientId())
-                        .ifPresent(hla -> populateRecipientHLAData(request, hla)));
-
-        return request;
-    }
-
-    private void populateRecipientLocationData(CreateRecipientHistoryRequest request, Recipient recipient) {
-        if (request.getUsedLocationId() != null) {
-            recipientLocationRepository.findById(request.getUsedLocationId())
-                    .ifPresent(location -> {
-                        request.setUsedAddressLine(location.getAddressLine());
-                        request.setUsedLandmark(location.getLandmark());
-                        request.setUsedArea(location.getArea());
-                        request.setUsedCity(location.getCity());
-                        request.setUsedDistrict(location.getDistrict());
-                        request.setUsedState(location.getState());
-                        request.setUsedCountry(location.getCountry());
-                        request.setUsedPincode(location.getPincode());
-                        request.setUsedLatitude(location.getLatitude());
-                        request.setUsedLongitude(location.getLongitude());
-                    });
-        }
-    }
-
-    private void populateRequestData(CreateRecipientHistoryRequest request, ReceiveRequest receiveRequest) {
-        request.setReceiveRequestId(receiveRequest.getReceiveRequestId());
-        request.setRequestType(receiveRequest.getRequestType().name());
-        request.setUsedLocationId(receiveRequest.getLocationId());
-
-        if (receiveRequest.getRequestedBloodType() != null) {
-            request.setRequestedBloodType(receiveRequest.getRequestedBloodType().name());
-        }
-        if (receiveRequest.getRequestedOrgan() != null) {
-            request.setRequestedOrgan(receiveRequest.getRequestedOrgan().name());
-        }
-        if (receiveRequest.getRequestedTissue() != null) {
-            request.setRequestedTissue(receiveRequest.getRequestedTissue().name());
-        }
-        if (receiveRequest.getRequestedStemCellType() != null) {
-            request.setRequestedStemCellType(receiveRequest.getRequestedStemCellType().name());
-        }
-        request.setUrgencyLevel(receiveRequest.getUrgencyLevel().name());
-        request.setQuantity(receiveRequest.getQuantity());
-        request.setRequestDate(receiveRequest.getRequestDate());
-        request.setRequestStatus(receiveRequest.getStatus().name());
-        request.setRequestNotes(receiveRequest.getNotes());
-    }
-
-    private void populateRecipientData(CreateRecipientHistoryRequest request, Recipient recipient) {
-        request.setRecipientId(recipient.getRecipientId());
-        request.setRecipientUserId(recipient.getUserId());
-        request.setAvailability(recipient.getAvailability() != null ? recipient.getAvailability().name() : null);
-
-        request.setHemoglobinLevel(recipient.getHemoglobinLevel());
-        request.setBloodPressure(recipient.getBloodPressure());
-        request.setDiagnosis(recipient.getDiagnosis());
-        request.setAllergies(recipient.getAllergies());
-        request.setCurrentMedications(recipient.getCurrentMedications());
-        request.setAdditionalNotes(recipient.getAdditionalNotes());
-        request.setHasInfectiousDiseases(recipient.getHasInfectiousDiseases());
-        request.setInfectiousDiseaseDetails(recipient.getInfectiousDiseaseDetails());
-        request.setCreatinineLevel(recipient.getCreatinineLevel());
-        request.setLiverFunctionTests(recipient.getLiverFunctionTests());
-        request.setCardiacStatus(recipient.getCardiacStatus());
-        request.setPulmonaryFunction(recipient.getPulmonaryFunction());
-        request.setOverallHealthStatus(recipient.getOverallHealthStatus());
-
-        request.setAgeEligible(recipient.getAgeEligible());
-        request.setAge(recipient.getAge());
-        request.setDob(recipient.getDob());
-        request.setWeightEligible(recipient.getWeightEligible());
-        request.setWeight(recipient.getWeight());
-        request.setMedicallyEligible(recipient.getMedicallyEligible());
-        request.setLegalClearance(recipient.getLegalClearance());
-        request.setNotes(recipient.getEligibilityNotes());
-        request.setLastReviewed(recipient.getLastReviewed());
-        request.setHeight(recipient.getHeight());
-        request.setBodyMassIndex(recipient.getBodyMassIndex());
-        request.setBodySize(recipient.getBodySize());
-        request.setIsLivingDonor(recipient.getIsLivingDonor());
-    }
-
-    private void populateRecipientHLAData(CreateRecipientHistoryRequest request, RecipientHLAProfile hla) {
-        request.setHlaA1(hla.getHlaA1());
-        request.setHlaA2(hla.getHlaA2());
-        request.setHlaB1(hla.getHlaB1());
-        request.setHlaB2(hla.getHlaB2());
-        request.setHlaC1(hla.getHlaC1());
-        request.setHlaC2(hla.getHlaC2());
-        request.setHlaDR1(hla.getHlaDR1());
-        request.setHlaDR2(hla.getHlaDR2());
-        request.setHlaDQ1(hla.getHlaDQ1());
-        request.setHlaDQ2(hla.getHlaDQ2());
-        request.setHlaDP1(hla.getHlaDP1());
-        request.setHlaDP2(hla.getHlaDP2());
-        request.setTestingDate(hla.getTestingDate());
-        request.setTestingMethod(hla.getTestingMethod());
-        request.setLaboratoryName(hla.getLaboratoryName());
-        request.setCertificationNumber(hla.getCertificationNumber());
-        request.setHlaString(hla.getHlaString());
-        request.setIsHighResolution(hla.getIsHighResolution());
-    }
-
     @Override
     public boolean hasAccessToDonation(UUID donationId, UUID recipientUserId) {
-        List<MatchResult> matchResults = matchResultRepository.findByDonationIdAndRecipientUserId(donationId, recipientUserId);
-        System.out.println("Match results for donation " + donationId + " and recipient " + recipientUserId + ": " + matchResults.toString());
-
-        return !matchResults.isEmpty();
+        return matchResultRepository.existsByDonationIdAndRecipientUserId(donationId, recipientUserId);
     }
 
     @Override
     public boolean hasAccessToRequest(UUID requestId, UUID donorUserId) {
-        List<MatchResult> matchResults = matchResultRepository.findByReceiveRequestIdAndDonorUserId(requestId, donorUserId);
-        System.out.println("Match results for request " + requestId + " and donor " + donorUserId + ": " + matchResults.toString());
-
-        return !matchResults.isEmpty();
+        return matchResultRepository.existsByReceiveRequestIdAndDonorUserId(requestId, donorUserId);
     }
 
     @Override
@@ -575,13 +283,7 @@ public class MatchingServiceImpl implements MatchingService {
         Donation donation = donationRepository.findById(donationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Donation not found"));
 
-        DonationDTO dto = convertToDTO(donation);
-
-        if (donation.getLocationId() != null) {
-            populateDonationLocationData(dto, donation.getLocationId());
-        }
-
-        return dto;
+        return convertToDTO(donation);
     }
 
     @Override
@@ -589,52 +291,158 @@ public class MatchingServiceImpl implements MatchingService {
         ReceiveRequest request = receiveRequestRepository.findById(requestId)
                 .orElseThrow(() -> new ResourceNotFoundException("Request not found"));
 
-        ReceiveRequestDTO dto = convertToDTO(request);
+        return convertToDTO(request);
+    }
 
-        if (request.getLocationId() != null) {
-            populateRequestLocationData(dto, request.getLocationId());
+    @Override
+    public DonorDTO getDonorByUserId(UUID userId) {
+        Donor donor = donorRepository.findLatestByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Donor not found for user: " + userId));
+        return convertDonorToDTO(donor);
+    }
+
+    @Override
+    public RecipientDTO getRecipientByUserId(UUID userId) {
+        Recipient recipient = recipientRepository.findLatestByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Recipient not found for user: " + userId));
+        return convertRecipientToDTO(recipient);
+    }
+
+    private DonorDTO convertDonorToDTO(Donor donor) {
+        DonorDTO dto = new DonorDTO();
+        dto.setDonorId(donor.getDonorId());
+        dto.setUserId(donor.getUserId());
+        dto.setRegistrationDate(donor.getRegistrationDate());
+        dto.setStatus(donor.getStatus());
+
+        if (donor.getMedicalDetails() != null) {
+            DonorDTO.DonorMedicalDetailsDTO medicalDetails = new DonorDTO.DonorMedicalDetailsDTO();
+            medicalDetails.setMedicalDetailsId(donor.getMedicalDetails().getMedicalDetailsId());
+            medicalDetails.setHemoglobinLevel(donor.getMedicalDetails().getHemoglobinLevel());
+            medicalDetails.setBloodPressure(donor.getMedicalDetails().getBloodPressure());
+            medicalDetails.setHasDiseases(donor.getMedicalDetails().getHasDiseases());
+            medicalDetails.setTakingMedication(donor.getMedicalDetails().getTakingMedication());
+            medicalDetails.setDiseaseDescription(donor.getMedicalDetails().getDiseaseDescription());
+            medicalDetails.setCurrentMedications(donor.getMedicalDetails().getCurrentMedications());
+            medicalDetails.setLastMedicalCheckup(donor.getMedicalDetails().getLastMedicalCheckup());
+            medicalDetails.setMedicalHistory(donor.getMedicalDetails().getMedicalHistory());
+            medicalDetails.setHasInfectiousDiseases(donor.getMedicalDetails().getHasInfectiousDiseases());
+            medicalDetails.setInfectiousDiseaseDetails(donor.getMedicalDetails().getInfectiousDiseaseDetails());
+            medicalDetails.setCreatinineLevel(donor.getMedicalDetails().getCreatinineLevel());
+            medicalDetails.setLiverFunctionTests(donor.getMedicalDetails().getLiverFunctionTests());
+            medicalDetails.setCardiacStatus(donor.getMedicalDetails().getCardiacStatus());
+            medicalDetails.setPulmonaryFunction(donor.getMedicalDetails().getPulmonaryFunction());
+            medicalDetails.setOverallHealthStatus(donor.getMedicalDetails().getOverallHealthStatus());
+            dto.setMedicalDetails(medicalDetails);
         }
+
+        if (donor.getEligibilityCriteria() != null) {
+            DonorDTO.DonorEligibilityCriteriaDTO eligibility = new DonorDTO.DonorEligibilityCriteriaDTO();
+            eligibility.setEligibilityCriteriaId(donor.getEligibilityCriteria().getEligibilityCriteriaId());
+            eligibility.setWeight(donor.getEligibilityCriteria().getWeight());
+            eligibility.setAge(donor.getEligibilityCriteria().getAge());
+            eligibility.setDob(donor.getEligibilityCriteria().getDob());
+            eligibility.setMedicalClearance(donor.getEligibilityCriteria().getMedicalClearance());
+            eligibility.setRecentTattooOrPiercing(donor.getEligibilityCriteria().getRecentTattooOrPiercing());
+            eligibility.setRecentTravelDetails(donor.getEligibilityCriteria().getRecentTravelDetails());
+            eligibility.setRecentVaccination(donor.getEligibilityCriteria().getRecentVaccination());
+            eligibility.setRecentSurgery(donor.getEligibilityCriteria().getRecentSurgery());
+            eligibility.setChronicDiseases(donor.getEligibilityCriteria().getChronicDiseases());
+            eligibility.setAllergies(donor.getEligibilityCriteria().getAllergies());
+            eligibility.setLastDonationDate(donor.getEligibilityCriteria().getLastDonationDate());
+            eligibility.setHeight(donor.getEligibilityCriteria().getHeight());
+            eligibility.setBodyMassIndex(donor.getEligibilityCriteria().getBodyMassIndex());
+            eligibility.setBodySize(donor.getEligibilityCriteria().getBodySize());
+            eligibility.setIsLivingDonor(donor.getEligibilityCriteria().getIsLivingDonor());
+            eligibility.setSmokingStatus(donor.getEligibilityCriteria().getSmokingStatus());
+            eligibility.setPackYears(donor.getEligibilityCriteria().getPackYears());
+            eligibility.setQuitSmokingDate(donor.getEligibilityCriteria().getQuitSmokingDate());
+            eligibility.setAlcoholStatus(donor.getEligibilityCriteria().getAlcoholStatus());
+            eligibility.setDrinksPerWeek(donor.getEligibilityCriteria().getDrinksPerWeek());
+            eligibility.setQuitAlcoholDate(donor.getEligibilityCriteria().getQuitAlcoholDate());
+            eligibility.setAlcoholAbstinenceMonths(donor.getEligibilityCriteria().getAlcoholAbstinenceMonths());
+            dto.setEligibilityCriteria(eligibility);
+        }
+
+        donorHLAProfileRepository.findLatestByDonorId(donor.getDonorId())
+                .ifPresent(hlaProfile -> dto.setHlaProfile(convertHLAProfileToDTO(hlaProfile)));
+
+        List<LocationDTO> locations = donorLocationRepository.findLatestLocationsByDonorId(donor.getDonorId())
+                .stream()
+                .map(this::convertLocationToDTO)
+                .collect(Collectors.toList());
+        dto.setLocations(locations);
 
         return dto;
     }
 
-    private void populateDonationLocationData(DonationDTO dto, UUID locationId) {
-        donorLocationRepository.findById(locationId)
-                .ifPresent(location -> {
-                    dto.setUsedLocationAddressLine(location.getAddressLine());
-                    dto.setUsedLocationLandmark(location.getLandmark());
-                    dto.setUsedLocationArea(location.getArea());
-                    dto.setUsedLocationCity(location.getCity());
-                    dto.setUsedLocationDistrict(location.getDistrict());
-                    dto.setUsedLocationState(location.getState());
-                    dto.setUsedLocationCountry(location.getCountry());
-                    dto.setUsedLocationPincode(location.getPincode());
-                    dto.setUsedLocationLatitude(location.getLatitude());
-                    dto.setUsedLocationLongitude(location.getLongitude());
-                });
-    }
+    private RecipientDTO convertRecipientToDTO(Recipient recipient) {
+        RecipientDTO dto = new RecipientDTO();
+        dto.setRecipientId(recipient.getRecipientId());
+        dto.setUserId(recipient.getUserId());
+        dto.setAvailability(recipient.getAvailability());
 
-    private void populateRequestLocationData(ReceiveRequestDTO dto, UUID locationId) {
-        recipientLocationRepository.findById(locationId)
-                .ifPresent(location -> {
-                    dto.setUsedLocationAddressLine(location.getAddressLine());
-                    dto.setUsedLocationLandmark(location.getLandmark());
-                    dto.setUsedLocationArea(location.getArea());
-                    dto.setUsedLocationCity(location.getCity());
-                    dto.setUsedLocationDistrict(location.getDistrict());
-                    dto.setUsedLocationState(location.getState());
-                    dto.setUsedLocationCountry(location.getCountry());
-                    dto.setUsedLocationPincode(location.getPincode());
-                    dto.setUsedLocationLatitude(location.getLatitude());
-                    dto.setUsedLocationLongitude(location.getLongitude());
-                });
+        if (recipient.getMedicalDetails() != null) {
+            RecipientDTO.RecipientMedicalDetailsDTO medicalDetails = new RecipientDTO.RecipientMedicalDetailsDTO();
+            medicalDetails.setMedicalDetailsId(recipient.getMedicalDetails().getMedicalDetailsId());
+            medicalDetails.setHemoglobinLevel(recipient.getMedicalDetails().getHemoglobinLevel());
+            medicalDetails.setBloodPressure(recipient.getMedicalDetails().getBloodPressure());
+            medicalDetails.setDiagnosis(recipient.getMedicalDetails().getDiagnosis());
+            medicalDetails.setAllergies(recipient.getMedicalDetails().getAllergies());
+            medicalDetails.setCurrentMedications(recipient.getMedicalDetails().getCurrentMedications());
+            medicalDetails.setAdditionalNotes(recipient.getMedicalDetails().getAdditionalNotes());
+            medicalDetails.setHasInfectiousDiseases(recipient.getMedicalDetails().getHasInfectiousDiseases());
+            medicalDetails.setInfectiousDiseaseDetails(recipient.getMedicalDetails().getInfectiousDiseaseDetails());
+            medicalDetails.setCreatinineLevel(recipient.getMedicalDetails().getCreatinineLevel());
+            medicalDetails.setLiverFunctionTests(recipient.getMedicalDetails().getLiverFunctionTests());
+            medicalDetails.setCardiacStatus(recipient.getMedicalDetails().getCardiacStatus());
+            medicalDetails.setPulmonaryFunction(recipient.getMedicalDetails().getPulmonaryFunction());
+            medicalDetails.setOverallHealthStatus(recipient.getMedicalDetails().getOverallHealthStatus());
+            dto.setMedicalDetails(medicalDetails);
+        }
+
+        if (recipient.getEligibilityCriteria() != null) {
+            RecipientDTO.RecipientEligibilityCriteriaDTO eligibility = new RecipientDTO.RecipientEligibilityCriteriaDTO();
+            eligibility.setEligibilityCriteriaId(recipient.getEligibilityCriteria().getEligibilityCriteriaId());
+            eligibility.setAgeEligible(recipient.getEligibilityCriteria().getAgeEligible());
+            eligibility.setAge(recipient.getEligibilityCriteria().getAge());
+            eligibility.setDob(recipient.getEligibilityCriteria().getDob());
+            eligibility.setWeightEligible(recipient.getEligibilityCriteria().getWeightEligible());
+            eligibility.setWeight(recipient.getEligibilityCriteria().getWeight());
+            eligibility.setMedicallyEligible(recipient.getEligibilityCriteria().getMedicallyEligible());
+            eligibility.setLegalClearance(recipient.getEligibilityCriteria().getLegalClearance());
+            eligibility.setNotes(recipient.getEligibilityCriteria().getNotes());
+            eligibility.setLastReviewed(recipient.getEligibilityCriteria().getLastReviewed());
+            eligibility.setHeight(recipient.getEligibilityCriteria().getHeight());
+            eligibility.setBodyMassIndex(recipient.getEligibilityCriteria().getBodyMassIndex());
+            eligibility.setBodySize(recipient.getEligibilityCriteria().getBodySize());
+            eligibility.setIsLivingDonor(recipient.getEligibilityCriteria().getIsLivingDonor());
+            eligibility.setSmokingStatus(recipient.getEligibilityCriteria().getSmokingStatus());
+            eligibility.setPackYears(recipient.getEligibilityCriteria().getPackYears());
+            eligibility.setQuitSmokingDate(recipient.getEligibilityCriteria().getQuitSmokingDate());
+            eligibility.setAlcoholStatus(recipient.getEligibilityCriteria().getAlcoholStatus());
+            eligibility.setDrinksPerWeek(recipient.getEligibilityCriteria().getDrinksPerWeek());
+            eligibility.setQuitAlcoholDate(recipient.getEligibilityCriteria().getQuitAlcoholDate());
+            eligibility.setAlcoholAbstinenceMonths(recipient.getEligibilityCriteria().getAlcoholAbstinenceMonths());
+            dto.setEligibilityCriteria(eligibility);
+        }
+
+        recipientHLAProfileRepository.findLatestByRecipientId(recipient.getRecipientId())
+                .ifPresent(hlaProfile -> dto.setHlaProfile(convertHLAProfileToDTO(hlaProfile)));
+
+        List<LocationDTO> locations = recipientLocationRepository.findLatestLocationsByRecipientId(recipient.getRecipientId())
+                .stream()
+                .map(this::convertLocationToDTO)
+                .collect(Collectors.toList());
+        dto.setLocations(locations);
+
+        return dto;
     }
 
     private DonationDTO convertToDTO(Donation donation) {
         DonationDTO dto = new DonationDTO();
         dto.setId(donation.getDonationId());
         dto.setDonorId(donation.getDonorId());
-        dto.setLocationId(donation.getLocationId());
         dto.setDonationType(donation.getDonationType());
         dto.setDonationDate(donation.getDonationDate());
         dto.setStatus(donation.getStatus());
@@ -665,6 +473,10 @@ public class MatchingServiceImpl implements MatchingService {
             dto.setQuantity(stemCell.getQuantity());
         }
 
+        if (donation.getLocation() != null) {
+            dto.setLocation(convertLocationToDTO(donation.getLocation()));
+        }
+
         return dto;
     }
 
@@ -672,7 +484,6 @@ public class MatchingServiceImpl implements MatchingService {
         ReceiveRequestDTO dto = new ReceiveRequestDTO();
         dto.setId(receiveRequest.getReceiveRequestId());
         dto.setRecipientId(receiveRequest.getRecipientId());
-        dto.setLocationId(receiveRequest.getLocationId());
         dto.setRequestType(receiveRequest.getRequestType());
         dto.setRequestedBloodType(receiveRequest.getRequestedBloodType());
         dto.setRequestedOrgan(receiveRequest.getRequestedOrgan());
@@ -684,7 +495,110 @@ public class MatchingServiceImpl implements MatchingService {
         dto.setStatus(receiveRequest.getStatus());
         dto.setNotes(receiveRequest.getNotes());
 
+        if (receiveRequest.getLocation() != null) {
+            dto.setLocation(convertLocationToDTO(receiveRequest.getLocation()));
+        }
+
         return dto;
+    }
+
+    private LocationDTO convertLocationToDTO(DonorLocation location) {
+        LocationDTO dto = new LocationDTO();
+        dto.setLocationId(location.getLocationId());
+        dto.setAddressLine(location.getAddressLine());
+        dto.setLandmark(location.getLandmark());
+        dto.setArea(location.getArea());
+        dto.setCity(location.getCity());
+        dto.setDistrict(location.getDistrict());
+        dto.setState(location.getState());
+        dto.setCountry(location.getCountry());
+        dto.setPincode(location.getPincode());
+        dto.setLatitude(location.getLatitude());
+        dto.setLongitude(location.getLongitude());
+        return dto;
+    }
+
+    private LocationDTO convertLocationToDTO(RecipientLocation location) {
+        LocationDTO dto = new LocationDTO();
+        dto.setLocationId(location.getLocationId());
+        dto.setAddressLine(location.getAddressLine());
+        dto.setLandmark(location.getLandmark());
+        dto.setArea(location.getArea());
+        dto.setCity(location.getCity());
+        dto.setDistrict(location.getDistrict());
+        dto.setState(location.getState());
+        dto.setCountry(location.getCountry());
+        dto.setPincode(location.getPincode());
+        dto.setLatitude(location.getLatitude());
+        dto.setLongitude(location.getLongitude());
+        return dto;
+    }
+
+    private HLAProfileDTO convertHLAProfileToDTO(DonorHLAProfile hlaProfile) {
+        HLAProfileDTO dto = new HLAProfileDTO();
+        dto.setId(hlaProfile.getId());
+        dto.setHlaA1(hlaProfile.getHlaA1());
+        dto.setHlaA2(hlaProfile.getHlaA2());
+        dto.setHlaB1(hlaProfile.getHlaB1());
+        dto.setHlaB2(hlaProfile.getHlaB2());
+        dto.setHlaC1(hlaProfile.getHlaC1());
+        dto.setHlaC2(hlaProfile.getHlaC2());
+        dto.setHlaDR1(hlaProfile.getHlaDR1());
+        dto.setHlaDR2(hlaProfile.getHlaDR2());
+        dto.setHlaDQ1(hlaProfile.getHlaDQ1());
+        dto.setHlaDQ2(hlaProfile.getHlaDQ2());
+        dto.setHlaDP1(hlaProfile.getHlaDP1());
+        dto.setHlaDP2(hlaProfile.getHlaDP2());
+        dto.setTestingDate(hlaProfile.getTestingDate());
+        dto.setTestingMethod(hlaProfile.getTestingMethod());
+        dto.setLaboratoryName(hlaProfile.getLaboratoryName());
+        dto.setCertificationNumber(hlaProfile.getCertificationNumber());
+        dto.setHlaString(hlaProfile.getHlaString());
+        dto.setIsHighResolution(hlaProfile.getIsHighResolution());
+        return dto;
+    }
+
+    private HLAProfileDTO convertHLAProfileToDTO(RecipientHLAProfile hlaProfile) {
+        HLAProfileDTO dto = new HLAProfileDTO();
+        dto.setId(hlaProfile.getId());
+        dto.setHlaA1(hlaProfile.getHlaA1());
+        dto.setHlaA2(hlaProfile.getHlaA2());
+        dto.setHlaB1(hlaProfile.getHlaB1());
+        dto.setHlaB2(hlaProfile.getHlaB2());
+        dto.setHlaC1(hlaProfile.getHlaC1());
+        dto.setHlaC2(hlaProfile.getHlaC2());
+        dto.setHlaDR1(hlaProfile.getHlaDR1());
+        dto.setHlaDR2(hlaProfile.getHlaDR2());
+        dto.setHlaDQ1(hlaProfile.getHlaDQ1());
+        dto.setHlaDQ2(hlaProfile.getHlaDQ2());
+        dto.setHlaDP1(hlaProfile.getHlaDP1());
+        dto.setHlaDP2(hlaProfile.getHlaDP2());
+        dto.setTestingDate(hlaProfile.getTestingDate());
+        dto.setTestingMethod(hlaProfile.getTestingMethod());
+        dto.setLaboratoryName(hlaProfile.getLaboratoryName());
+        dto.setCertificationNumber(hlaProfile.getCertificationNumber());
+        dto.setHlaString(hlaProfile.getHlaString());
+        dto.setIsHighResolution(hlaProfile.getIsHighResolution());
+        return dto;
+    }
+
+    private Double calculateDistance(DonorLocation donorLoc, RecipientLocation recipientLoc) {
+        if (donorLoc == null || recipientLoc == null ||
+                donorLoc.getLatitude() == null || donorLoc.getLongitude() == null ||
+                recipientLoc.getLatitude() == null || recipientLoc.getLongitude() == null) {
+            return null;
+        }
+
+        final int R = 6371;
+
+        double latDistance = Math.toRadians(recipientLoc.getLatitude() - donorLoc.getLatitude());
+        double lonDistance = Math.toRadians(recipientLoc.getLongitude() - donorLoc.getLongitude());
+        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                + Math.cos(Math.toRadians(donorLoc.getLatitude())) * Math.cos(Math.toRadians(recipientLoc.getLatitude()))
+                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return R * c;
     }
 
     @Override

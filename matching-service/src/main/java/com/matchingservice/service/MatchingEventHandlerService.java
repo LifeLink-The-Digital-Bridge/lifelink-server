@@ -1,108 +1,161 @@
 package com.matchingservice.service;
 
-import com.matchingservice.enums.DonorStatus;
-import com.matchingservice.exceptions.ResourceNotFoundException;
-import com.matchingservice.kafka.event.donor_events.DonationEvent;
-import com.matchingservice.kafka.event.donor_events.DonorEvent;
-import com.matchingservice.kafka.event.donor_events.DonorHLAProfileEvent;
-import com.matchingservice.kafka.event.donor_events.DonorLocationEvent;
-import com.matchingservice.kafka.event.recipient_events.ReceiveRequestEvent;
-import com.matchingservice.kafka.event.recipient_events.RecipientEvent;
-import com.matchingservice.kafka.event.recipient_events.RecipientHLAProfileEvent;
-import com.matchingservice.kafka.event.recipient_events.RecipientLocationEvent;
+import com.matchingservice.enums.*;
+import com.matchingservice.kafka.event.donor_events.*;
+import com.matchingservice.kafka.event.recipient_events.*;
 import com.matchingservice.model.donor.*;
-import com.matchingservice.model.recipients.Recipient;
-import com.matchingservice.model.recipients.RecipientHLAProfile;
-import com.matchingservice.model.recipients.RecipientLocation;
-import com.matchingservice.model.recipients.ReceiveRequest;
-import com.matchingservice.repository.*;
+import com.matchingservice.model.recipients.*;
+import com.matchingservice.repository.donor.*;
+import com.matchingservice.repository.recipient.*;
 import com.matchingservice.utils.*;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.Optional;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class MatchingEventHandlerService {
 
     private final DonorRepository donorRepository;
     private final DonorLocationRepository donorLocationRepository;
     private final DonationRepository donationRepository;
+    private final DonorHLAProfileRepository donorHLAProfileRepository;
 
     private final RecipientRepository recipientRepository;
     private final RecipientLocationRepository recipientLocationRepository;
     private final ReceiveRequestRepository receiveRequestRepository;
-    private final DonorHLAProfileRepository donorHLAProfileRepository;
+    private final RecipientHLAProfileRepository recipientHLAProfileRepository;
 
     private final DonorEventBuffer donorEventBuffer;
     private final DonationEventBuffer donationEventBuffer;
     private final RecipientEventBuffer recipientEventBuffer;
     private final ReceiveRequestEventBuffer receiveRequestEventBuffer;
-    private final RecipientHLAProfileRepository recipientHLAProfileRepository;
 
+    @Transactional
     public void handleDonorEvent(DonorEvent event) {
-        Donor donor = donorRepository.findById(event.getDonorId()).orElse(null);
-        if (donor == null) {
-            donor = new Donor();
-            donor.setDonorId(event.getDonorId());
-        }
+        System.out.println("Processing DonorEvent for donorId: " + event.getDonorId());
 
+        Donor donor = new Donor();
+        donor.setDonorId(event.getDonorId());
         donor.setUserId(event.getUserId());
         donor.setRegistrationDate(event.getRegistrationDate());
-
         donor.setStatus(DonorStatus.valueOf(event.getStatus()));
+        donor.setEventTimestamp(LocalDateTime.now());
 
-        donor.setWeight(event.getWeight());
-        donor.setAge(event.getAge());
-        donor.setDob(event.getDob());
-        donor.setMedicalClearance(event.getMedicalClearance());
-        donor.setRecentTattooOrPiercing(event.getRecentTattooOrPiercing());
-        donor.setRecentTravelDetails(event.getRecentTravelDetails());
-        donor.setRecentVaccination(event.getRecentVaccination());
-        donor.setRecentSurgery(event.getRecentSurgery());
-        donor.setChronicDiseases(event.getChronicDiseases());
-        donor.setAllergies(event.getAllergies());
-        donor.setLastDonationDate(event.getLastDonationDate());
-        donor.setHeight(event.getHeight());
-        donor.setBodyMassIndex(event.getBodyMassIndex());
-        donor.setBodySize(event.getBodySize());
-        donor.setIsLivingDonor(event.getIsLivingDonor());
+        if (event.getEligibilityCriteriaId() != null) {
+            DonorEligibilityCriteria eligibility = new DonorEligibilityCriteria();
+            eligibility.setEligibilityCriteriaId(event.getEligibilityCriteriaId());
+            eligibility.setDonor(donor);
+            eligibility.setWeight(event.getWeight());
+            eligibility.setAge(event.getAge());
+            eligibility.setDob(event.getDob());
+            eligibility.setMedicalClearance(event.getMedicalClearance());
+            eligibility.setRecentTattooOrPiercing(event.getRecentTattooOrPiercing());
+            eligibility.setRecentTravelDetails(event.getRecentTravelDetails());
+            eligibility.setRecentVaccination(event.getRecentVaccination());
+            eligibility.setRecentSurgery(event.getRecentSurgery());
+            eligibility.setChronicDiseases(event.getChronicDiseases());
+            eligibility.setAllergies(event.getAllergies());
+            eligibility.setLastDonationDate(event.getLastDonationDate());
+            eligibility.setHeight(event.getHeight());
+            eligibility.setBodyMassIndex(event.getBodyMassIndex());
+            eligibility.setBodySize(event.getBodySize());
+            eligibility.setIsLivingDonor(event.getIsLivingDonor());
+            eligibility.setSmokingStatus(event.getSmokingStatus());
+            eligibility.setPackYears(event.getPackYears());
+            eligibility.setQuitSmokingDate(event.getQuitSmokingDate());
+            eligibility.setAlcoholStatus(event.getAlcoholStatus());
+            eligibility.setDrinksPerWeek(event.getDrinksPerWeek());
+            eligibility.setQuitAlcoholDate(event.getQuitAlcoholDate());
+            eligibility.setAlcoholAbstinenceMonths(event.getAlcoholAbstinenceMonths());
+            donor.setEligibilityCriteria(eligibility);
+        }
 
-        donor.setHemoglobinLevel(event.getHemoglobinLevel());
-        donor.setBloodPressure(event.getBloodPressure());
-        donor.setHasDiseases(event.getHasDiseases());
-        donor.setTakingMedication(event.getTakingMedication());
-        donor.setDiseaseDescription(event.getDiseaseDescription());
+        if (event.getMedicalDetailsId() != null) {
+            DonorMedicalDetails medicalDetails = new DonorMedicalDetails();
+            medicalDetails.setMedicalDetailsId(event.getMedicalDetailsId());
+            medicalDetails.setDonor(donor);
+            medicalDetails.setHemoglobinLevel(event.getHemoglobinLevel());
+            medicalDetails.setBloodPressure(event.getBloodPressure());
+            medicalDetails.setHasDiseases(event.getHasDiseases());
+            medicalDetails.setTakingMedication(event.getTakingMedication());
+            medicalDetails.setDiseaseDescription(event.getDiseaseDescription());
+            medicalDetails.setCurrentMedications(event.getCurrentMedications());
+            medicalDetails.setLastMedicalCheckup(event.getLastMedicalCheckup());
+            medicalDetails.setMedicalHistory(event.getMedicalHistory());
+            medicalDetails.setHasInfectiousDiseases(event.getHasInfectiousDiseases());
+            medicalDetails.setInfectiousDiseaseDetails(event.getInfectiousDiseaseDetails());
+            medicalDetails.setCreatinineLevel(event.getCreatinineLevel());
+            medicalDetails.setLiverFunctionTests(event.getLiverFunctionTests());
+            medicalDetails.setCardiacStatus(event.getCardiacStatus());
+            medicalDetails.setPulmonaryFunction(event.getPulmonaryFunction());
+            medicalDetails.setOverallHealthStatus(event.getOverallHealthStatus());
+            donor.setMedicalDetails(medicalDetails);
+        }
 
-        donor.setCurrentMedications(event.getCurrentMedications());
-        donor.setLastMedicalCheckup(event.getLastMedicalCheckup());
-        donor.setMedicalHistory(event.getMedicalHistory());
-        donor.setHasInfectiousDiseases(event.getHasInfectiousDiseases());
-        donor.setInfectiousDiseaseDetails(event.getInfectiousDiseaseDetails());
-        donor.setCreatinineLevel(event.getCreatinineLevel());
-        donor.setLiverFunctionTests(event.getLiverFunctionTests());
-        donor.setCardiacStatus(event.getCardiacStatus());
-        donor.setPulmonaryFunction(event.getPulmonaryFunction());
-        donor.setOverallHealthStatus(event.getOverallHealthStatus());
+        Donor savedDonor = donorRepository.save(donor);
+        System.out.println("Created new donor history snapshot: " + savedDonor.getDonorId()
+                + " at timestamp: " + savedDonor.getEventTimestamp());
 
-        System.out.println("Inside handleDonorEvent: " + donor.getDonorId());
-        donorRepository.save(donor);
-
-        var pending = donorEventBuffer.drain(donor.getDonorId());
-        if (pending != null) {
-            pending.forEach(this::safeRun);
+        var pendingEvents = donorEventBuffer.drain(donor.getDonorId());
+        if (pendingEvents != null) {
+            pendingEvents.forEach(this::safeRun);
         }
     }
 
-    public void handleDonorLocationEvent(DonorLocationEvent event) {
-        DonorLocation location = donorLocationRepository.findById(event.getLocationId()).orElse(null);
-        if (location == null) {
-            location = new DonorLocation();
-            location.setLocationId(event.getLocationId());
+    @Transactional
+    public void handleDonationEvent(DonationEvent event) {
+        System.out.println("Processing DonationEvent for donationId: " + event.getDonationId());
+
+        Donor donor = donorRepository.findTopByDonorIdOrderByEventTimestampDesc(event.getDonorId())
+                .orElse(null);
+
+        if (donor == null) {
+            System.out.println("Donor not found, buffering donation event: " + event.getDonorId());
+            donationEventBuffer.buffer(event.getDonorId(), event.getLocationId(), () -> handleDonationEvent(event));
+            return;
         }
-        location.setDonorId(event.getDonorId());
+
+        Donation donation = createDonationByType(event);
+        donation.setDonationId(event.getDonationId());
+        donation.setDonor(donor);
+        donation.setDonorId(donor.getDonorId());
+        donation.setUserId(event.getDonorId());
+        donation.setDonationType(event.getDonationType());
+        donation.setBloodType(event.getBloodType());
+        donation.setDonationDate(event.getDonationDate());
+        donation.setStatus(event.getStatus());
+        donation.setEventTimestamp(LocalDateTime.now());
+
+        if (event.getLocationId() != null) {
+            DonorLocation location = donorLocationRepository
+                    .findTopByLocationIdOrderByEventTimestampDesc(event.getLocationId())
+                    .orElse(null);
+            donation.setLocation(location);
+        }
+
+        Donation savedDonation = donationRepository.save(donation);
+        System.out.println("Created new donation history record: " + savedDonation.getDonationId());
+    }
+
+    @Transactional
+    public void handleDonorLocationEvent(DonorLocationEvent event) {
+        System.out.println("Processing DonorLocationEvent for locationId: " + event.getLocationId());
+
+        Donor donor = donorRepository.findTopByDonorIdOrderByEventTimestampDesc(event.getDonorId())
+                .orElse(null);
+
+        if (donor == null) {
+            System.out.println("Donor not found for location event, skipping");
+            return;
+        }
+
+        DonorLocation location = new DonorLocation();
+        location.setLocationId(event.getLocationId());
+        location.setDonor(donor);
         location.setAddressLine(event.getAddressLine());
         location.setLandmark(event.getLandmark());
         location.setArea(event.getArea());
@@ -113,317 +166,281 @@ public class MatchingEventHandlerService {
         location.setPincode(event.getPincode());
         location.setLatitude(event.getLatitude());
         location.setLongitude(event.getLongitude());
+        location.setEventTimestamp(LocalDateTime.now());
 
-        donorLocationRepository.save(location);
+        DonorLocation savedLocation = donorLocationRepository.save(location);
+        System.out.println("Created new donor location history: " + savedLocation.getLocationId());
 
-        var pending = donationEventBuffer.drain(location.getDonorId(), location.getLocationId());
+        var pending = donationEventBuffer.drain(location.getDonor().getDonorId(), location.getLocationId());
         if (pending != null) {
             pending.forEach(this::safeRun);
         }
     }
 
-    public void handleDonationEvent(DonationEvent event) {
-        Donor donor = donorRepository.findById(event.getDonorId()).orElse(null);
-        if (donor == null) {
-            donorEventBuffer.buffer(event.getDonorId(), () -> {
-                System.out.println("Re-running buffered donation event after donor created for donorId: " + event.getDonorId());
-                handleDonationEvent(event);
-            });
-            System.out.println("Donor not found - buffering donation event for donorId: " + event.getDonorId());
+    @Transactional
+    public void handleReceiveRequestEvent(ReceiveRequestEvent event) {
+        System.out.println("Processing ReceiveRequestEvent for requestId: " + event.getReceiveRequestId());
+
+        Recipient recipient = recipientRepository.findTopByRecipientIdOrderByEventTimestampDesc(event.getRecipientId())
+                .orElse(null);
+
+        if (recipient == null) {
+            System.out.println("Recipient not found, buffering receive request event: " + event.getRecipientId());
+            receiveRequestEventBuffer.buffer(event.getRecipientId(), event.getLocationId(), () -> handleReceiveRequestEvent(event));
             return;
         }
 
-        DonorLocation location = donorLocationRepository.findById(event.getLocationId()).orElse(null);
-        if (location == null) {
-            donationEventBuffer.buffer(event.getDonorId(), event.getLocationId(), () -> {
-                System.out.println("Re-running buffered donation event after location created for donorId: " + event.getDonorId() + ", locationId: " + event.getLocationId());
-                handleDonationEvent(event);
-            });
-            System.out.println("Location not found - buffering donation event for donorId: " + event.getDonorId() + ", locationId: " + event.getLocationId());
-            return;
+        ReceiveRequest request = new ReceiveRequest();
+        request.setReceiveRequestId(event.getReceiveRequestId());
+        request.setRecipient(recipient);
+        request.setRecipientId(recipient.getRecipientId());
+        request.setRequestType(event.getRequestType());
+        request.setRequestedBloodType(event.getRequestedBloodType());
+        request.setRequestedOrgan(event.getRequestedOrgan());
+        request.setRequestedTissue(event.getRequestedTissue());
+        request.setRequestedStemCellType(event.getRequestedStemCellType());
+        request.setUrgencyLevel(event.getUrgencyLevel());
+        request.setQuantity(event.getQuantity());
+        request.setRequestDate(event.getRequestDate());
+        request.setStatus(event.getStatus());
+        request.setNotes(event.getNotes());
+        request.setEventTimestamp(LocalDateTime.now());
+
+        if (event.getLocationId() != null) {
+            RecipientLocation location = recipientLocationRepository
+                    .findTopByLocationIdOrderByEventTimestampDesc(event.getLocationId())
+                    .orElse(null);
+            request.setLocation(location);
         }
 
-        if (donationRepository.findById(event.getDonationId()).isPresent()) {
-            System.out.println("Donation already exists for donationId: " + event.getDonationId());
-            return;
-        }
+        ReceiveRequest savedRequest = receiveRequestRepository.save(request);
+        System.out.println("Created new receive request history record: " + savedRequest.getReceiveRequestId());
+    }
 
-        Donation donation = switch (event.getDonationType()) {
+    private Donation createDonationByType(DonationEvent event) {
+        return switch (event.getDonationType()) {
             case BLOOD -> {
-                BloodDonation d = new BloodDonation();
-                d.setQuantity(event.getQuantity());
-                yield d;
+                BloodDonation bloodDonation = new BloodDonation();
+                bloodDonation.setQuantity(event.getQuantity());
+                yield bloodDonation;
             }
             case ORGAN -> {
-                OrganDonation d = new OrganDonation();
-                d.setOrganType(event.getOrganType());
-                d.setIsCompatible(event.getIsCompatible());
-                d.setOrganQuality(event.getOrganQuality());
-                d.setOrganViabilityExpiry(event.getOrganViabilityExpiry());
-                d.setColdIschemiaTime(event.getColdIschemiaTime());
-                d.setOrganPerfused(event.getOrganPerfused());
-                d.setOrganWeight(event.getOrganWeight());
-                d.setOrganSize(event.getOrganSize());
-                d.setFunctionalAssessment(event.getFunctionalAssessment());
-                d.setHasAbnormalities(event.getHasAbnormalities());
-                d.setAbnormalityDescription(event.getAbnormalityDescription());
-                yield d;
+                OrganDonation organDonation = new OrganDonation();
+                organDonation.setOrganType(event.getOrganType());
+                organDonation.setIsCompatible(event.getIsCompatible());
+                organDonation.setOrganQuality(event.getOrganQuality());
+                organDonation.setOrganViabilityExpiry(event.getOrganViabilityExpiry());
+                organDonation.setColdIschemiaTime(event.getColdIschemiaTime());
+                organDonation.setOrganPerfused(event.getOrganPerfused());
+                organDonation.setOrganWeight(event.getOrganWeight());
+                organDonation.setOrganSize(event.getOrganSize());
+                organDonation.setFunctionalAssessment(event.getFunctionalAssessment());
+                organDonation.setHasAbnormalities(event.getHasAbnormalities());
+                organDonation.setAbnormalityDescription(event.getAbnormalityDescription());
+                yield organDonation;
             }
             case TISSUE -> {
-                TissueDonation d = new TissueDonation();
-                d.setTissueType(event.getTissueType());
-                d.setQuantity(event.getQuantity());
-                yield d;
+                TissueDonation tissueDonation = new TissueDonation();
+                tissueDonation.setTissueType(event.getTissueType());
+                tissueDonation.setQuantity(event.getQuantity());
+                yield tissueDonation;
             }
             case STEM_CELL -> {
-                StemCellDonation d = new StemCellDonation();
-                d.setStemCellType(event.getStemCellType());
-                d.setQuantity(event.getQuantity());
-                yield d;
+                StemCellDonation stemCellDonation = new StemCellDonation();
+                stemCellDonation.setStemCellType(event.getStemCellType());
+                stemCellDonation.setQuantity(event.getQuantity());
+                yield stemCellDonation;
             }
         };
-
-        donation.setDonationId(event.getDonationId());
-        donation.setDonorId(event.getDonorId());
-        donation.setUserId(donor.getUserId());
-        donation.setLocationId(event.getLocationId());
-        donation.setDonationType(event.getDonationType());
-        donation.setDonationDate(event.getDonationDate());
-        donation.setBloodType(event.getBloodType());
-        donation.setStatus(event.getStatus());
-
-        LocationSummary summary = new LocationSummary();
-        summary.setCity(location.getCity());
-        summary.setState(location.getState());
-        summary.setLatitude(location.getLatitude());
-        summary.setLongitude(location.getLongitude());
-        donation.setLocationSummary(summary);
-
-        donationRepository.save(donation);
-        System.out.println("Donation created: " + donation.getDonationId());
     }
 
-    public void handleRecipientEvent(RecipientEvent event) {
-        Recipient recipient = recipientRepository.findById(event.getRecipientId()).orElse(null);
-        if (recipient == null) {
-            recipient = new Recipient();
-            recipient.setRecipientId(event.getRecipientId());
-        }
-
-        recipient.setUserId(event.getUserId());
-        recipient.setAvailability(event.getAvailability());
-
-        recipient.setMedicalDetailsId(event.getMedicalDetailsId());
-        recipient.setHemoglobinLevel(event.getHemoglobinLevel());
-        recipient.setBloodPressure(event.getBloodPressure());
-        recipient.setDiagnosis(event.getDiagnosis());
-        recipient.setAllergies(event.getAllergies());
-        recipient.setCurrentMedications(event.getCurrentMedications());
-        recipient.setAdditionalNotes(event.getAdditionalNotes());
-        recipient.setHasInfectiousDiseases(event.getHasInfectiousDiseases());
-        recipient.setInfectiousDiseaseDetails(event.getInfectiousDiseaseDetails());
-        recipient.setCreatinineLevel(event.getCreatinineLevel());
-        recipient.setLiverFunctionTests(event.getLiverFunctionTests());
-        recipient.setCardiacStatus(event.getCardiacStatus());
-        recipient.setPulmonaryFunction(event.getPulmonaryFunction());
-        recipient.setOverallHealthStatus(event.getOverallHealthStatus());
-
-        recipient.setEligibilityCriteriaId(event.getEligibilityCriteriaId());
-        recipient.setAgeEligible(event.getAgeEligible());
-        recipient.setAge(event.getAge());
-        recipient.setDob(event.getDob());
-        recipient.setWeightEligible(event.getWeightEligible());
-        recipient.setWeight(event.getWeight());
-        recipient.setMedicallyEligible(event.getMedicallyEligible());
-        recipient.setLegalClearance(event.getLegalClearance());
-        recipient.setEligibilityNotes(event.getEligibilityNotes());
-        recipient.setLastReviewed(event.getLastReviewed());
-        recipient.setHeight(event.getHeight());
-        recipient.setBodyMassIndex(event.getBodyMassIndex());
-        recipient.setBodySize(event.getBodySize());
-        recipient.setIsLivingDonor(event.getIsLivingDonor());
-
-        System.out.println("Inside handleRecipientEvent: " + recipient.getRecipientId());
-        recipientRepository.save(recipient);
-
-        var pending = recipientEventBuffer.drain(recipient.getRecipientId());
-        if (pending != null) {
-            pending.forEach(this::safeRun);
-        }
-    }
-
-
-    public void handleRecipientLocationEvent(RecipientLocationEvent event) {
-        RecipientLocation location = recipientLocationRepository.findById(event.getLocationId()).orElse(null);
-        if (location == null) {
-            location = new RecipientLocation();
-            location.setLocationId(event.getLocationId());
-        }
-
-        location.setRecipientId(event.getRecipientId());
-        location.setAddressLine(event.getAddressLine());
-        location.setLandmark(event.getLandmark());
-        location.setArea(event.getArea());
-        location.setCity(event.getCity());
-        location.setDistrict(event.getDistrict());
-        location.setState(event.getState());
-        location.setCountry(event.getCountry());
-        location.setPincode(event.getPincode());
-        location.setLatitude(event.getLatitude());
-        location.setLongitude(event.getLongitude());
-
-        recipientLocationRepository.save(location);
-
-        var pending = receiveRequestEventBuffer.drain(location.getRecipientId(), location.getLocationId());
-        if (pending != null) {
-            pending.forEach(this::safeRun);
-        }
-    }
-
-    public void handleReceiveRequestEvent(ReceiveRequestEvent event) {
-        Recipient recipient = recipientRepository.findById(event.getRecipientId()).orElse(null);
-        if (recipient == null) {
-            recipientEventBuffer.buffer(event.getRecipientId(), () -> {
-                System.out.println("Re-running buffered receive request event after recipient created for recipientId: " + event.getRecipientId());
-                handleReceiveRequestEvent(event);
-            });
-            System.out.println("Recipient not found - buffering receive request event for recipientId: " + event.getRecipientId());
-            return;
-        }
-
-        RecipientLocation location = null;
-        if (event.getLocationId() != null) {
-            location = recipientLocationRepository.findById(event.getLocationId()).orElse(null);
-            if (location == null) {
-                receiveRequestEventBuffer.buffer(event.getRecipientId(), event.getLocationId(), () -> {
-                    System.out.println("Re-running buffered receive request event after location created for recipientId: " + event.getRecipientId() + ", locationId: " + event.getLocationId());
-                    handleReceiveRequestEvent(event);
-                });
-                System.out.println("Location not found - buffering receive request event for recipientId: " + event.getRecipientId() + ", locationId: " + event.getLocationId());
-                return;
-            }
-        }
-
-        if (receiveRequestRepository.findById(event.getReceiveRequestId()).isPresent()) {
-            System.out.println("Receive request already exists for receiveRequestId: " + event.getReceiveRequestId());
-            return;
-        }
-
-        ReceiveRequest receiveRequest = new ReceiveRequest();
-        receiveRequest.setReceiveRequestId(event.getReceiveRequestId());
-        receiveRequest.setRecipientId(event.getRecipientId());
-        receiveRequest.setUserId(recipient.getUserId());
-        receiveRequest.setLocationId(event.getLocationId());
-        receiveRequest.setRequestType(event.getRequestType());
-        receiveRequest.setRequestedBloodType(event.getRequestedBloodType());
-        receiveRequest.setRequestedOrgan(event.getRequestedOrgan());
-        receiveRequest.setRequestedTissue(event.getRequestedTissue());
-        receiveRequest.setRequestedStemCellType(event.getRequestedStemCellType());
-        receiveRequest.setUrgencyLevel(event.getUrgencyLevel());
-        receiveRequest.setQuantity(event.getQuantity());
-        receiveRequest.setRequestDate(event.getRequestDate());
-        receiveRequest.setStatus(event.getStatus());
-        receiveRequest.setNotes(event.getNotes());
-
-        receiveRequestRepository.save(receiveRequest);
-        System.out.println("Receive request created: " + receiveRequest.getReceiveRequestId());
-    }
-
-    private void safeRun(Runnable r) {
+    private void safeRun(Runnable runnable) {
         try {
-            r.run();
+            runnable.run();
         } catch (Exception e) {
+            System.err.println("Error processing buffered event: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
     @Transactional
-    public void handleDonorHLAProfileEvent(DonorHLAProfileEvent event) {
-        System.out.println("Processing HLA Profile Event for donor: " + event.getDonorId());
+    public void handleRecipientEvent(RecipientEvent event) {
+        System.out.println("Processing RecipientEvent for recipientId: " + event.getRecipientId());
 
-        Optional<DonorHLAProfile> existingProfileOptional = donorHLAProfileRepository.findById(event.getId());
+        Recipient recipient = new Recipient();
+        recipient.setRecipientId(event.getRecipientId());
+        recipient.setUserId(event.getUserId());
+        recipient.setAvailability(event.getAvailability());
+        recipient.setEventTimestamp(LocalDateTime.now());
 
-        DonorHLAProfile profile = getDonorHLAProfile(event, existingProfileOptional);
-
-        DonorHLAProfile savedProfile = donorHLAProfileRepository.save(profile);
-
-        if (existingProfileOptional.isPresent()) {
-            System.out.println("Updated existing HLA profile for donor: " + event.getDonorId());
-        } else {
-            System.out.println("Created new HLA profile for donor: " + event.getDonorId());
+        if (event.getEligibilityCriteriaId() != null) {
+            RecipientEligibilityCriteria eligibility = new RecipientEligibilityCriteria();
+            eligibility.setEligibilityCriteriaId(event.getEligibilityCriteriaId());
+            eligibility.setRecipient(recipient);
+            eligibility.setAgeEligible(event.getAgeEligible());
+            eligibility.setAge(event.getAge());
+            eligibility.setDob(event.getDob());
+            eligibility.setWeightEligible(event.getWeightEligible());
+            eligibility.setWeight(event.getWeight());
+            eligibility.setMedicallyEligible(event.getMedicallyEligible());
+            eligibility.setLegalClearance(event.getLegalClearance());
+            eligibility.setNotes(event.getEligibilityNotes());
+            eligibility.setLastReviewed(event.getLastReviewed());
+            eligibility.setHeight(event.getHeight());
+            eligibility.setBodyMassIndex(event.getBodyMassIndex());
+            eligibility.setBodySize(event.getBodySize());
+            eligibility.setIsLivingDonor(event.getIsLivingDonor());
+            eligibility.setSmokingStatus(event.getSmokingStatus());
+            eligibility.setPackYears(event.getPackYears());
+            eligibility.setQuitSmokingDate(event.getQuitSmokingDate());
+            eligibility.setAlcoholStatus(event.getAlcoholStatus());
+            eligibility.setDrinksPerWeek(event.getDrinksPerWeek());
+            eligibility.setQuitAlcoholDate(event.getQuitAlcoholDate());
+            eligibility.setAlcoholAbstinenceMonths(event.getAlcoholAbstinenceMonths());
+            recipient.setEligibilityCriteria(eligibility);
         }
 
+        if (event.getMedicalDetailsId() != null) {
+            RecipientMedicalDetails medicalDetails = new RecipientMedicalDetails();
+            medicalDetails.setMedicalDetailsId(event.getMedicalDetailsId());
+            medicalDetails.setRecipient(recipient);
+            medicalDetails.setHemoglobinLevel(event.getHemoglobinLevel());
+            medicalDetails.setBloodPressure(event.getBloodPressure());
+            medicalDetails.setDiagnosis(event.getDiagnosis());
+            medicalDetails.setAllergies(event.getAllergies());
+            medicalDetails.setCurrentMedications(event.getCurrentMedications());
+            medicalDetails.setAdditionalNotes(event.getAdditionalNotes());
+            medicalDetails.setHasInfectiousDiseases(event.getHasInfectiousDiseases());
+            medicalDetails.setInfectiousDiseaseDetails(event.getInfectiousDiseaseDetails());
+            medicalDetails.setCreatinineLevel(event.getCreatinineLevel());
+            medicalDetails.setLiverFunctionTests(event.getLiverFunctionTests());
+            medicalDetails.setCardiacStatus(event.getCardiacStatus());
+            medicalDetails.setPulmonaryFunction(event.getPulmonaryFunction());
+            medicalDetails.setOverallHealthStatus(event.getOverallHealthStatus());
+            recipient.setMedicalDetails(medicalDetails);
+        }
+
+        Recipient savedRecipient = recipientRepository.save(recipient);
+        System.out.println("Created new recipient history snapshot: " + savedRecipient.getRecipientId()
+                + " at timestamp: " + savedRecipient.getEventTimestamp());
+
+        var pendingEvents = recipientEventBuffer.drain(recipient.getRecipientId());
+        if (pendingEvents != null) {
+            pendingEvents.forEach(this::safeRun);
+        }
     }
 
-    private static DonorHLAProfile getDonorHLAProfile(DonorHLAProfileEvent event, Optional<DonorHLAProfile> existingProfileOptional) {
-        DonorHLAProfile profile = existingProfileOptional.orElse(new DonorHLAProfile());
+    @Transactional
+    public void handleRecipientLocationEvent(RecipientLocationEvent event) {
+        System.out.println("Processing RecipientLocationEvent for locationId: " + event.getLocationId());
 
-        profile.setId(event.getId());
-        profile.setDonorId(event.getDonorId());
-        profile.setHlaA1(event.getHlaA1());
-        profile.setHlaA2(event.getHlaA2());
-        profile.setHlaB1(event.getHlaB1());
-        profile.setHlaB2(event.getHlaB2());
-        profile.setHlaC1(event.getHlaC1());
-        profile.setHlaC2(event.getHlaC2());
-        profile.setHlaDR1(event.getHlaDR1());
-        profile.setHlaDR2(event.getHlaDR2());
-        profile.setHlaDQ1(event.getHlaDQ1());
-        profile.setHlaDQ2(event.getHlaDQ2());
-        profile.setHlaDP1(event.getHlaDP1());
-        profile.setHlaDP2(event.getHlaDP2());
-        profile.setTestingDate(event.getTestingDate());
-        profile.setTestingMethod(event.getTestingMethod());
-        profile.setLaboratoryName(event.getLaboratoryName());
-        profile.setCertificationNumber(event.getCertificationNumber());
-        profile.setHlaString(event.getHlaString());
-        profile.setIsHighResolution(event.getIsHighResolution());
-        return profile;
+        Recipient recipient = recipientRepository.findTopByRecipientIdOrderByEventTimestampDesc(event.getRecipientId())
+                .orElse(null);
+
+        if (recipient == null) {
+            System.out.println("Recipient not found for location event, skipping");
+            return;
+        }
+
+        RecipientLocation location = new RecipientLocation();
+        location.setLocationId(event.getLocationId());
+        location.setRecipient(recipient);
+        location.setAddressLine(event.getAddressLine());
+        location.setLandmark(event.getLandmark());
+        location.setArea(event.getArea());
+        location.setCity(event.getCity());
+        location.setDistrict(event.getDistrict());
+        location.setState(event.getState());
+        location.setCountry(event.getCountry());
+        location.setPincode(event.getPincode());
+        location.setLatitude(event.getLatitude());
+        location.setLongitude(event.getLongitude());
+        location.setEventTimestamp(LocalDateTime.now());
+
+        RecipientLocation savedLocation = recipientLocationRepository.save(location);
+        System.out.println("Created new recipient location history: " + savedLocation.getLocationId());
+
+        var pending = receiveRequestEventBuffer.drain(location.getRecipient().getRecipientId(), location.getLocationId());
+        if (pending != null) {
+            pending.forEach(this::safeRun);
+        }
+    }
+
+    @Transactional
+    public void handleDonorHLAProfileEvent(DonorHLAProfileEvent event) {
+        System.out.println("Processing DonorHLAProfileEvent for donorId: " + event.getDonorId());
+
+        Donor donor = donorRepository.findTopByDonorIdOrderByEventTimestampDesc(event.getDonorId())
+                .orElse(null);
+
+        if (donor == null) {
+            System.out.println("Donor not found for HLA profile event, skipping");
+            return;
+        }
+
+        DonorHLAProfile hlaProfile = new DonorHLAProfile();
+        hlaProfile.setId(event.getId());
+        hlaProfile.setDonor(donor);
+        hlaProfile.setHlaA1(event.getHlaA1());
+        hlaProfile.setHlaA2(event.getHlaA2());
+        hlaProfile.setHlaB1(event.getHlaB1());
+        hlaProfile.setHlaB2(event.getHlaB2());
+        hlaProfile.setHlaC1(event.getHlaC1());
+        hlaProfile.setHlaC2(event.getHlaC2());
+        hlaProfile.setHlaDR1(event.getHlaDR1());
+        hlaProfile.setHlaDR2(event.getHlaDR2());
+        hlaProfile.setHlaDQ1(event.getHlaDQ1());
+        hlaProfile.setHlaDQ2(event.getHlaDQ2());
+        hlaProfile.setHlaDP1(event.getHlaDP1());
+        hlaProfile.setHlaDP2(event.getHlaDP2());
+        hlaProfile.setTestingDate(event.getTestingDate());
+        hlaProfile.setTestingMethod(event.getTestingMethod());
+        hlaProfile.setLaboratoryName(event.getLaboratoryName());
+        hlaProfile.setCertificationNumber(event.getCertificationNumber());
+        hlaProfile.setHlaString(event.getHlaString());
+        hlaProfile.setIsHighResolution(event.getIsHighResolution());
+        hlaProfile.setEventTimestamp(LocalDateTime.now());
+
+        DonorHLAProfile savedProfile = donorHLAProfileRepository.save(hlaProfile);
+        System.out.println("Created new donor HLA profile history: " + savedProfile.getId());
     }
 
     @Transactional
     public void handleRecipientHLAProfileEvent(RecipientHLAProfileEvent event) {
-        System.out.println("Processing HLA Profile Event for recipient: " + event.getRecipientId());
+        System.out.println("Processing RecipientHLAProfileEvent for recipientId: " + event.getRecipientId());
 
-        Optional<RecipientHLAProfile> existingProfileOptional = recipientHLAProfileRepository.findById(event.getId());
+        Recipient recipient = recipientRepository.findTopByRecipientIdOrderByEventTimestampDesc(event.getRecipientId())
+                .orElse(null);
 
-        RecipientHLAProfile profile = getRecipientHLAProfile(event, existingProfileOptional);
-
-        RecipientHLAProfile savedProfile = recipientHLAProfileRepository.save(profile);
-
-        if (existingProfileOptional.isPresent()) {
-            System.out.println("Updated existing HLA profile for recipient: " + event.getRecipientId());
-        } else {
-            System.out.println("Created new HLA profile for recipient: " + event.getRecipientId());
+        if (recipient == null) {
+            System.out.println("Recipient not found for HLA profile event, skipping");
+            return;
         }
+
+        RecipientHLAProfile hlaProfile = new RecipientHLAProfile();
+        hlaProfile.setId(event.getId());
+        hlaProfile.setRecipient(recipient);
+        hlaProfile.setHlaA1(event.getHlaA1());
+        hlaProfile.setHlaA2(event.getHlaA2());
+        hlaProfile.setHlaB1(event.getHlaB1());
+        hlaProfile.setHlaB2(event.getHlaB2());
+        hlaProfile.setHlaC1(event.getHlaC1());
+        hlaProfile.setHlaC2(event.getHlaC2());
+        hlaProfile.setHlaDR1(event.getHlaDR1());
+        hlaProfile.setHlaDR2(event.getHlaDR2());
+        hlaProfile.setHlaDQ1(event.getHlaDQ1());
+        hlaProfile.setHlaDQ2(event.getHlaDQ2());
+        hlaProfile.setHlaDP1(event.getHlaDP1());
+        hlaProfile.setHlaDP2(event.getHlaDP2());
+        hlaProfile.setTestingDate(event.getTestingDate());
+        hlaProfile.setTestingMethod(event.getTestingMethod());
+        hlaProfile.setLaboratoryName(event.getLaboratoryName());
+        hlaProfile.setCertificationNumber(event.getCertificationNumber());
+        hlaProfile.setHlaString(event.getHlaString());
+        hlaProfile.setIsHighResolution(event.getIsHighResolution());
+        hlaProfile.setEventTimestamp(LocalDateTime.now());
+
+        RecipientHLAProfile savedProfile = recipientHLAProfileRepository.save(hlaProfile);
+        System.out.println("Created new recipient HLA profile history: " + savedProfile.getId());
     }
-
-    private static RecipientHLAProfile getRecipientHLAProfile(RecipientHLAProfileEvent event,
-                                                              Optional<RecipientHLAProfile> existingProfileOptional) {
-        RecipientHLAProfile profile = existingProfileOptional.orElse(new RecipientHLAProfile());
-
-        profile.setId(event.getId());
-        profile.setRecipientId(event.getRecipientId());
-        profile.setHlaA1(event.getHlaA1());
-        profile.setHlaA2(event.getHlaA2());
-        profile.setHlaB1(event.getHlaB1());
-        profile.setHlaB2(event.getHlaB2());
-        profile.setHlaC1(event.getHlaC1());
-        profile.setHlaC2(event.getHlaC2());
-        profile.setHlaDR1(event.getHlaDR1());
-        profile.setHlaDR2(event.getHlaDR2());
-        profile.setHlaDQ1(event.getHlaDQ1());
-        profile.setHlaDQ2(event.getHlaDQ2());
-        profile.setHlaDP1(event.getHlaDP1());
-        profile.setHlaDP2(event.getHlaDP2());
-        profile.setTestingDate(event.getTestingDate());
-        profile.setTestingMethod(event.getTestingMethod());
-        profile.setLaboratoryName(event.getLaboratoryName());
-        profile.setCertificationNumber(event.getCertificationNumber());
-        profile.setHlaString(event.getHlaString());
-        profile.setIsHighResolution(event.getIsHighResolution());
-
-        return profile;
-    }
-
 }

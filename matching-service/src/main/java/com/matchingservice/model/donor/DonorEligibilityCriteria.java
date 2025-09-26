@@ -1,60 +1,89 @@
-package com.matchingservice.kafka.event.donor_events;
+package com.matchingservice.model.donor;
 
 import com.matchingservice.enums.AlcoholStatus;
 import com.matchingservice.enums.SmokingStatus;
+import jakarta.persistence.*;
 import lombok.Data;
 
 import java.time.LocalDate;
-import java.util.UUID;
 
 @Data
-public class DonorEvent {
-    private UUID donorId;
-    private UUID userId;
-    private LocalDate registrationDate;
-    private String status;
+@Entity
+@Table(name = "donor_eligibility_criteria")
+public class DonorEligibilityCriteria {
 
+    @Id
     private Long eligibilityCriteriaId;
+
+    @OneToOne
+    @JoinColumn(name = "donor_db_id", referencedColumnName = "id")
+    private Donor donor;
+
+    @Column
     private Double weight;
+
+    @Column
     private Integer age;
+
+    @Column
     private LocalDate dob;
+
+    @Column
     private Boolean medicalClearance;
+
+    @Column
     private Boolean recentTattooOrPiercing;
+
+    @Column
     private String recentTravelDetails;
+
+    @Column
     private Boolean recentVaccination;
+
+    @Column
     private Boolean recentSurgery;
+
+    @Column
     private String chronicDiseases;
+
+    @Column
     private String allergies;
+
+    @Column
     private LocalDate lastDonationDate;
+
+    @Column
     private Double height;
+
+    @Column
     private Double bodyMassIndex;
+
+    @Column
     private String bodySize;
+
+    @Column
     private Boolean isLivingDonor;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "smoking_status")
     private SmokingStatus smokingStatus;
+
+    @Column(name = "pack_years")
     private Integer packYears;
+
+    @Column(name = "quit_smoking_date")
     private LocalDate quitSmokingDate;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "alcohol_status")
     private AlcoholStatus alcoholStatus;
+
+    @Column(name = "drinks_per_week")
     private Integer drinksPerWeek;
+
+    @Column(name = "quit_alcohol_date")
     private LocalDate quitAlcoholDate;
+
+    @Column(name = "alcohol_abstinence_months")
     private Integer alcoholAbstinenceMonths;
-
-    private Long medicalDetailsId;
-    private Double hemoglobinLevel;
-    private String bloodPressure;
-    private Boolean hasDiseases;
-    private Boolean takingMedication;
-    private String diseaseDescription;
-
-    private String currentMedications;
-    private LocalDate lastMedicalCheckup;
-    private String medicalHistory;
-    private Boolean hasInfectiousDiseases;
-    private String infectiousDiseaseDetails;
-    private Double creatinineLevel;
-    private String liverFunctionTests;
-    private String cardiacStatus;
-    private Double pulmonaryFunction;
-    private String overallHealthStatus;
 }

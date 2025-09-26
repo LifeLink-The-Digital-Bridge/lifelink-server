@@ -5,24 +5,30 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
-@Data 
+@Data
 @Entity
-@Table(name = "receive_request")
+@Table(name = "receive_requests")
 public class ReceiveRequest {
 
     @Id
     private UUID receiveRequestId;
 
+    @ManyToOne
+    @JoinColumn(name = "recipient_db_id", referencedColumnName = "id")
+    private Recipient recipient;
+
     @Column(nullable = false)
     private UUID recipientId;
 
-    @Column(nullable = false)
-    private UUID userId;
+    @ManyToOne
+    @JoinColumn(name = "location_db_id", referencedColumnName = "id")
+    private RecipientLocation location;
 
-    @Column
-    private UUID locationId;
+    @Column(name = "event_timestamp", nullable = false)
+    private LocalDateTime eventTimestamp;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -41,6 +47,7 @@ public class ReceiveRequest {
     private StemCellType requestedStemCellType;
 
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private UrgencyLevel urgencyLevel;
 
     @Column(nullable = false)
