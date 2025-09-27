@@ -1,5 +1,7 @@
 package com.donorservice.kafka.event;
 
+import com.donorservice.enums.AlcoholStatus;
+import com.donorservice.enums.SmokingStatus;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -29,11 +31,11 @@ public class DonorEvent {
     private String bodySize;
     private Boolean isLivingDonor;
 
-    private String smokingStatus;
+    private SmokingStatus smokingStatus;
     private Integer packYears;
     private LocalDate quitSmokingDate;
 
-    private String alcoholStatus;
+    private AlcoholStatus alcoholStatus;
     private Integer drinksPerWeek;
     private LocalDate quitAlcoholDate;
     private Integer alcoholAbstinenceMonths;

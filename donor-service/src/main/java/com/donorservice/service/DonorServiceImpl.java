@@ -395,13 +395,13 @@ public class DonorServiceImpl implements DonorService {
             donorEvent.setIsLivingDonor(ec.getIsLivingDonor());
 
             if (ec.getSmokingStatus() != null) {
-                donorEvent.setSmokingStatus(ec.getSmokingStatus().name());
+                donorEvent.setSmokingStatus(ec.getSmokingStatus());
             }
             donorEvent.setPackYears(ec.getPackYears());
             donorEvent.setQuitSmokingDate(ec.getQuitSmokingDate());
 
             if (ec.getAlcoholStatus() != null) {
-                donorEvent.setAlcoholStatus(ec.getAlcoholStatus().name());
+                donorEvent.setAlcoholStatus(ec.getAlcoholStatus());
             }
             donorEvent.setDrinksPerWeek(ec.getDrinksPerWeek());
             donorEvent.setQuitAlcoholDate(ec.getQuitAlcoholDate());
