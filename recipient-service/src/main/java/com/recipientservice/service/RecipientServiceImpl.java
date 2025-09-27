@@ -389,13 +389,13 @@ public class RecipientServiceImpl implements RecipientService {
             recipientEvent.setIsLivingDonor(eligibility.getIsLivingDonor());
 
             if (eligibility.getSmokingStatus() != null) {
-                recipientEvent.setSmokingStatus(eligibility.getSmokingStatus().name());
+                recipientEvent.setSmokingStatus(eligibility.getSmokingStatus());
             }
             recipientEvent.setPackYears(eligibility.getPackYears());
             recipientEvent.setQuitSmokingDate(eligibility.getQuitSmokingDate());
 
             if (eligibility.getAlcoholStatus() != null) {
-                recipientEvent.setAlcoholStatus(eligibility.getAlcoholStatus().name());
+                recipientEvent.setAlcoholStatus(eligibility.getAlcoholStatus());
             }
             recipientEvent.setDrinksPerWeek(eligibility.getDrinksPerWeek());
             recipientEvent.setQuitAlcoholDate(eligibility.getQuitAlcoholDate());

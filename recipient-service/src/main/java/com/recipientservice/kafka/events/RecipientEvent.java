@@ -1,6 +1,8 @@
 package com.recipientservice.kafka.events;
 
+import com.recipientservice.enums.AlcoholStatus;
 import com.recipientservice.enums.Availability;
+import com.recipientservice.enums.SmokingStatus;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -42,11 +44,11 @@ public class RecipientEvent {
     private String bodySize;
     private Boolean isLivingDonor;
 
-    private String smokingStatus;
+    private SmokingStatus smokingStatus;
     private Integer packYears;
     private LocalDate quitSmokingDate;
 
-    private String alcoholStatus;
+    private AlcoholStatus alcoholStatus;
     private Integer drinksPerWeek;
     private LocalDate quitAlcoholDate;
     private Integer alcoholAbstinenceMonths;
