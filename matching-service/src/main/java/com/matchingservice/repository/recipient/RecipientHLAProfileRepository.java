@@ -13,8 +13,7 @@ import java.util.UUID;
 @Repository
 public interface RecipientHLAProfileRepository extends JpaRepository<RecipientHLAProfile, Long> {
 
-    @Query("SELECT rhp FROM RecipientHLAProfile rhp WHERE rhp.recipient.recipientId = :recipientId ORDER BY rhp.eventTimestamp DESC LIMIT 1")
-    Optional<RecipientHLAProfile> findLatestByRecipientId(@Param("recipientId") UUID recipientId);
+    Optional<RecipientHLAProfile> findTopByRecipient_RecipientIdOrderByEventTimestampDesc(UUID recipientId);
 
     @Query("SELECT rhp FROM RecipientHLAProfile rhp WHERE rhp.recipient.recipientId = :recipientId ORDER BY rhp.eventTimestamp DESC")
     List<RecipientHLAProfile> findAllByRecipientIdOrderByEventTimestampDesc(@Param("recipientId") UUID recipientId);
@@ -29,4 +28,6 @@ public interface RecipientHLAProfileRepository extends JpaRepository<RecipientHL
             @Param("hlaA1") String hlaA1,
             @Param("hlaB1") String hlaB1
     );
+
+    Optional<RecipientHLAProfile> findTopByRecipient_RecipientIdAndIdOrderByEventTimestampDesc(UUID recipientId, Long id);
 }

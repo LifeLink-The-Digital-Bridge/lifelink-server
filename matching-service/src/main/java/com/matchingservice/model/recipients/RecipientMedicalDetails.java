@@ -9,6 +9,10 @@ import lombok.Data;
 public class RecipientMedicalDetails {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private Long id;
+
+    @Column
     private Long medicalDetailsId;
 
     @OneToOne

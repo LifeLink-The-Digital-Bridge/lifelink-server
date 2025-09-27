@@ -13,6 +13,10 @@ import java.time.LocalDate;
 public class DonorEligibilityCriteria {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private Long id;
+
+    @Column
     private Long eligibilityCriteriaId;
 
     @OneToOne

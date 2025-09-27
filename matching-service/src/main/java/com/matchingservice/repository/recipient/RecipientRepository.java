@@ -11,10 +11,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface RecipientRepository extends JpaRepository<Recipient, UUID> {
+public interface RecipientRepository extends JpaRepository<Recipient, Long> {
 
-    @Query("SELECT r FROM Recipient r WHERE r.recipientId = :recipientId ORDER BY r.eventTimestamp DESC LIMIT 1")
-    Optional<Recipient> findTopByRecipientIdOrderByEventTimestampDesc(@Param("recipientId") UUID recipientId);
+    Optional<Recipient> findTopByUserIdOrderByEventTimestampDesc(UUID userId);
+
+    Optional<Recipient> findTopByRecipientIdOrderByEventTimestampDesc(UUID recipientId);
 
     List<Recipient> findByRecipientIdOrderByEventTimestampDesc(UUID recipientId);
 

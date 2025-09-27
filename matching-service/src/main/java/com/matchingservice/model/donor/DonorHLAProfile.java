@@ -11,7 +11,12 @@ import java.time.LocalDateTime;
 @Table(name = "donor_hla_profiles")
 public class DonorHLAProfile {
 
+
     @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private Long dbId;
+
+    @Column
     private Long id;
 
     @ManyToOne

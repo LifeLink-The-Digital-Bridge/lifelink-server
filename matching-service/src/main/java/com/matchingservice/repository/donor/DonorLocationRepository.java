@@ -11,10 +11,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface DonorLocationRepository extends JpaRepository<DonorLocation, UUID> {
+public interface DonorLocationRepository extends JpaRepository<DonorLocation, Long> {
 
-    @Query("SELECT dl FROM DonorLocation dl WHERE dl.locationId = :locationId ORDER BY dl.eventTimestamp DESC LIMIT 1")
-    Optional<DonorLocation> findTopByLocationIdOrderByEventTimestampDesc(@Param("locationId") UUID locationId);
+    List<DonorLocation> findByDonor_DonorIdOrderByEventTimestampDesc(UUID donorId);
+
+    Optional<DonorLocation> findTopByLocationIdOrderByEventTimestampDesc(UUID locationId);
 
     @Query("""
         SELECT dl FROM DonorLocation dl 

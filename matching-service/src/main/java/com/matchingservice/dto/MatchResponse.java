@@ -1,5 +1,6 @@
 package com.matchingservice.dto;
 
+import com.matchingservice.enums.MatchStatus;
 import com.matchingservice.model.MatchResult;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -23,13 +24,23 @@ public class MatchResponse {
     private String requestType;
     private String bloodType;
     private String matchType;
-    private boolean isConfirmed;
-    private boolean donorConfirmed;
-    private boolean recipientConfirmed;
+    private MatchStatus status;
+    private Boolean isConfirmed;
+    private Boolean donorConfirmed;
+    private Boolean recipientConfirmed;
     private LocalDateTime donorConfirmedAt;
     private LocalDateTime recipientConfirmedAt;
     private LocalDateTime matchedAt;
+    private LocalDateTime expiredAt;
+    private String expiryReason;
     private Double distance;
+    private Double compatibilityScore;
+    private Double bloodCompatibilityScore;
+    private Double locationCompatibilityScore;
+    private Double medicalCompatibilityScore;
+    private Double urgencyPriorityScore;
+    private String matchReason;
+    private Integer priorityRank;
 
     public static MatchResponse fromMatchResult(MatchResult matchResult) {
         return MatchResponse.builder()
@@ -38,6 +49,7 @@ public class MatchResponse {
                 .receiveRequestId(matchResult.getReceiveRequestId())
                 .donorUserId(matchResult.getDonorUserId())
                 .recipientUserId(matchResult.getRecipientUserId())
+                .status(matchResult.getStatus())
                 .matchType("DONOR_TO_RECIPIENT")
                 .isConfirmed(matchResult.getIsConfirmed())
                 .donorConfirmed(matchResult.getDonorConfirmed())
@@ -45,7 +57,16 @@ public class MatchResponse {
                 .donorConfirmedAt(matchResult.getDonorConfirmedAt())
                 .recipientConfirmedAt(matchResult.getRecipientConfirmedAt())
                 .matchedAt(matchResult.getMatchedAt())
+                .expiredAt(matchResult.getExpiredAt())
+                .expiryReason(matchResult.getExpiryReason())
                 .distance(matchResult.getDistance())
+                .compatibilityScore(matchResult.getCompatibilityScore())
+                .bloodCompatibilityScore(matchResult.getBloodCompatibilityScore())
+                .locationCompatibilityScore(matchResult.getLocationCompatibilityScore())
+                .medicalCompatibilityScore(matchResult.getMedicalCompatibilityScore())
+                .urgencyPriorityScore(matchResult.getUrgencyPriorityScore())
+                .matchReason(matchResult.getMatchReason())
+                .priorityRank(matchResult.getPriorityRank())
                 .build();
     }
 }

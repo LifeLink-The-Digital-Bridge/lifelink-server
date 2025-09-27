@@ -12,7 +12,12 @@ import java.time.LocalDate;
 @Table(name = "recipient_eligibility_criteria")
 public class RecipientEligibilityCriteria {
 
+
     @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private Long id;
+
+    @Column
     private Long eligibilityCriteriaId;
 
     @OneToOne

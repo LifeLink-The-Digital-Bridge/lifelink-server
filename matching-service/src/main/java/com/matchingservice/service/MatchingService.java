@@ -35,4 +35,10 @@ public interface MatchingService {
     DonorDTO getDonorByUserId(UUID userId);
 
     RecipientDTO getRecipientByUserId(UUID userId);
+
+    List<MatchResponse> getPendingMatchesForUser(UUID userId);
+
+    List<MatchResponse> getActiveMatchesForUser(UUID userId);
+
+    List<MatchResponse> getConfirmedMatchesForUser(UUID userId);
 }

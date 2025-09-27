@@ -3,8 +3,6 @@ package com.matchingservice.controller;
 import com.matchingservice.aop.RequireRole;
 import com.matchingservice.dto.*;
 import com.matchingservice.exceptions.ResourceNotFoundException;
-import com.matchingservice.model.MatchResult;
-import com.matchingservice.repository.MatchResultRepository;
 import com.matchingservice.service.MatchingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -12,7 +10,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/matching")
@@ -20,7 +17,6 @@ import java.util.stream.Collectors;
 public class MatchingController {
 
     private final MatchingService matchingService;
-    private final MatchResultRepository matchResultRepository;
 
     @PostMapping("/manual-match")
     public ResponseEntity<ManualMatchResponse> manualMatch(@RequestBody ManualMatchRequest request) {
@@ -82,53 +78,69 @@ public class MatchingController {
     }
 
     @RequireRole("RECIPIENT")
-    @GetMapping("/by-userId/{userId}")
+    @GetMapping("/donor-details/{userId}")
     public ResponseEntity<DonorDTO> getDonorDetails(@PathVariable UUID userId){
-        DonorDTO donorDTO = matchingService.getDonorByUserId(userId);
-        if (donorDTO == null){
+        try {
+            DonorDTO donorDTO = matchingService.getDonorByUserId(userId);
+            return ResponseEntity.ok(donorDTO);
+        } catch (ResourceNotFoundException e) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(donorDTO);
+    }
+
+    @RequireRole("DONOR")
+    @GetMapping("/recipient-details/{userId}")
+    public ResponseEntity<RecipientDTO> getRecipientDetails(@PathVariable UUID userId){
+        try {
+            RecipientDTO recipientDTO = matchingService.getRecipientByUserId(userId);
+            return ResponseEntity.ok(recipientDTO);
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @RequireRole("RECIPIENT")
     @GetMapping("/donations/{donationId}")
     public ResponseEntity<DonationDTO> getDonationDetails(@PathVariable UUID donationId, @RequestHeader("id") UUID userId) {
         if (!matchingService.hasAccessToDonation(donationId, userId)) {
-            System.out.println("In getDonationDetails Denied " + userId);
             return ResponseEntity.status(403).build();
         }
-        System.out.println("In getDonationDetails");
-        DonationDTO donationDTO = matchingService.getDonationById(donationId);
-        System.out.println(donationDTO);
-        return ResponseEntity.ok(donationDTO);
-    }
-
-    @RequireRole("DONOR")
-    @GetMapping("/by-userId/{userId}")
-    public ResponseEntity<RecipientDTO> getRecipientByUserId(@PathVariable UUID userId){
-        RecipientDTO recipientDTO = matchingService.getRecipientByUserId(userId);
-        if (recipientDTO == null){
+        try {
+            DonationDTO donationDTO = matchingService.getDonationById(donationId);
+            return ResponseEntity.ok(donationDTO);
+        } catch (ResourceNotFoundException e) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(recipientDTO);
     }
 
     @RequireRole("DONOR")
     @GetMapping("/requests/{requestId}")
     public ResponseEntity<ReceiveRequestDTO> getRequestDetails(@PathVariable UUID requestId, @RequestHeader("id") UUID userId) {
         if (!matchingService.hasAccessToRequest(requestId, userId)) {
-            System.out.println("In getRequestDetails Denied " + userId);
             return ResponseEntity.status(403).build();
         }
-        System.out.println("In getRequestDetails");
-
-        ReceiveRequestDTO requestDTO = matchingService.getRequestById(requestId);
-        System.out.println(requestDTO);
-        return ResponseEntity.ok(requestDTO);
+        try {
+            ReceiveRequestDTO requestDTO = matchingService.getRequestById(requestId);
+            return ResponseEntity.ok(requestDTO);
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
+    @GetMapping("/my-matches/active")
+    public ResponseEntity<List<MatchResponse>> getActiveMatches(@RequestHeader("id") UUID userId) {
+        return ResponseEntity.ok(matchingService.getActiveMatchesForUser(userId));
+    }
 
+    @GetMapping("/my-matches/pending")
+    public ResponseEntity<List<MatchResponse>> getPendingMatches(@RequestHeader("id") UUID userId) {
+        return ResponseEntity.ok(matchingService.getPendingMatchesForUser(userId));
+    }
+
+    @GetMapping("/my-matches/confirmed")
+    public ResponseEntity<List<MatchResponse>> getConfirmedMatches(@RequestHeader("id") UUID userId) {
+        return ResponseEntity.ok(matchingService.getConfirmedMatchesForUser(userId));
+    }
 
     @GetMapping("/match/{matchId}/status")
     public ResponseEntity<Boolean> getMatchConfirmationStatus(@PathVariable UUID matchId) {

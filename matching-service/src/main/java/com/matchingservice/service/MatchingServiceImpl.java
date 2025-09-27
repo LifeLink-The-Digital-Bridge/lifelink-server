@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -128,22 +129,6 @@ public class MatchingServiceImpl implements MatchingService {
     }
 
     @Override
-    public List<MatchResponse> getMatchesForDonor(UUID donorUserId) {
-        return matchResultRepository.findByDonorUserIdOrderByMatchedAtDesc(donorUserId)
-                .stream()
-                .map(matchResult -> enrichMatchResponse(matchResult, "DONOR_TO_RECIPIENT"))
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public List<MatchResponse> getMatchesForRecipient(UUID recipientUserId) {
-        return matchResultRepository.findByRecipientUserIdOrderByMatchedAtDesc(recipientUserId)
-                .stream()
-                .map(matchResult -> enrichMatchResponse(matchResult, "RECIPIENT_TO_DONOR"))
-                .collect(Collectors.toList());
-    }
-
-    @Override
     public List<MatchResponse> getAllMatches() {
         return matchResultRepository.findAll()
                 .stream()
@@ -243,6 +228,8 @@ public class MatchingServiceImpl implements MatchingService {
         matchResult.setIsConfirmed(true);
         matchResult.setStatus(MatchStatus.CONFIRMED);
 
+        expireConflictingMatches(matchResult);
+
         donationRepository.findById(matchResult.getDonationId())
                 .ifPresent(donation -> {
                     donation.setStatus(DonationStatus.COMPLETED);
@@ -267,6 +254,41 @@ public class MatchingServiceImpl implements MatchingService {
             System.err.println("Failed to update request status in recipient-service: " + e.getMessage());
         }
     }
+
+    @Transactional
+    public void expireConflictingMatches(MatchResult confirmedMatch) {
+        matchResultRepository.expirePendingDonationMatches(
+                confirmedMatch.getDonationId(),
+                confirmedMatch.getId()
+        );
+
+        matchResultRepository.expirePendingRequestMatches(
+                confirmedMatch.getReceiveRequestId(),
+                confirmedMatch.getId()
+        );
+
+        System.out.println("Expired conflicting matches for donation: " + confirmedMatch.getDonationId() +
+                " and request: " + confirmedMatch.getReceiveRequestId());
+    }
+
+    @Override
+    public List<MatchResponse> getMatchesForDonor(UUID donorUserId) {
+        return matchResultRepository.findByDonorUserIdOrderByMatchedAtDesc(donorUserId)
+                .stream()
+                .filter(match -> match.getStatus() != MatchStatus.EXPIRED)
+                .map(matchResult -> enrichMatchResponse(matchResult, "DONOR_TO_RECIPIENT"))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<MatchResponse> getMatchesForRecipient(UUID recipientUserId) {
+        return matchResultRepository.findByRecipientUserIdOrderByMatchedAtDesc(recipientUserId)
+                .stream()
+                .filter(match -> match.getStatus() != MatchStatus.EXPIRED)
+                .map(matchResult -> enrichMatchResponse(matchResult, "RECIPIENT_TO_DONOR"))
+                .collect(Collectors.toList());
+    }
+
 
     @Override
     public boolean hasAccessToDonation(UUID donationId, UUID recipientUserId) {
@@ -306,6 +328,48 @@ public class MatchingServiceImpl implements MatchingService {
         Recipient recipient = recipientRepository.findLatestByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Recipient not found for user: " + userId));
         return convertRecipientToDTO(recipient);
+    }
+
+    @Override
+    public List<MatchResponse> getActiveMatchesForUser(UUID userId) {
+        List<MatchResult> donorMatches = matchResultRepository.findByDonorUserIdOrderByMatchedAtDesc(userId)
+                .stream()
+                .filter(match -> match.getStatus() == MatchStatus.PENDING || match.getStatus() == MatchStatus.CONFIRMED)
+                .collect(Collectors.toList());
+
+        List<MatchResult> recipientMatches = matchResultRepository.findByRecipientUserIdOrderByMatchedAtDesc(userId)
+                .stream()
+                .filter(match -> match.getStatus() == MatchStatus.PENDING || match.getStatus() == MatchStatus.CONFIRMED)
+                .collect(Collectors.toList());
+
+        List<MatchResult> allActiveMatches = new ArrayList<>();
+        allActiveMatches.addAll(donorMatches);
+        allActiveMatches.addAll(recipientMatches);
+
+        return allActiveMatches.stream()
+                .distinct()
+                .sorted((m1, m2) -> m2.getMatchedAt().compareTo(m1.getMatchedAt()))
+                .map(match -> {
+                    boolean isDonor = match.getDonorUserId().equals(userId);
+                    return enrichMatchResponse(match, isDonor ? "DONOR_TO_RECIPIENT" : "RECIPIENT_TO_DONOR");
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<MatchResponse> getPendingMatchesForUser(UUID userId) {
+        return getActiveMatchesForUser(userId)
+                .stream()
+                .filter(match -> MatchStatus.PENDING.equals(match.getStatus()))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<MatchResponse> getConfirmedMatchesForUser(UUID userId) {
+        return getActiveMatchesForUser(userId)
+                .stream()
+                .filter(match -> MatchStatus.CONFIRMED.equals(match.getStatus()))
+                .collect(Collectors.toList());
     }
 
     private DonorDTO convertDonorToDTO(Donor donor) {
@@ -364,7 +428,7 @@ public class MatchingServiceImpl implements MatchingService {
             dto.setEligibilityCriteria(eligibility);
         }
 
-        donorHLAProfileRepository.findLatestByDonorId(donor.getDonorId())
+        donorHLAProfileRepository.findTopByDonor_DonorIdOrderByEventTimestampDesc(donor.getDonorId())
                 .ifPresent(hlaProfile -> dto.setHlaProfile(convertHLAProfileToDTO(hlaProfile)));
 
         List<LocationDTO> locations = donorLocationRepository.findLatestLocationsByDonorId(donor.getDonorId())
@@ -427,7 +491,7 @@ public class MatchingServiceImpl implements MatchingService {
             dto.setEligibilityCriteria(eligibility);
         }
 
-        recipientHLAProfileRepository.findLatestByRecipientId(recipient.getRecipientId())
+        recipientHLAProfileRepository.findTopByRecipient_RecipientIdOrderByEventTimestampDesc(recipient.getRecipientId())
                 .ifPresent(hlaProfile -> dto.setHlaProfile(convertHLAProfileToDTO(hlaProfile)));
 
         List<LocationDTO> locations = recipientLocationRepository.findLatestLocationsByRecipientId(recipient.getRecipientId())

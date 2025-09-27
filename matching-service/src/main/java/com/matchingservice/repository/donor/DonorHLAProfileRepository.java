@@ -13,8 +13,7 @@ import java.util.UUID;
 @Repository
 public interface DonorHLAProfileRepository extends JpaRepository<DonorHLAProfile, Long> {
 
-    @Query("SELECT dhp FROM DonorHLAProfile dhp WHERE dhp.donor.donorId = :donorId ORDER BY dhp.eventTimestamp DESC LIMIT 1")
-    Optional<DonorHLAProfile> findLatestByDonorId(@Param("donorId") UUID donorId);
+    Optional<DonorHLAProfile> findTopByDonor_DonorIdOrderByEventTimestampDesc(UUID donorId);
 
     @Query("SELECT dhp FROM DonorHLAProfile dhp WHERE dhp.donor.donorId = :donorId ORDER BY dhp.eventTimestamp DESC")
     List<DonorHLAProfile> findAllByDonorIdOrderByEventTimestampDesc(@Param("donorId") UUID donorId);
@@ -29,4 +28,6 @@ public interface DonorHLAProfileRepository extends JpaRepository<DonorHLAProfile
             @Param("hlaA1") String hlaA1,
             @Param("hlaB1") String hlaB1
     );
+
+    Optional<DonorHLAProfile> findTopByDonor_DonorIdAndIdOrderByEventTimestampDesc(UUID donorId, Long id);
 }

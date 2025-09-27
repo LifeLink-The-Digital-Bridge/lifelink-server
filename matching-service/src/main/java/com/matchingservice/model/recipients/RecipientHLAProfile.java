@@ -12,6 +12,10 @@ import java.time.LocalDateTime;
 public class RecipientHLAProfile {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private Long dbId;
+
+    @Column
     private Long id;
 
     @ManyToOne
