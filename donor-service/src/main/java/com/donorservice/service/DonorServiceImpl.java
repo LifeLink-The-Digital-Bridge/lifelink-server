@@ -1,6 +1,7 @@
 package com.donorservice.service;
 
 import com.donorservice.client.UserClient;
+import com.donorservice.client.UserGrpcClient;
 import com.donorservice.dto.*;
 import com.donorservice.enums.*;
 import com.donorservice.exception.*;
@@ -11,6 +12,7 @@ import com.donorservice.kafka.event.HLAProfileEvent;
 import com.donorservice.kafka.event.LocationEvent;
 import com.donorservice.model.*;
 import com.donorservice.repository.*;
+import com.userservice.grpc.UserProfileResponse;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
@@ -25,17 +27,19 @@ public class DonorServiceImpl implements DonorService {
     private final LocationRepository locationRepository;
     private final EventPublisher eventPublisher;
     private final ProfileLockService profileLockService;
+    private final UserGrpcClient userGrpcClient;
 
     public DonorServiceImpl(DonorRepository donorRepository,
                             DonationRepository donationRepository,
                             LocationRepository locationRepository,
                             EventPublisher eventPublisher,
-                            ProfileLockService profileLockService) {
+                            ProfileLockService profileLockService, UserGrpcClient userGrpcClient) {
         this.donorRepository = donorRepository;
         this.donationRepository = donationRepository;
         this.locationRepository = locationRepository;
         this.eventPublisher = eventPublisher;
         this.profileLockService = profileLockService;
+        this.userGrpcClient = userGrpcClient;
     }
 
     @Override
@@ -136,7 +140,7 @@ public class DonorServiceImpl implements DonorService {
         if (donor == null) {
             throw new ResourceNotFoundException("Donor not found");
         }
-        return getDonationsByDonorId(donor.getId());
+        return getDonationsByDonorId(donor.getId(), userId);
     }
 
     @Override
@@ -441,13 +445,41 @@ public class DonorServiceImpl implements DonorService {
         return event;
     }
 
+
     @Override
-    public List<DonationDTO> getDonationsByDonorId(UUID donorId) {
+    public List<DonationDTO> getDonationsByDonorId(UUID donorId, UUID requesterId) {
+        Donor donor = donorRepository.findById(donorId)
+                .orElseThrow(() -> new ResourceNotFoundException("Donor not found"));
+
+        UUID donorUserId = donor.getUserId();
+
+        if (donorUserId.equals(requesterId)) {
+            List<Donation> donations = donationRepository.findByDonorId(donorId);
+            return donations.stream()
+                    .map(this::convertToDTO)
+                    .collect(Collectors.toList());
+        }
+
+        UserProfileResponse userProfile = userGrpcClient.getUserProfile(donorUserId);
+        Visibility visibility = Visibility.valueOf(userProfile.getProfileVisibility());
+
+        if (visibility == Visibility.PRIVATE) {
+            throw new AccessDeniedException("This user's donations are private");
+        }
+
+        if (visibility == Visibility.FOLLOWERS_ONLY) {
+            boolean isFollowing = userGrpcClient.checkFollowStatus(requesterId, donorUserId);
+            if (!isFollowing) {
+                throw new AccessDeniedException("You must follow this user to view their donations");
+            }
+        }
+
         List<Donation> donations = donationRepository.findByDonorId(donorId);
         return donations.stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
+
 
     private DonationDTO convertToDTO(Donation donation) {
         DonationDTO dto = new DonationDTO();

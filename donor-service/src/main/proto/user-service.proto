@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package userservice;
+
+option java_package = "com.userservice.grpc";
+option java_multiple_files = true;
+
+service UserService {
+  rpc GetUserByEmail(GetUserByEmailRequest) returns (UserResponse);
+  rpc GetUserByUsername(GetUserByUsernameRequest) returns (UserResponse);
+  rpc GetUserById(GetUserByIdRequest) returns (UserResponse);
+  rpc UpdatePassword(UpdatePasswordRequest) returns (UpdatePasswordResponse);
+
+  rpc GetUserProfile(UserProfileRequest) returns (UserProfileResponse);
+  rpc CheckFollowStatus(FollowStatusRequest) returns (FollowStatusResponse);
+}
+
+message GetUserByEmailRequest {
+  string email = 1;
+}
+
+message GetUserByUsernameRequest {
+  string username = 1;
+}
+
+message GetUserByIdRequest {
+  string id = 1;
+}
+
+message UserResponse {
+  string id = 1;
+  string username = 2;
+  string email = 3;
+  string password = 4;
+  repeated string roles = 5;
+  string gender = 6;
+  string dob = 7;
+  string ProfileVisibility = 8;
+}
+
+message UpdatePasswordRequest {
+  string email = 1;
+  string newPassword = 2;
+  string repeatPassword = 3;
+}
+
+message UpdatePasswordResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message UserProfileRequest {
+  string user_id = 1;
+}
+
+message UserProfileResponse {
+  string id = 1;
+  string username = 2;
+  string email = 3;
+  string profile_visibility = 4;
+  int64 followers = 5;
+  int64 following = 6;
+}
+
+message FollowStatusRequest {
+  string follower_id = 1;
+  string following_id = 2;
+}
+
+message FollowStatusResponse {
+  bool is_following = 1;
+}

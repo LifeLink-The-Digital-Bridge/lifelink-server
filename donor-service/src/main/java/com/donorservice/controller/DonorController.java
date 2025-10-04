@@ -5,6 +5,9 @@ import com.donorservice.aop.RequireRole;
 import com.donorservice.client.UserClient;
 import com.donorservice.dto.*;
 import com.donorservice.enums.DonationStatus;
+import com.donorservice.exception.AccessDeniedException;
+import com.donorservice.model.Donor;
+import com.donorservice.repository.DonorRepository;
 import com.donorservice.service.DonorService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,10 +23,12 @@ public class DonorController {
 
     private final UserClient userClient;
     private final DonorService donorService;
+    private final DonorRepository donorRepository;
 
-    public DonorController(UserClient userClient, DonorService donorService) {
+    public DonorController(UserClient userClient, DonorService donorService, DonorRepository donorRepository) {
         this.userClient = userClient;
         this.donorService = donorService;
+        this.donorRepository = donorRepository;
     }
     @PutMapping("/addRole")
     public ResponseEntity<String> addRoleToUser(@RequestHeader("id") String userId) {
@@ -73,10 +78,17 @@ public class DonorController {
         return donorService.getDonorById(id);
     }
 
-    @RequireRole("DONOR")
     @GetMapping("/{donorId}/donations")
-    public ResponseEntity<List<DonationDTO>> getDonations(@PathVariable UUID donorId) {
-        return ResponseEntity.ok(donorService.getDonationsByDonorId(donorId));
+    public ResponseEntity<?> getDonations(
+            @PathVariable UUID donorId,
+            @RequestHeader("id") String requesterId) {
+
+        try {
+            UUID requesterUUID = UUID.fromString(requesterId);
+            return ResponseEntity.ok(donorService.getDonationsByDonorId(donorId, requesterUUID));
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(Map.of("error", e.getMessage()));
+        }
     }
 
     @RequireRole("DONOR")
@@ -84,6 +96,27 @@ public class DonorController {
     public ResponseEntity<List<DonationDTO>> getMyDonations(@RequestHeader("id") UUID userId) {
         return ResponseEntity.ok(donorService.getDonationsByUserId(userId));
     }
+
+    @GetMapping("/by-userId/{userId}/donations")
+    public ResponseEntity<?> getDonationsByUserId(
+            @PathVariable UUID userId,
+            @RequestHeader("id") String requesterId) {
+
+        try {
+            UUID requesterUUID = UUID.fromString(requesterId);
+            Donor donor = donorRepository.findByUserId(userId);
+
+            if (donor == null) {
+                return ResponseEntity.ok(List.of());
+            }
+            List<DonationDTO> donations = donorService.getDonationsByDonorId(donor.getId(), requesterUUID);
+            return ResponseEntity.ok(donations);
+
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(Map.of("error", e.getMessage()));
+        }
+    }
+
 
     @InternalOnly
     @PutMapping("/donations/{donationId}/status/completed")

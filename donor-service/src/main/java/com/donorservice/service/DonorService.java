@@ -13,8 +13,6 @@ public interface DonorService {
 
     DonationDTO registerDonation(DonationRequestDTO donationDTO);
 
-    List<DonationDTO> getDonationsByDonorId(UUID donorId);
-
     DonorDTO getDonorByUserId(UUID userId);
     
     List<DonationDTO> getDonationsByUserId(UUID userId);
@@ -25,4 +23,5 @@ public interface DonorService {
     
     DonationDTO getDonationById(UUID donationId);
 
+    List<DonationDTO> getDonationsByDonorId(UUID donorId, UUID requesterId);
 }
