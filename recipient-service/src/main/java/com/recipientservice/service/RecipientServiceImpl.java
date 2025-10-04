@@ -2,6 +2,7 @@ package com.recipientservice.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.recipientservice.client.UserGrpcClient;
 import com.recipientservice.dto.*;
 import com.recipientservice.enums.*;
 import com.recipientservice.exceptions.AccessDeniedException;
@@ -14,6 +15,7 @@ import com.recipientservice.kafka.events.ReceiveRequestEvent;
 import com.recipientservice.kafka.events.RecipientEvent;
 import com.recipientservice.model.*;
 import com.recipientservice.repository.*;
+import com.userservice.grpc.UserProfileResponse;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,23 +33,21 @@ public class RecipientServiceImpl implements RecipientService {
     private final ReceiveRequestRepository receiveRequestRepository;
     private final EventPublisher eventPublisher;
     private final ProfileLockService profileLockService;
-    private final ObjectMapper objectMapper;
-
+    private final UserGrpcClient userGrpcClient;
 
     public RecipientServiceImpl(
             RecipientRepository recipientRepository,
             LocationRepository locationRepository,
             ReceiveRequestRepository receiveRequestRepository,
             EventPublisher eventPublisher,
-            ProfileLockService profileLockService,
-            ObjectMapper objectMapper
-    ) {
+            ProfileLockService profileLockService, UserGrpcClient userGrpcClient
+            ) {
         this.recipientRepository = recipientRepository;
         this.locationRepository = locationRepository;
         this.receiveRequestRepository = receiveRequestRepository;
         this.eventPublisher = eventPublisher;
         this.profileLockService = profileLockService;
-        this.objectMapper = objectMapper;
+        this.userGrpcClient = userGrpcClient;
     }
 
 
@@ -219,7 +219,33 @@ public class RecipientServiceImpl implements RecipientService {
     }
 
     @Override
-    public List<ReceiveRequestDTO> getReceiveRequestsByRecipientId(UUID recipientId) {
+    public List<ReceiveRequestDTO> getReceiveRequestsByRecipientId(UUID recipientId, UUID requesterId) {
+        Recipient recipient = recipientRepository.findById(recipientId)
+                .orElseThrow(() -> new RecipientNotFoundException("Recipient not found"));
+
+        UUID recipientUserId = recipient.getUserId();
+
+        if (recipientUserId.equals(requesterId)) {
+            List<ReceiveRequest> requests = receiveRequestRepository.findAllByRecipientId(recipientId);
+            return requests.stream()
+                    .map(this::convertToDTO)
+                    .collect(Collectors.toList());
+        }
+
+        UserProfileResponse userProfile = userGrpcClient.getUserProfile(recipientUserId);
+        Visibility visibility = Visibility.valueOf(userProfile.getProfileVisibility());
+
+        if (visibility == Visibility.PRIVATE) {
+            throw new AccessDeniedException("This user's requests are private");
+        }
+
+        if (visibility == Visibility.FOLLOWERS_ONLY) {
+            boolean isFollowing = userGrpcClient.checkFollowStatus(requesterId, recipientUserId);
+            if (!isFollowing) {
+                throw new AccessDeniedException("You must follow this user to view their requests");
+            }
+        }
+
         List<ReceiveRequest> requests = receiveRequestRepository.findAllByRecipientId(recipientId);
         return requests.stream()
                 .map(this::convertToDTO)
@@ -232,8 +258,9 @@ public class RecipientServiceImpl implements RecipientService {
         if (recipient == null) {
             throw new RecipientNotFoundException("Recipient not found");
         }
-        return getReceiveRequestsByRecipientId(recipient.getId());
+        return getReceiveRequestsByRecipientId(recipient.getId(), userId);
     }
+
 
     @Override
     public void updateRequestStatus(UUID requestId, RequestStatus status) {

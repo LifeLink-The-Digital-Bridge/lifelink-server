@@ -5,6 +5,9 @@ import com.recipientservice.aop.RequireRole;
 import com.recipientservice.client.UserClient;
 import com.recipientservice.dto.*;
 import com.recipientservice.enums.RequestStatus;
+import com.recipientservice.exceptions.AccessDeniedException;
+import com.recipientservice.model.Recipient;
+import com.recipientservice.repository.RecipientRepository;
 import com.recipientservice.service.RecipientService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,10 +23,12 @@ public class RecipientController {
 
     private final UserClient userClient;
     private final RecipientService recipientService;
+    private final RecipientRepository recipientRepository;
 
-    public RecipientController(UserClient userClient, RecipientService recipientService) {
+    public RecipientController(UserClient userClient, RecipientService recipientService, RecipientRepository recipientRepository) {
         this.userClient = userClient;
         this.recipientService = recipientService;
+        this.recipientRepository = recipientRepository;
     }
 
     @PutMapping("/addRole")
@@ -74,10 +79,17 @@ public class RecipientController {
         return recipientService.getRecipientById(id);
     }
 
-    @RequireRole("RECIPIENT")
     @GetMapping("/{recipientId}/requests")
-    public ResponseEntity<List<ReceiveRequestDTO>> getReceiveRequests(@PathVariable UUID recipientId) {
-        return ResponseEntity.ok(recipientService.getReceiveRequestsByRecipientId(recipientId));
+    public ResponseEntity<?> getReceiveRequests(
+            @PathVariable UUID recipientId,
+            @RequestHeader("id") String requesterId) {
+
+        try {
+            UUID requesterUUID = UUID.fromString(requesterId);
+            return ResponseEntity.ok(recipientService.getReceiveRequestsByRecipientId(recipientId, requesterUUID));
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(Map.of("error", e.getMessage()));
+        }
     }
 
     @RequireRole("RECIPIENT")
@@ -85,6 +97,29 @@ public class RecipientController {
     public ResponseEntity<List<ReceiveRequestDTO>> getMyRequests(@RequestHeader("id") UUID userId) {
         return ResponseEntity.ok(recipientService.getReceiveRequestsByUserId(userId));
     }
+
+    @GetMapping("/by-userId/{userId}/requests")
+    public ResponseEntity<?> getRequestsByUserId(
+            @PathVariable UUID userId,
+            @RequestHeader("id") String requesterId) {
+
+        try {
+            UUID requesterUUID = UUID.fromString(requesterId);
+
+            Recipient recipient = recipientRepository.findByUserId(userId);
+
+            if (recipient == null) {
+                return ResponseEntity.ok(List.of());
+            }
+
+            List<ReceiveRequestDTO> requests = recipientService.getReceiveRequestsByRecipientId(recipient.getId(), requesterUUID);
+            return ResponseEntity.ok(requests);
+
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(Map.of("error", e.getMessage()));
+        }
+    }
+
 
     @InternalOnly
     @PutMapping("/requests/{requestId}/status/fulfilled")

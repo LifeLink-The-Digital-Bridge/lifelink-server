@@ -3,7 +3,6 @@ package com.recipientservice.service;
 import com.recipientservice.dto.*;
 import com.recipientservice.enums.RequestStatus;
 
-
 import java.util.List;
 import java.util.UUID;
 
@@ -17,16 +16,13 @@ public interface RecipientService {
 
     RecipientDTO getRecipientById(UUID id);
 
-    List<ReceiveRequestDTO> getReceiveRequestsByRecipientId(UUID recipientId);
-    
+    List<ReceiveRequestDTO> getReceiveRequestsByRecipientId(UUID recipientId, UUID requesterId);
+
     List<ReceiveRequestDTO> getReceiveRequestsByUserId(UUID userId);
-    
+
     void updateRequestStatus(UUID requestId, RequestStatus status);
-    
+
     String getRequestStatus(UUID requestId);
-    
+
     ReceiveRequestDTO getRequestById(UUID requestId);
-    
-
-
 }

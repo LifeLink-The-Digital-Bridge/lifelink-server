@@ -11,8 +11,6 @@ import java.util.UUID;
 
 @FeignClient(name = "USER-SERVICE", path = "/users", configuration = FeignClientConfig.class)
 public interface UserClient {
-    @GetMapping("/{id}")
-    UserDTO getUserById(@PathVariable UUID id);
 
     @PutMapping("/{id}/add-role")
     void addRole(@PathVariable("id") UUID id, @RequestParam("role") String role);
