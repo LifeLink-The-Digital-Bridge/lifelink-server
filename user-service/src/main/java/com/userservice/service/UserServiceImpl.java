@@ -17,6 +17,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -240,4 +241,29 @@ public class UserServiceImpl implements UserService {
         userRepository.save(user);
         return true;
     }
+
+    @Override
+    public List<UserDTO> searchUsers(String query, UUID requesterId) {
+        List<User> users = userRepository.findByUsernameContainingIgnoreCaseOrEmailContainingIgnoreCase(query, query);
+
+        return users.stream()
+                .map(user -> {
+                    UserDTO dto = new UserDTO();
+                    BeanUtils.copyProperties(user, dto);
+                    dto.setRoles(user.getUserRoles().stream()
+                            .map(ur -> ur.getRole().getName().name())
+                            .collect(Collectors.toSet()));
+                    return dto;
+                })
+                .limit(20)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public boolean checkFollowStatus(UUID followerId, String username) {
+        User followedUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+        return followService.isFollowing(followerId, followedUser.getId());
+    }
+
 }

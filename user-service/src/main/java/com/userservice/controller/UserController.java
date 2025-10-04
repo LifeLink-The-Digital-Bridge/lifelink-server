@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -76,6 +77,25 @@ public class UserController {
         return ResponseEntity.ok(profile);
     }
 
+    @GetMapping("/search")
+    public ResponseEntity<List<UserDTO>> searchUsers(
+            @RequestParam String query,
+            @RequestHeader(value = "id", required = false) String requesterId) {
+
+        UUID requesterUUID = requesterId != null ? UUID.fromString(requesterId) : null;
+        List<UserDTO> results = userService.searchUsers(query, requesterUUID);
+        return ResponseEntity.ok(results);
+    }
+
+    @GetMapping("/profile/{username}/follow-status")
+    public ResponseEntity<Boolean> checkFollowStatus(
+            @PathVariable String username,
+            @RequestHeader("id") String followerIdHeader) {
+
+        UUID followerId = UUID.fromString(followerIdHeader);
+        boolean isFollowing = userService.checkFollowStatus(followerId, username);
+        return ResponseEntity.ok(isFollowing);
+    }
 
     @Value("${internal.access-token}")
     private String expectedSecret;
@@ -104,8 +124,6 @@ public class UserController {
         }
         return ResponseEntity.status(HttpStatus.CONFLICT).body("User Role not added");
     }
-
-
 
     @GetMapping("/test")
     public ResponseEntity<String> test(@RequestHeader("id") String id,

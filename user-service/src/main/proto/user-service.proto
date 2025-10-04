@@ -10,6 +10,9 @@ service UserService {
   rpc GetUserByUsername(GetUserByUsernameRequest) returns (UserResponse);
   rpc GetUserById(GetUserByIdRequest) returns (UserResponse);
   rpc UpdatePassword(UpdatePasswordRequest) returns (UpdatePasswordResponse);
+
+  rpc GetUserProfile(UserProfileRequest) returns (UserProfileResponse);
+  rpc CheckFollowStatus(FollowStatusRequest) returns (FollowStatusResponse);
 }
 
 message GetUserByEmailRequest {
@@ -44,4 +47,26 @@ message UpdatePasswordRequest {
 message UpdatePasswordResponse {
   bool success = 1;
   string message = 2;
+}
+
+message UserProfileRequest {
+  string user_id = 1;
+}
+
+message UserProfileResponse {
+  string id = 1;
+  string username = 2;
+  string email = 3;
+  string profile_visibility = 4;
+  int64 followers = 5;
+  int64 following = 6;
+}
+
+message FollowStatusRequest {
+  string follower_id = 1;
+  string following_id = 2;
+}
+
+message FollowStatusResponse {
+  bool is_following = 1;
 }
