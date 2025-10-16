@@ -55,7 +55,7 @@ public class HLAProfile {
     @Column(name = "hla_dp2")
     private String hlaDP2;
 
-    @Column(nullable = false)
+    @Column
     private LocalDate testingDate;
 
     @Column

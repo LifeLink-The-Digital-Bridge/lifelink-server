@@ -226,7 +226,7 @@ public class DonorServiceImpl implements DonorService {
         Donor donor = donorRepository.findById(donationRequestDTO.getDonorId())
                 .orElseThrow(() -> new ResourceNotFoundException("Donor not found"));
 
-        validateDonorProfileComplete(donor);
+        validateDonorProfileComplete(donor, donationRequestDTO.getDonationType());
 
         if (donationRequestDTO.getBloodType() == null) {
             throw new UnsupportedDonationTypeException("Blood type is required for all donation types.");
@@ -315,6 +315,9 @@ public class DonorServiceImpl implements DonorService {
         HLAProfileEvent hlaProfileEvent = getHLAProfileEvent(donor);
         if (hlaProfileEvent != null) {
             eventPublisher.publishHLAProfileEvent(hlaProfileEvent);
+            System.out.println("HLA profile event published for " + donationRequestDTO.getDonationType() + " donation");
+        } else {
+            System.out.println("No HLA profile to publish for " + donationRequestDTO.getDonationType() + " donation");
         }
         System.out.println("Event published successfully.");
         return donationDTO;
@@ -362,6 +365,8 @@ public class DonorServiceImpl implements DonorService {
             MedicalDetails md = donor.getMedicalDetails();
             donorEvent.setMedicalDetailsId(md.getId());
             donorEvent.setHemoglobinLevel(md.getHemoglobinLevel());
+            donorEvent.setBloodGlucoseLevel(md.getBloodGlucoseLevel());
+            donorEvent.setHasDiabetes(md.getHasDiabetes());
             donorEvent.setBloodPressure(md.getBloodPressure());
             donorEvent.setHasDiseases(md.getHasDiseases());
             donorEvent.setTakingMedication(md.getTakingMedication());
@@ -524,15 +529,29 @@ public class DonorServiceImpl implements DonorService {
         return dto;
     }
 
-    private void validateDonorProfileComplete(Donor donor) {
+    private void validateDonorProfileComplete(Donor donor, DonationType donationType) {
         if (donor.getMedicalDetails() == null ||
                 donor.getEligibilityCriteria() == null ||
                 donor.getConsentForm() == null ||
                 !Boolean.TRUE.equals(donor.getConsentForm().getIsConsented())) {
             throw new InvalidDonorProfileException(
-                    "Donor profile is incomplete. Please complete all details including medical details, eligibility criteria, and consent form before donating."
+                    "Donor profile is incomplete. Please complete all details."
+            );
+        }
+        validateHLAProfileRequired(donationType, donor);
+    }
+
+    private void validateHLAProfileRequired(DonationType donationType, Donor donor) {
+        if ((donationType == DonationType.ORGAN ||
+                donationType == DonationType.TISSUE ||
+                donationType == DonationType.STEM_CELL) &&
+                donor.getHlaProfile() == null) {
+            throw new IncompleteProfileException(
+                    "HLA profile is required for " + donationType + " donation. " +
+                            "Please complete your HLA typing before registering this donation type."
             );
         }
     }
+
 
 }

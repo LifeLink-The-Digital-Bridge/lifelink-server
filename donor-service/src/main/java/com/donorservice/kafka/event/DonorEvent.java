@@ -43,6 +43,8 @@ public class DonorEvent {
 
     private Long medicalDetailsId;
     private Double hemoglobinLevel;
+    private Double bloodGlucoseLevel;
+    private Boolean hasDiabetes;
     private String bloodPressure;
     private Boolean hasDiseases;
     private Boolean takingMedication;

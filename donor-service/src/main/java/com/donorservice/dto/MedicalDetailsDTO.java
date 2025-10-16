@@ -9,6 +9,8 @@ public class MedicalDetailsDTO {
     private Long id;
     private UUID donorId;
     private Double hemoglobinLevel;
+    private Double bloodGlucoseLevel;
+    private Boolean hasDiabetes;
     private String bloodPressure;
     private Boolean hasDiseases;
     private Boolean takingMedication;
