@@ -6,6 +6,7 @@ import com.recipientservice.client.UserGrpcClient;
 import com.recipientservice.dto.*;
 import com.recipientservice.enums.*;
 import com.recipientservice.exceptions.AccessDeniedException;
+import com.recipientservice.exceptions.IncompleteProfileException;
 import com.recipientservice.exceptions.InvalidLocationException;
 import com.recipientservice.exceptions.RecipientNotFoundException;
 import com.recipientservice.kafka.EventPublisher;
@@ -152,6 +153,7 @@ public class RecipientServiceImpl implements RecipientService {
         }
 
         validateRecipientProfileComplete(recipient);
+        validateHLAProfileRequired(requestDTO.getRequestType(), recipient);
 
         Location location = null;
         if (requestDTO.getLocationId() != null) {
@@ -176,12 +178,18 @@ public class RecipientServiceImpl implements RecipientService {
         if (location != null) {
             eventPublisher.publishRecipientLocationEvent(getLocationEvent(location, recipient.getId()));
         }
-        if (recipient.getHlaProfile() != null) {
-            eventPublisher.publishHLAProfileEvent(getHLAProfileEvent(recipient.getHlaProfile(), recipient.getId()));
+
+        HLAProfileEvent hlaProfileEvent = getHLAProfileEvent(recipient.getHlaProfile(), recipient.getId());
+        if (hlaProfileEvent != null) {
+            eventPublisher.publishHLAProfileEvent(hlaProfileEvent);
+            System.out.println("HLA profile event published for " + requestDTO.getRequestType() + " request");
+        } else {
+            System.out.println("No HLA profile to publish for " + requestDTO.getRequestType() + " request");
         }
         System.out.println("Event published successfully.");
         return responseDTO;
     }
+
 
     private HLAProfileEvent getHLAProfileEvent(HLAProfile hlaProfile, UUID recipientId) {
         if (hlaProfile == null) return null;
@@ -384,6 +392,8 @@ public class RecipientServiceImpl implements RecipientService {
             MedicalDetails medical = recipient.getMedicalDetails();
             recipientEvent.setMedicalDetailsId(medical.getId());
             recipientEvent.setHemoglobinLevel(medical.getHemoglobinLevel());
+            recipientEvent.setBloodGlucoseLevel(medical.getBloodGlucoseLevel());
+            recipientEvent.setHasDiabetes(medical.getHasDiabetes());
             recipientEvent.setBloodPressure(medical.getBloodPressure());
             recipientEvent.setDiagnosis(medical.getDiagnosis());
             recipientEvent.setAllergies(medical.getAllergies());
@@ -485,5 +495,18 @@ public class RecipientServiceImpl implements RecipientService {
             );
         }
     }
+
+    private void validateHLAProfileRequired(RequestType requestType, Recipient recipient) {
+        if ((requestType == RequestType.ORGAN ||
+                requestType == RequestType.TISSUE ||
+                requestType == RequestType.STEM_CELL) &&
+                recipient.getHlaProfile() == null) {
+            throw new IncompleteProfileException(
+                    "HLA profile is required for " + requestType + " requests. " +
+                            "Please complete your HLA typing before creating this request type."
+            );
+        }
+    }
+
 
 }
