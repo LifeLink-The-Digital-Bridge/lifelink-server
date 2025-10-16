@@ -4,6 +4,7 @@ import com.matchingservice.kafka.event.donor_events.*;
 import com.matchingservice.kafka.event.recipient_events.*;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.*;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
@@ -18,7 +19,8 @@ import java.util.Map;
 @Configuration
 public class KafkaConsumerConfig {
 
-    private final String bootstrapServers = "localhost:9092";
+    @Value("${spring.kafka.bootstrap-servers}")
+    private String bootstrapServers;
 
     private Map<String, Object> baseConsumerProps() {
         Map<String, Object> props = new HashMap<>();
@@ -142,6 +144,7 @@ public class KafkaConsumerConfig {
         factory.setConsumerFactory(recipientLocationConsumerFactory());
         return factory;
     }
+
     @Bean
     public ConsumerFactory<String, RecipientHLAProfileEvent> recipientHlaProfileConsumerFactory() {
         Map<String, Object> props = new HashMap<>(baseConsumerProps());

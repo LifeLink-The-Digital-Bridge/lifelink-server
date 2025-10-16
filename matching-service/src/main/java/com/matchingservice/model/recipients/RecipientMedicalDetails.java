@@ -22,6 +22,12 @@ public class RecipientMedicalDetails {
     @Column(nullable = false)
     private Double hemoglobinLevel;
 
+    @Column
+    private Double bloodGlucoseLevel;
+
+    @Column
+    private Boolean hasDiabetes;
+
     @Column(nullable = false)
     private String bloodPressure;
 

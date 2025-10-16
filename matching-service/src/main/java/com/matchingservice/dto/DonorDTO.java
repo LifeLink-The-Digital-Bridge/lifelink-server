@@ -3,6 +3,7 @@ package com.matchingservice.dto;
 import com.matchingservice.enums.DonorStatus;
 import com.matchingservice.enums.AlcoholStatus;
 import com.matchingservice.enums.SmokingStatus;
+import jakarta.persistence.Column;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -25,6 +26,8 @@ public class DonorDTO {
     public static class DonorMedicalDetailsDTO {
         private Long medicalDetailsId;
         private Double hemoglobinLevel;
+        private Double bloodGlucoseLevel;
+        private Boolean hasDiabetes;
         private String bloodPressure;
         private Boolean hasDiseases;
         private Boolean takingMedication;

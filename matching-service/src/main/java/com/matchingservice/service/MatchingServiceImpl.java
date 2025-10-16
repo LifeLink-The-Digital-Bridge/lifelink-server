@@ -291,14 +291,47 @@ public class MatchingServiceImpl implements MatchingService {
 
 
     @Override
-    public boolean hasAccessToDonation(UUID donationId, UUID recipientUserId) {
-        return matchResultRepository.existsByDonationIdAndRecipientUserId(donationId, recipientUserId);
+    public boolean hasAccessToDonation(UUID donationId, UUID userId) {
+        return donationRepository.findById(donationId)
+                .map(donation -> donation.getDonor().getUserId().equals(userId))
+                .orElse(false)
+                || matchResultRepository.existsByDonationIdAndRecipientUserId(donationId, userId);
+    }
+
+
+    @Override
+    public boolean hasAccessToRequest(UUID requestId, UUID userId) {
+        return receiveRequestRepository.findById(requestId)
+                .map(request -> request.getRecipient().getUserId().equals(userId))
+                .orElse(false)
+                || matchResultRepository.existsByReceiveRequestIdAndDonorUserId(requestId, userId);
     }
 
     @Override
-    public boolean hasAccessToRequest(UUID requestId, UUID donorUserId) {
-        return matchResultRepository.existsByReceiveRequestIdAndDonorUserId(requestId, donorUserId);
+    public boolean hasAccessToDonorSnapshot(UUID donationId, UUID userId) {
+        Donation donation = donationRepository.findById(donationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Donation not found"));
+
+        if (donation.getDonor().getUserId().equals(userId)) {
+            return true;
+        }
+
+        return matchResultRepository.existsByDonationIdAndRecipientUserId(donationId, userId);
     }
+
+    @Override
+    public boolean hasAccessToRecipientSnapshot(UUID requestId, UUID userId) {
+        ReceiveRequest request = receiveRequestRepository.findById(requestId)
+                .orElseThrow(() -> new ResourceNotFoundException("Request not found"));
+
+        if (request.getRecipient().getUserId().equals(userId)) {
+            return true;
+        }
+
+        return matchResultRepository.existsByReceiveRequestIdAndDonorUserId(requestId, userId);
+    }
+
+
 
     @Override
     public DonationDTO getDonationById(UUID donationId) {
@@ -328,6 +361,22 @@ public class MatchingServiceImpl implements MatchingService {
         Recipient recipient = recipientRepository.findLatestByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Recipient not found for user: " + userId));
         return convertRecipientToDTO(recipient);
+    }
+
+    public DonorDTO getDonorSnapshotByDonation(UUID donationId) {
+        Donation donation = donationRepository.findById(donationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Donation not found with id: " + donationId));
+
+        Donor historicalDonor = donation.getDonor();
+        return convertDonorToDTO(historicalDonor);
+    }
+
+    public RecipientDTO getRecipientSnapshotByRequest(UUID requestId) {
+        ReceiveRequest request = receiveRequestRepository.findById(requestId)
+                .orElseThrow(() -> new ResourceNotFoundException("Request not found with id: " + requestId));
+
+        Recipient historicalRecipient = request.getRecipient();
+        return convertRecipientToDTO(historicalRecipient);
     }
 
     @Override
@@ -382,6 +431,8 @@ public class MatchingServiceImpl implements MatchingService {
         if (donor.getMedicalDetails() != null) {
             DonorDTO.DonorMedicalDetailsDTO medicalDetails = new DonorDTO.DonorMedicalDetailsDTO();
             medicalDetails.setMedicalDetailsId(donor.getMedicalDetails().getMedicalDetailsId());
+            medicalDetails.setBloodGlucoseLevel(donor.getMedicalDetails().getBloodGlucoseLevel());
+            medicalDetails.setHasDiabetes(donor.getMedicalDetails().getHasDiabetes());
             medicalDetails.setHemoglobinLevel(donor.getMedicalDetails().getHemoglobinLevel());
             medicalDetails.setBloodPressure(donor.getMedicalDetails().getBloodPressure());
             medicalDetails.setHasDiseases(donor.getMedicalDetails().getHasDiseases());
@@ -450,6 +501,8 @@ public class MatchingServiceImpl implements MatchingService {
             RecipientDTO.RecipientMedicalDetailsDTO medicalDetails = new RecipientDTO.RecipientMedicalDetailsDTO();
             medicalDetails.setMedicalDetailsId(recipient.getMedicalDetails().getMedicalDetailsId());
             medicalDetails.setHemoglobinLevel(recipient.getMedicalDetails().getHemoglobinLevel());
+            medicalDetails.setBloodGlucoseLevel(recipient.getMedicalDetails().getBloodGlucoseLevel());
+            medicalDetails.setHasDiabetes(recipient.getMedicalDetails().getHasDiabetes());
             medicalDetails.setBloodPressure(recipient.getMedicalDetails().getBloodPressure());
             medicalDetails.setDiagnosis(recipient.getMedicalDetails().getDiagnosis());
             medicalDetails.setAllergies(recipient.getMedicalDetails().getAllergies());

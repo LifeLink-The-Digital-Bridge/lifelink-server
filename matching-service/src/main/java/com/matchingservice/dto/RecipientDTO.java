@@ -24,6 +24,8 @@ public class RecipientDTO {
     public static class RecipientMedicalDetailsDTO {
         private Long medicalDetailsId;
         private Double hemoglobinLevel;
+        private Double bloodGlucoseLevel;
+        private Boolean hasDiabetes;
         private String bloodPressure;
         private String diagnosis;
         private String allergies;

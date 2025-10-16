@@ -41,4 +41,12 @@ public interface MatchingService {
     List<MatchResponse> getActiveMatchesForUser(UUID userId);
 
     List<MatchResponse> getConfirmedMatchesForUser(UUID userId);
+
+    DonorDTO getDonorSnapshotByDonation(UUID donationId);
+
+    RecipientDTO getRecipientSnapshotByRequest(UUID requestId);
+
+    boolean hasAccessToDonorSnapshot(UUID donationId, UUID userId);
+
+    boolean hasAccessToRecipientSnapshot(UUID requestId, UUID userId);
 }

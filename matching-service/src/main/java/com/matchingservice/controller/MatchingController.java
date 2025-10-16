@@ -99,7 +99,6 @@ public class MatchingController {
         }
     }
 
-    @RequireRole("RECIPIENT")
     @GetMapping("/donations/{donationId}")
     public ResponseEntity<DonationDTO> getDonationDetails(@PathVariable UUID donationId, @RequestHeader("id") UUID userId) {
         if (!matchingService.hasAccessToDonation(donationId, userId)) {
@@ -113,7 +112,6 @@ public class MatchingController {
         }
     }
 
-    @RequireRole("DONOR")
     @GetMapping("/requests/{requestId}")
     public ResponseEntity<ReceiveRequestDTO> getRequestDetails(@PathVariable UUID requestId, @RequestHeader("id") UUID userId) {
         if (!matchingService.hasAccessToRequest(requestId, userId)) {
@@ -122,6 +120,34 @@ public class MatchingController {
         try {
             ReceiveRequestDTO requestDTO = matchingService.getRequestById(requestId);
             return ResponseEntity.ok(requestDTO);
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @GetMapping("/donations/{donationId}/donor-snapshot")
+    public ResponseEntity<DonorDTO> getDonorSnapshotByDonation(@PathVariable UUID donationId, @RequestHeader("id") UUID userId) {
+        if (!matchingService.hasAccessToDonorSnapshot(donationId, userId)) {
+            System.out.println("Access Denied to Donor Snapshot for donationId: " + donationId + ", userId: " + userId);
+            return ResponseEntity.status(403).build();
+        }
+        try {
+            DonorDTO donorSnapshot = matchingService.getDonorSnapshotByDonation(donationId);
+            return ResponseEntity.ok(donorSnapshot);
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @GetMapping("/requests/{requestId}/recipient-snapshot")
+    public ResponseEntity<RecipientDTO> getRecipientSnapshotByRequest(@PathVariable UUID requestId, @RequestHeader("id") UUID userId) {
+        if (!matchingService.hasAccessToRecipientSnapshot(requestId, userId)) {
+            System.out.println("Access Denied to Recipient Snapshot for requestId: " + requestId + ", userId: " + userId);
+            return ResponseEntity.status(403).build();
+        }
+        try {
+            RecipientDTO recipientSnapshot = matchingService.getRecipientSnapshotByRequest(requestId);
+            return ResponseEntity.ok(recipientSnapshot);
         } catch (ResourceNotFoundException e) {
             return ResponseEntity.notFound().build();
         }
