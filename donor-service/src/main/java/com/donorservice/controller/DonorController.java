@@ -9,6 +9,8 @@ import com.donorservice.exception.AccessDeniedException;
 import com.donorservice.model.Donor;
 import com.donorservice.repository.DonorRepository;
 import com.donorservice.service.DonorService;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -30,6 +32,7 @@ public class DonorController {
         this.donorService = donorService;
         this.donorRepository = donorRepository;
     }
+
     @PutMapping("/addRole")
     public ResponseEntity<String> addRoleToUser(@RequestHeader("id") String userId) {
         userClient.addRole(UUID.fromString(userId), "DONOR");
@@ -79,9 +82,7 @@ public class DonorController {
     }
 
     @GetMapping("/{donorId}/donations")
-    public ResponseEntity<?> getDonations(
-            @PathVariable UUID donorId,
-            @RequestHeader("id") String requesterId) {
+    public ResponseEntity<?> getDonations(@PathVariable UUID donorId, @RequestHeader("id") String requesterId) {
 
         try {
             UUID requesterUUID = UUID.fromString(requesterId);
@@ -98,9 +99,7 @@ public class DonorController {
     }
 
     @GetMapping("/by-userId/{userId}/donations")
-    public ResponseEntity<?> getDonationsByUserId(
-            @PathVariable UUID userId,
-            @RequestHeader("id") String requesterId) {
+    public ResponseEntity<?> getDonationsByUserId(@PathVariable UUID userId, @RequestHeader("id") String requesterId) {
 
         try {
             UUID requesterUUID = UUID.fromString(requesterId);
@@ -119,17 +118,44 @@ public class DonorController {
 
 
     @InternalOnly
-    @PutMapping("/donations/{donationId}/status/completed")
-    public ResponseEntity<String> updateDonationStatusToCompleted(@PathVariable UUID donationId) {
-        donorService.updateDonationStatus(donationId, DonationStatus.COMPLETED);
-        return ResponseEntity.ok("Donation status updated to completed");
+    @PutMapping("/donations/{donationId}/status")
+    public ResponseEntity<String> updateDonationStatus(@PathVariable UUID donationId, @RequestBody DonationStatus status) {
+        donorService.updateDonationStatus(donationId, status);
+        return ResponseEntity.ok("Donation status updated to " + status);
     }
+
 
     @RequireRole("DONOR")
     @GetMapping("/donations/{donationId}/status")
     public ResponseEntity<String> getDonationStatus(@PathVariable UUID donationId) {
         String status = donorService.getDonationStatus(donationId);
         return ResponseEntity.ok(status);
+    }
+
+
+    @RequireRole("DONOR")
+    @PostMapping("/donations/{donationId}/cancel")
+    public ResponseEntity<?> cancelDonation(@PathVariable UUID donationId, @RequestHeader("id") UUID userId, @Valid @RequestBody CancellationRequestDTO request) {
+        try {
+            CancellationResponseDTO response = donorService.cancelDonation(donationId, userId, request);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @RequireRole("DONOR")
+    @GetMapping("/donations/{donationId}/can-cancel")
+    public ResponseEntity<Map<String, Boolean>> canCancelDonation(@PathVariable UUID donationId, @RequestHeader("id") UUID userId) {
+        boolean canCancel = donorService.canCancelDonation(donationId, userId);
+        return ResponseEntity.ok(Map.of("canCancel", canCancel));
+    }
+
+    @RequireRole("DONOR")
+    @GetMapping("/profile-lock-info")
+    public ResponseEntity<ProfileLockInfoDTO> getProfileLockInfo(@RequestHeader("id") UUID userId) {
+        ProfileLockInfoDTO lockInfo = donorService.getProfileLockInfo(userId);
+        return ResponseEntity.ok(lockInfo);
     }
 
 }

@@ -2,6 +2,7 @@ package com.donorservice.service;
 
 import com.donorservice.dto.*;
 import com.donorservice.enums.DonationStatus;
+import com.donorservice.exception.InvalidOperationException;
 
 import java.util.List;
 import java.util.UUID;
@@ -24,4 +25,10 @@ public interface DonorService {
     DonationDTO getDonationById(UUID donationId);
 
     List<DonationDTO> getDonationsByDonorId(UUID donorId, UUID requesterId);
+
+    CancellationResponseDTO cancelDonation(UUID donationId, UUID userId, CancellationRequestDTO request);
+
+    ProfileLockInfoDTO getProfileLockInfo(UUID userId);
+
+    boolean canCancelDonation(UUID donationId, UUID userId);
 }

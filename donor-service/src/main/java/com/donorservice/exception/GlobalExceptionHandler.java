@@ -61,6 +61,16 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(errorResponse, HttpStatus.FORBIDDEN);
     }
 
+    @ExceptionHandler(InvalidOperationException.class)
+    public ResponseEntity<?> handleInvalidOperationException(InvalidOperationException ex) {
+        Map<String, Object> errorResponse = new HashMap<>();
+        errorResponse.put("timestamp", LocalDateTime.now());
+        errorResponse.put("status", HttpStatus.BAD_REQUEST.value());
+        errorResponse.put("error", "Invalid Operation");
+        errorResponse.put("message", ex.getMessage());
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> handleGenericException(Exception ex) {
         Map<String, Object> errorResponse = new HashMap<>();

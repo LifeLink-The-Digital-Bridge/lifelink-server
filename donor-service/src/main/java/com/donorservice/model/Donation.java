@@ -6,6 +6,7 @@ import com.donorservice.enums.DonationType;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Data
@@ -40,4 +41,16 @@ public abstract class Donation {
     @Enumerated(EnumType.STRING)
     @Column(name = "donation_type", nullable = false)
     private DonationType donationType;
+
+    @Column(name = "cancellation_reason", length = 500)
+    private String cancellationReason;
+
+    @Column(name = "cancelled_at")
+    private LocalDateTime cancelledAt;
+
+    @Column(name = "cancelled_by_user_id")
+    private UUID cancelledByUserId;
+
+    @Column(name = "additional_cancellation_notes", length = 1000)
+    private String additionalCancellationNotes;
 }

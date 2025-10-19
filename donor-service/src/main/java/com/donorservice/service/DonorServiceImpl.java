@@ -6,16 +6,15 @@ import com.donorservice.dto.*;
 import com.donorservice.enums.*;
 import com.donorservice.exception.*;
 import com.donorservice.kafka.EventPublisher;
-import com.donorservice.kafka.event.DonationEvent;
-import com.donorservice.kafka.event.DonorEvent;
-import com.donorservice.kafka.event.HLAProfileEvent;
-import com.donorservice.kafka.event.LocationEvent;
+import com.donorservice.kafka.event.*;
 import com.donorservice.model.*;
 import com.donorservice.repository.*;
 import com.userservice.grpc.UserProfileResponse;
+import jakarta.transaction.Transactional;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -29,11 +28,7 @@ public class DonorServiceImpl implements DonorService {
     private final ProfileLockService profileLockService;
     private final UserGrpcClient userGrpcClient;
 
-    public DonorServiceImpl(DonorRepository donorRepository,
-                            DonationRepository donationRepository,
-                            LocationRepository locationRepository,
-                            EventPublisher eventPublisher,
-                            ProfileLockService profileLockService, UserGrpcClient userGrpcClient) {
+    public DonorServiceImpl(DonorRepository donorRepository, DonationRepository donationRepository, LocationRepository locationRepository, EventPublisher eventPublisher, ProfileLockService profileLockService, UserGrpcClient userGrpcClient) {
         this.donorRepository = donorRepository;
         this.donationRepository = donationRepository;
         this.locationRepository = locationRepository;
@@ -108,8 +103,7 @@ public class DonorServiceImpl implements DonorService {
                 validateLocationDTO(locDTO);
 
                 if (locDTO.getId() != null) {
-                    Location existing = locationRepository.findById(locDTO.getId())
-                            .orElseThrow(() -> new InvalidLocationException("Address not found"));
+                    Location existing = locationRepository.findById(locDTO.getId()).orElseThrow(() -> new InvalidLocationException("Address not found"));
                     BeanUtils.copyProperties(locDTO, existing, "id", "donor");
                     existing.setDonor(donor);
                     freshAddresses.add(existing);
@@ -129,8 +123,7 @@ public class DonorServiceImpl implements DonorService {
 
     @Override
     public DonorDTO getDonorById(UUID id) {
-        Donor savedDonor = donorRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Donor with id " + id + " not found!"));
+        Donor savedDonor = donorRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Donor with id " + id + " not found!"));
         return getDonorDTO(savedDonor);
     }
 
@@ -152,24 +145,20 @@ public class DonorServiceImpl implements DonorService {
 
     @Override
     public void updateDonationStatus(UUID donationId, DonationStatus status) {
-        donationRepository.findById(donationId)
-                .ifPresent(donation -> {
-                    donation.setStatus(status);
-                    donationRepository.save(donation);
-                });
+        donationRepository.findById(donationId).ifPresent(donation -> {
+            donation.setStatus(status);
+            donationRepository.save(donation);
+        });
     }
 
     @Override
     public String getDonationStatus(UUID donationId) {
-        return donationRepository.findById(donationId)
-                .map(donation -> donation.getStatus().toString())
-                .orElseThrow(() -> new ResourceNotFoundException("Donation not found"));
+        return donationRepository.findById(donationId).map(donation -> donation.getStatus().toString()).orElseThrow(() -> new ResourceNotFoundException("Donation not found"));
     }
 
     @Override
     public DonationDTO getDonationById(UUID donationId) {
-        Donation donation = donationRepository.findById(donationId)
-                .orElseThrow(() -> new ResourceNotFoundException("Donation not found"));
+        Donation donation = donationRepository.findById(donationId).orElseThrow(() -> new ResourceNotFoundException("Donation not found"));
         return convertToDTO(donation);
     }
 
@@ -223,8 +212,7 @@ public class DonorServiceImpl implements DonorService {
 
     @Override
     public DonationDTO registerDonation(DonationRequestDTO donationRequestDTO) {
-        Donor donor = donorRepository.findById(donationRequestDTO.getDonorId())
-                .orElseThrow(() -> new ResourceNotFoundException("Donor not found"));
+        Donor donor = donorRepository.findById(donationRequestDTO.getDonorId()).orElseThrow(() -> new ResourceNotFoundException("Donor not found"));
 
         validateDonorProfileComplete(donor, donationRequestDTO.getDonationType());
 
@@ -234,8 +222,7 @@ public class DonorServiceImpl implements DonorService {
 
         Location location = null;
         if (donationRequestDTO.getLocationId() != null) {
-            location = locationRepository.findById(donationRequestDTO.getLocationId())
-                    .orElseThrow(() -> new InvalidLocationException("Invalid location ID"));
+            location = locationRepository.findById(donationRequestDTO.getLocationId()).orElseThrow(() -> new InvalidLocationException("Invalid location ID"));
         }
         System.out.println("DonationRequestDTO: " + donationRequestDTO);
         System.out.println("Location: " + location);
@@ -300,8 +287,8 @@ public class DonorServiceImpl implements DonorService {
                 stemCellDonation.setDonationType(DonationType.STEM_CELL);
                 donation = stemCellDonation;
             }
-            default -> throw new UnsupportedDonationTypeException(
-                    "Donation type " + donationRequestDTO.getDonationType() + " is not supported.");
+            default ->
+                    throw new UnsupportedDonationTypeException("Donation type " + donationRequestDTO.getDonationType() + " is not supported.");
         }
 
         Donation savedDonation = donationRepository.save(donation);
@@ -336,11 +323,7 @@ public class DonorServiceImpl implements DonorService {
     }
 
     private void validateLocationDTO(LocationDTO locDTO) {
-        if (locDTO.getAddressLine() == null || locDTO.getLandmark() == null ||
-                locDTO.getArea() == null || locDTO.getCity() == null ||
-                locDTO.getDistrict() == null || locDTO.getState() == null ||
-                locDTO.getCountry() == null || locDTO.getPincode() == null ||
-                locDTO.getLatitude() == null || locDTO.getLongitude() == null) {
+        if (locDTO.getAddressLine() == null || locDTO.getLandmark() == null || locDTO.getArea() == null || locDTO.getCity() == null || locDTO.getDistrict() == null || locDTO.getState() == null || locDTO.getCountry() == null || locDTO.getPincode() == null || locDTO.getLatitude() == null || locDTO.getLongitude() == null) {
             throw new InvalidLocationException("All location fields must be provided and non-null.");
         }
     }
@@ -450,19 +433,15 @@ public class DonorServiceImpl implements DonorService {
         return event;
     }
 
-
     @Override
     public List<DonationDTO> getDonationsByDonorId(UUID donorId, UUID requesterId) {
-        Donor donor = donorRepository.findById(donorId)
-                .orElseThrow(() -> new ResourceNotFoundException("Donor not found"));
+        Donor donor = donorRepository.findById(donorId).orElseThrow(() -> new ResourceNotFoundException("Donor not found"));
 
         UUID donorUserId = donor.getUserId();
 
         if (donorUserId.equals(requesterId)) {
             List<Donation> donations = donationRepository.findByDonorId(donorId);
-            return donations.stream()
-                    .map(this::convertToDTO)
-                    .collect(Collectors.toList());
+            return donations.stream().map(this::convertToDTO).collect(Collectors.toList());
         }
 
         UserProfileResponse userProfile = userGrpcClient.getUserProfile(donorUserId);
@@ -480,9 +459,81 @@ public class DonorServiceImpl implements DonorService {
         }
 
         List<Donation> donations = donationRepository.findByDonorId(donorId);
-        return donations.stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
+        return donations.stream().map(this::convertToDTO).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public CancellationResponseDTO cancelDonation(UUID donationId, UUID userId, CancellationRequestDTO request) {
+        Donation donation = donationRepository.findById(donationId).orElseThrow(() -> new ResourceNotFoundException("Donation not found with ID: " + donationId));
+
+        if (!donation.getDonor().getUserId().equals(userId)) {
+            throw new AccessDeniedException("You can only cancel your own donations");
+        }
+
+        if (donation.getStatus() == DonationStatus.COMPLETED) {
+            throw new InvalidOperationException("Cannot cancel completed donation");
+        }
+
+        if (donation.getStatus() == DonationStatus.CANCELLED_BY_DONOR) {
+            throw new InvalidOperationException("Donation is already cancelled");
+        }
+
+        if (donation.getStatus() == DonationStatus.IN_PROGRESS) {
+            throw new InvalidOperationException("Donation is in progress. Please contact support at support@lifelink.com " + "or call 1-800-LIFELINK for cancellation assistance.");
+        }
+
+        donation.setStatus(DonationStatus.CANCELLED_BY_DONOR);
+        donation.setCancellationReason(request.getReason());
+        donation.setAdditionalCancellationNotes(request.getAdditionalNotes());
+        donation.setCancelledAt(LocalDateTime.now());
+        donation.setCancelledByUserId(userId);
+
+        Donation savedDonation = donationRepository.save(donation);
+
+        profileLockService.releaseLock(donation.getDonor().getId());
+        boolean profileUnlocked = !profileLockService.isDonorProfileLocked(donation.getDonor().getId());
+
+        DonationCancelledEvent event = DonationCancelledEvent.builder().donationId(donationId).donorId(donation.getDonor().getId()).donorUserId(userId).cancellationReason(request.getReason()).cancelledAt(LocalDateTime.now()).eventType("DONATION_CANCELLED").build();
+
+        try {
+            eventPublisher.publishDonationCancelledEvent(event);
+            System.out.println("Published cancellation event for donation: " + donationId);
+        } catch (Exception e) {
+            System.err.println("Failed to publish cancellation event: " + e.getMessage());
+        }
+
+        return CancellationResponseDTO.builder().success(true).message("Donation cancelled successfully. All pending matches will be expired.").donationId(donationId).cancelledAt(savedDonation.getCancelledAt()).cancellationReason(savedDonation.getCancellationReason()).expiredMatchesCount(0).profileUnlocked(profileUnlocked).build();
+    }
+
+    @Override
+    public ProfileLockInfoDTO getProfileLockInfo(UUID userId) {
+        Donor donor = donorRepository.findByUserId(userId);
+        if (donor == null) {
+            throw new ResourceNotFoundException("Donor not found for user: " + userId);
+        }
+
+        return profileLockService.getDetailedLockInfo(donor.getId());
+    }
+
+    @Override
+    public boolean canCancelDonation(UUID donationId, UUID userId) {
+        try {
+            Donation donation = donationRepository.findById(donationId).orElse(null);
+
+            if (donation == null) {
+                return false;
+            }
+
+            if (!donation.getDonor().getUserId().equals(userId)) {
+                return false;
+            }
+
+            return donation.getStatus() != DonationStatus.COMPLETED && donation.getStatus() != DonationStatus.CANCELLED_BY_DONOR && donation.getStatus() != DonationStatus.IN_PROGRESS;
+
+        } catch (Exception e) {
+            return false;
+        }
     }
 
 
@@ -530,26 +581,15 @@ public class DonorServiceImpl implements DonorService {
     }
 
     private void validateDonorProfileComplete(Donor donor, DonationType donationType) {
-        if (donor.getMedicalDetails() == null ||
-                donor.getEligibilityCriteria() == null ||
-                donor.getConsentForm() == null ||
-                !Boolean.TRUE.equals(donor.getConsentForm().getIsConsented())) {
-            throw new InvalidDonorProfileException(
-                    "Donor profile is incomplete. Please complete all details."
-            );
+        if (donor.getMedicalDetails() == null || donor.getEligibilityCriteria() == null || donor.getConsentForm() == null || !Boolean.TRUE.equals(donor.getConsentForm().getIsConsented())) {
+            throw new InvalidDonorProfileException("Donor profile is incomplete. Please complete all details.");
         }
         validateHLAProfileRequired(donationType, donor);
     }
 
     private void validateHLAProfileRequired(DonationType donationType, Donor donor) {
-        if ((donationType == DonationType.ORGAN ||
-                donationType == DonationType.TISSUE ||
-                donationType == DonationType.STEM_CELL) &&
-                donor.getHlaProfile() == null) {
-            throw new IncompleteProfileException(
-                    "HLA profile is required for " + donationType + " donation. " +
-                            "Please complete your HLA typing before registering this donation type."
-            );
+        if ((donationType == DonationType.ORGAN || donationType == DonationType.TISSUE || donationType == DonationType.STEM_CELL) && donor.getHlaProfile() == null) {
+            throw new IncompleteProfileException("HLA profile is required for " + donationType + " donation. " + "Please complete your HLA typing before registering this donation type.");
         }
     }
 
