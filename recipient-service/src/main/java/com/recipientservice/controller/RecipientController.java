@@ -9,6 +9,8 @@ import com.recipientservice.exceptions.AccessDeniedException;
 import com.recipientservice.model.Recipient;
 import com.recipientservice.repository.RecipientRepository;
 import com.recipientservice.service.RecipientService;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -50,7 +52,7 @@ public class RecipientController {
 
     @RequireRole("RECIPIENT")
     @PostMapping("/request")
-    public ResponseEntity<ReceiveRequestDTO> createReceiveRequest(@RequestHeader("id") UUID userId, @RequestBody CreateReceiveRequestDTO  requestDTO) {
+    public ResponseEntity<ReceiveRequestDTO> createReceiveRequest(@RequestHeader("id") UUID userId, @RequestBody CreateReceiveRequestDTO requestDTO) {
         ReceiveRequestDTO response = recipientService.createReceiveRequest(userId, requestDTO);
         return ResponseEntity.ok(response);
     }
@@ -80,9 +82,7 @@ public class RecipientController {
     }
 
     @GetMapping("/{recipientId}/requests")
-    public ResponseEntity<?> getReceiveRequests(
-            @PathVariable UUID recipientId,
-            @RequestHeader("id") String requesterId) {
+    public ResponseEntity<?> getReceiveRequests(@PathVariable UUID recipientId, @RequestHeader("id") String requesterId) {
 
         try {
             UUID requesterUUID = UUID.fromString(requesterId);
@@ -99,9 +99,7 @@ public class RecipientController {
     }
 
     @GetMapping("/by-userId/{userId}/requests")
-    public ResponseEntity<?> getRequestsByUserId(
-            @PathVariable UUID userId,
-            @RequestHeader("id") String requesterId) {
+    public ResponseEntity<?> getRequestsByUserId(@PathVariable UUID userId, @RequestHeader("id") String requesterId) {
 
         try {
             UUID requesterUUID = UUID.fromString(requesterId);
@@ -120,19 +118,44 @@ public class RecipientController {
         }
     }
 
-
     @InternalOnly
-    @PutMapping("/requests/{requestId}/status/fulfilled")
-    public ResponseEntity<String> updateRequestStatusToFulfilled(@PathVariable UUID requestId) {
-        recipientService.updateRequestStatus(requestId, RequestStatus.FULFILLED);
-        return ResponseEntity.ok("Request status updated to fulfilled");
+    @PutMapping("/requests/{requestId}/status")
+    public ResponseEntity<String> updateRequestStatus(@PathVariable UUID requestId, @RequestBody RequestStatus status) {
+        recipientService.updateRequestStatus(requestId, status);
+        return ResponseEntity.ok("Request status updated to " + status);
     }
+
 
     @RequireRole("RECIPIENT")
     @GetMapping("/requests/{requestId}/status")
     public ResponseEntity<String> getRequestStatus(@PathVariable UUID requestId) {
         String status = recipientService.getRequestStatus(requestId);
         return ResponseEntity.ok(status);
+    }
+
+    @RequireRole("RECIPIENT")
+    @PostMapping("/requests/{requestId}/cancel")
+    public ResponseEntity<?> cancelRequest(@PathVariable UUID requestId, @RequestHeader("id") UUID userId, @Valid @RequestBody CancellationRequestDTO request) {
+        try {
+            CancellationResponseDTO response = recipientService.cancelRequest(requestId, userId, request);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @RequireRole("RECIPIENT")
+    @GetMapping("/requests/{requestId}/can-cancel")
+    public ResponseEntity<Map<String, Boolean>> canCancelRequest(@PathVariable UUID requestId, @RequestHeader("id") UUID userId) {
+        boolean canCancel = recipientService.canCancelRequest(requestId, userId);
+        return ResponseEntity.ok(Map.of("canCancel", canCancel));
+    }
+
+    @RequireRole("RECIPIENT")
+    @GetMapping("/profile-lock-info")
+    public ResponseEntity<ProfileLockInfoDTO> getProfileLockInfo(@RequestHeader("id") UUID userId) {
+        ProfileLockInfoDTO lockInfo = recipientService.getProfileLockInfo(userId);
+        return ResponseEntity.ok(lockInfo);
     }
 
 }

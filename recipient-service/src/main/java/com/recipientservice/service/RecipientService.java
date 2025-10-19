@@ -25,4 +25,10 @@ public interface RecipientService {
     String getRequestStatus(UUID requestId);
 
     ReceiveRequestDTO getRequestById(UUID requestId);
+
+    CancellationResponseDTO cancelRequest(UUID requestId, UUID userId, CancellationRequestDTO request);
+
+    ProfileLockInfoDTO getProfileLockInfo(UUID userId);
+
+    boolean canCancelRequest(UUID requestId, UUID userId);
 }

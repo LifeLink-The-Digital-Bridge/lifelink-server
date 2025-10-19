@@ -1,9 +1,6 @@
 package com.recipientservice.kafka;
 
-import com.recipientservice.kafka.events.HLAProfileEvent;
-import com.recipientservice.kafka.events.RecipientEvent;
-import com.recipientservice.kafka.events.ReceiveRequestEvent;
-import com.recipientservice.kafka.events.LocationEvent;
+import com.recipientservice.kafka.events.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
@@ -16,6 +13,7 @@ public class EventPublisher {
     private final KafkaTemplate<String, ReceiveRequestEvent> receiveRequestKafkaTemplate;
     private final KafkaTemplate<String, LocationEvent> recipientLocationKafkaTemplate;
     private final KafkaTemplate<String, HLAProfileEvent> hlaProfileKafkaTemplate;
+    private final KafkaTemplate<String, RequestCancelledEvent> requestCancelledKafkaTemplate;
 
     public void publishRecipientEvent(RecipientEvent event) {
         recipientKafkaTemplate.send("recipient-events", event.getRecipientId().toString(), event);
@@ -30,7 +28,11 @@ public class EventPublisher {
     }
 
     public void publishHLAProfileEvent(HLAProfileEvent event) {
-        hlaProfileKafkaTemplate.send("recipient-hla-profile-events", event.getRecipientId().toString(), event);
+        hlaProfileKafkaTemplate.send("recipient-hla-profile-event", event.getRecipientId().toString(), event);
+    }
+
+    public void publishRequestCancelledEvent(RequestCancelledEvent event) {
+        requestCancelledKafkaTemplate.send("request-cancelled", event.getRequestId().toString(), event);
+        System.out.println("Published request cancelled event for request: " + event.getRequestId());
     }
 }
-

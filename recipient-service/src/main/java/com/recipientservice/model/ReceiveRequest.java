@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Data
@@ -55,4 +56,16 @@ public class ReceiveRequest {
     @ManyToOne
     @JoinColumn(name = "location_id", referencedColumnName = "id")
     private Location location;
+
+    @Column(name = "cancellation_reason", length = 500)
+    private String cancellationReason;
+
+    @Column(name = "cancelled_at")
+    private LocalDateTime cancelledAt;
+
+    @Column(name = "cancelled_by_user_id")
+    private UUID cancelledByUserId;
+
+    @Column(name = "additional_cancellation_notes", length = 1000)
+    private String additionalCancellationNotes;
 }

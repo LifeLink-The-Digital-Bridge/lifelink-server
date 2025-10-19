@@ -10,10 +10,7 @@ import com.recipientservice.exceptions.IncompleteProfileException;
 import com.recipientservice.exceptions.InvalidLocationException;
 import com.recipientservice.exceptions.RecipientNotFoundException;
 import com.recipientservice.kafka.EventPublisher;
-import com.recipientservice.kafka.events.HLAProfileEvent;
-import com.recipientservice.kafka.events.LocationEvent;
-import com.recipientservice.kafka.events.ReceiveRequestEvent;
-import com.recipientservice.kafka.events.RecipientEvent;
+import com.recipientservice.kafka.events.*;
 import com.recipientservice.model.*;
 import com.recipientservice.repository.*;
 import com.userservice.grpc.UserProfileResponse;
@@ -36,13 +33,7 @@ public class RecipientServiceImpl implements RecipientService {
     private final ProfileLockService profileLockService;
     private final UserGrpcClient userGrpcClient;
 
-    public RecipientServiceImpl(
-            RecipientRepository recipientRepository,
-            LocationRepository locationRepository,
-            ReceiveRequestRepository receiveRequestRepository,
-            EventPublisher eventPublisher,
-            ProfileLockService profileLockService, UserGrpcClient userGrpcClient
-            ) {
+    public RecipientServiceImpl(RecipientRepository recipientRepository, LocationRepository locationRepository, ReceiveRequestRepository receiveRequestRepository, EventPublisher eventPublisher, ProfileLockService profileLockService, UserGrpcClient userGrpcClient) {
         this.recipientRepository = recipientRepository;
         this.locationRepository = locationRepository;
         this.receiveRequestRepository = receiveRequestRepository;
@@ -55,7 +46,7 @@ public class RecipientServiceImpl implements RecipientService {
     @Override
     public RecipientDTO saveOrUpdateRecipient(UUID userId, RegisterRecipientDTO dto) {
         Recipient recipient = recipientRepository.findByUserId(userId);
-        
+
         if (recipient != null && profileLockService.isRecipientProfileLocked(recipient.getId())) {
             throw new IllegalStateException(profileLockService.getProfileLockReason(recipient.getId()));
         }
@@ -119,8 +110,7 @@ public class RecipientServiceImpl implements RecipientService {
                 validateLocationDTO(locDTO);
 
                 if (locDTO.getId() != null) {
-                    Location existing = locationRepository.findById(locDTO.getId())
-                            .orElseThrow(() -> new InvalidLocationException("Address not found"));
+                    Location existing = locationRepository.findById(locDTO.getId()).orElseThrow(() -> new InvalidLocationException("Address not found"));
                     BeanUtils.copyProperties(locDTO, existing, "id", "recipient");
                     existing.setRecipient(recipient);
                     freshAddresses.add(existing);
@@ -157,8 +147,7 @@ public class RecipientServiceImpl implements RecipientService {
 
         Location location = null;
         if (requestDTO.getLocationId() != null) {
-            location = locationRepository.findById(requestDTO.getLocationId())
-                    .orElseThrow(() -> new InvalidLocationException("Invalid location ID"));
+            location = locationRepository.findById(requestDTO.getLocationId()).orElseThrow(() -> new InvalidLocationException("Invalid location ID"));
         }
 
         System.out.println("CreateReceiveRequestDTO: " + requestDTO);
@@ -214,8 +203,7 @@ public class RecipientServiceImpl implements RecipientService {
 
     @Override
     public RecipientDTO getRecipientById(UUID id) {
-        Recipient savedRecipient = recipientRepository.findById(id)
-                .orElseThrow(() -> new RecipientNotFoundException("Recipient with id " + id + " not found!"));
+        Recipient savedRecipient = recipientRepository.findById(id).orElseThrow(() -> new RecipientNotFoundException("Recipient with id " + id + " not found!"));
         return getRecipientDTO(savedRecipient);
     }
 
@@ -228,16 +216,13 @@ public class RecipientServiceImpl implements RecipientService {
 
     @Override
     public List<ReceiveRequestDTO> getReceiveRequestsByRecipientId(UUID recipientId, UUID requesterId) {
-        Recipient recipient = recipientRepository.findById(recipientId)
-                .orElseThrow(() -> new RecipientNotFoundException("Recipient not found"));
+        Recipient recipient = recipientRepository.findById(recipientId).orElseThrow(() -> new RecipientNotFoundException("Recipient not found"));
 
         UUID recipientUserId = recipient.getUserId();
 
         if (recipientUserId.equals(requesterId)) {
             List<ReceiveRequest> requests = receiveRequestRepository.findAllByRecipientId(recipientId);
-            return requests.stream()
-                    .map(this::convertToDTO)
-                    .collect(Collectors.toList());
+            return requests.stream().map(this::convertToDTO).collect(Collectors.toList());
         }
 
         UserProfileResponse userProfile = userGrpcClient.getUserProfile(recipientUserId);
@@ -255,9 +240,7 @@ public class RecipientServiceImpl implements RecipientService {
         }
 
         List<ReceiveRequest> requests = receiveRequestRepository.findAllByRecipientId(recipientId);
-        return requests.stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
+        return requests.stream().map(this::convertToDTO).collect(Collectors.toList());
     }
 
     @Override
@@ -272,25 +255,95 @@ public class RecipientServiceImpl implements RecipientService {
 
     @Override
     public void updateRequestStatus(UUID requestId, RequestStatus status) {
-        receiveRequestRepository.findById(requestId)
-                .ifPresent(request -> {
-                    request.setStatus(status);
-                    receiveRequestRepository.save(request);
-                });
+        receiveRequestRepository.findById(requestId).ifPresent(request -> {
+            request.setStatus(status);
+            receiveRequestRepository.save(request);
+        });
     }
 
     @Override
     public String getRequestStatus(UUID requestId) {
-        return receiveRequestRepository.findById(requestId)
-                .map(request -> request.getStatus().toString())
-                .orElseThrow(() -> new RecipientNotFoundException("Request not found"));
+        return receiveRequestRepository.findById(requestId).map(request -> request.getStatus().toString()).orElseThrow(() -> new RecipientNotFoundException("Request not found"));
     }
 
     @Override
     public ReceiveRequestDTO getRequestById(UUID requestId) {
-        ReceiveRequest request = receiveRequestRepository.findById(requestId)
-                .orElseThrow(() -> new RecipientNotFoundException("Request not found"));
+        ReceiveRequest request = receiveRequestRepository.findById(requestId).orElseThrow(() -> new RecipientNotFoundException("Request not found"));
         return convertToDTO(request);
+    }
+
+    @Override
+    @Transactional
+    public CancellationResponseDTO cancelRequest(UUID requestId, UUID userId, CancellationRequestDTO request) {
+        ReceiveRequest receiveRequest = receiveRequestRepository.findById(requestId).orElseThrow(() -> new RecipientNotFoundException("Request not found with ID: " + requestId));
+
+        if (!receiveRequest.getRecipient().getUserId().equals(userId)) {
+            throw new AccessDeniedException("You can only cancel your own requests");
+        }
+
+        if (receiveRequest.getStatus() == RequestStatus.FULFILLED) {
+            throw new IllegalStateException("Cannot cancel fulfilled request");
+        }
+
+        if (receiveRequest.getStatus() == RequestStatus.CANCELLED_BY_RECIPIENT) {
+            throw new IllegalStateException("Request is already cancelled");
+        }
+
+        if (receiveRequest.getStatus() == RequestStatus.IN_PROGRESS) {
+            throw new IllegalStateException("Request is in progress. Please contact support at support@lifelink.com " + "or call 1-800-LIFELINK for cancellation assistance.");
+        }
+
+        receiveRequest.setStatus(RequestStatus.CANCELLED_BY_RECIPIENT);
+        receiveRequest.setCancellationReason(request.getReason());
+        receiveRequest.setAdditionalCancellationNotes(request.getAdditionalNotes());
+        receiveRequest.setCancelledAt(java.time.LocalDateTime.now());
+        receiveRequest.setCancelledByUserId(userId);
+
+        ReceiveRequest savedRequest = receiveRequestRepository.save(receiveRequest);
+
+        profileLockService.releaseLock(receiveRequest.getRecipient().getId());
+        boolean profileUnlocked = !profileLockService.isRecipientProfileLocked(receiveRequest.getRecipient().getId());
+
+        RequestCancelledEvent event = RequestCancelledEvent.builder().requestId(requestId).recipientId(receiveRequest.getRecipient().getId()).recipientUserId(userId).cancellationReason(request.getReason()).cancelledAt(java.time.LocalDateTime.now()).eventType("REQUEST_CANCELLED").build();
+
+        try {
+            eventPublisher.publishRequestCancelledEvent(event);
+            System.out.println("Published cancellation event for request: " + requestId);
+        } catch (Exception e) {
+            System.err.println("Failed to publish cancellation event: " + e.getMessage());
+        }
+
+        return CancellationResponseDTO.builder().success(true).message("Request cancelled successfully. All pending matches will be expired.").requestId(requestId).cancelledAt(savedRequest.getCancelledAt()).cancellationReason(savedRequest.getCancellationReason()).expiredMatchesCount(0).profileUnlocked(profileUnlocked).build();
+    }
+
+    @Override
+    public ProfileLockInfoDTO getProfileLockInfo(UUID userId) {
+        Recipient recipient = recipientRepository.findByUserId(userId);
+        if (recipient == null) {
+            throw new RecipientNotFoundException("Recipient not found for user: " + userId);
+        }
+
+        return profileLockService.getDetailedLockInfo(recipient.getId());
+    }
+
+    @Override
+    public boolean canCancelRequest(UUID requestId, UUID userId) {
+        try {
+            ReceiveRequest request = receiveRequestRepository.findById(requestId).orElse(null);
+
+            if (request == null) {
+                return false;
+            }
+
+            if (!request.getRecipient().getUserId().equals(userId)) {
+                return false;
+            }
+
+            return request.getStatus() != RequestStatus.FULFILLED && request.getStatus() != RequestStatus.CANCELLED_BY_RECIPIENT && request.getStatus() != RequestStatus.IN_PROGRESS;
+
+        } catch (Exception e) {
+            return false;
+        }
     }
 
 
@@ -347,8 +400,7 @@ public class RecipientServiceImpl implements RecipientService {
             throw new IllegalArgumentException("Testing date cannot be in the future");
         }
 
-        if (hlaProfileDTO.getHlaA1() == null && hlaProfileDTO.getHlaA2() == null &&
-                hlaProfileDTO.getHlaB1() == null && hlaProfileDTO.getHlaB2() == null) {
+        if (hlaProfileDTO.getHlaA1() == null && hlaProfileDTO.getHlaA2() == null && hlaProfileDTO.getHlaB1() == null && hlaProfileDTO.getHlaB2() == null) {
             throw new IllegalArgumentException("At least some HLA markers must be provided");
         }
 
@@ -359,11 +411,7 @@ public class RecipientServiceImpl implements RecipientService {
 
 
     private void validateLocationDTO(LocationDTO locDTO) {
-        if (locDTO.getAddressLine() == null || locDTO.getLandmark() == null ||
-                locDTO.getArea() == null || locDTO.getCity() == null ||
-                locDTO.getDistrict() == null || locDTO.getState() == null ||
-                locDTO.getCountry() == null || locDTO.getPincode() == null ||
-                locDTO.getLatitude() == null || locDTO.getLongitude() == null) {
+        if (locDTO.getAddressLine() == null || locDTO.getLandmark() == null || locDTO.getArea() == null || locDTO.getCity() == null || locDTO.getDistrict() == null || locDTO.getState() == null || locDTO.getCountry() == null || locDTO.getPincode() == null || locDTO.getLatitude() == null || locDTO.getLongitude() == null) {
             throw new InvalidLocationException("All location fields must be provided and non-null.");
         }
     }
@@ -486,25 +534,14 @@ public class RecipientServiceImpl implements RecipientService {
 
 
     private void validateRecipientProfileComplete(Recipient recipient) {
-        if (recipient.getMedicalDetails() == null ||
-                recipient.getEligibilityCriteria() == null ||
-                recipient.getConsentForm() == null ||
-                !Boolean.TRUE.equals(recipient.getConsentForm().getIsConsented())) {
-            throw new RecipientNotFoundException(
-                    "Recipient profile is incomplete. Please complete all details including medical details, eligibility criteria, and consent form before creating requests."
-            );
+        if (recipient.getMedicalDetails() == null || recipient.getEligibilityCriteria() == null || recipient.getConsentForm() == null || !Boolean.TRUE.equals(recipient.getConsentForm().getIsConsented())) {
+            throw new RecipientNotFoundException("Recipient profile is incomplete. Please complete all details including medical details, eligibility criteria, and consent form before creating requests.");
         }
     }
 
     private void validateHLAProfileRequired(RequestType requestType, Recipient recipient) {
-        if ((requestType == RequestType.ORGAN ||
-                requestType == RequestType.TISSUE ||
-                requestType == RequestType.STEM_CELL) &&
-                recipient.getHlaProfile() == null) {
-            throw new IncompleteProfileException(
-                    "HLA profile is required for " + requestType + " requests. " +
-                            "Please complete your HLA typing before creating this request type."
-            );
+        if ((requestType == RequestType.ORGAN || requestType == RequestType.TISSUE || requestType == RequestType.STEM_CELL) && recipient.getHlaProfile() == null) {
+            throw new IncompleteProfileException("HLA profile is required for " + requestType + " requests. " + "Please complete your HLA typing before creating this request type.");
         }
     }
 
