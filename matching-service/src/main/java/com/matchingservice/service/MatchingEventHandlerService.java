@@ -3,8 +3,10 @@ package com.matchingservice.service;
 import com.matchingservice.enums.*;
 import com.matchingservice.kafka.event.donor_events.*;
 import com.matchingservice.kafka.event.recipient_events.*;
+import com.matchingservice.model.MatchResult;
 import com.matchingservice.model.donor.*;
 import com.matchingservice.model.recipients.*;
+import com.matchingservice.repository.MatchResultRepository;
 import com.matchingservice.repository.donor.*;
 import com.matchingservice.repository.recipient.*;
 import jakarta.transaction.Transactional;
@@ -28,6 +30,7 @@ public class MatchingEventHandlerService {
     private final RecipientLocationRepository recipientLocationRepository;
     private final ReceiveRequestRepository receiveRequestRepository;
     private final RecipientHLAProfileRepository recipientHLAProfileRepository;
+    private final MatchResultRepository matchResultRepository;
 
     private final ConcurrentHashMap<UUID, ReentrantLock> donorLocks = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, ReentrantLock> recipientLocks = new ConcurrentHashMap<>();
@@ -565,5 +568,134 @@ public class MatchingEventHandlerService {
                     hlaEventReceived, hlaRequired);
         }
     }
+
+    @Transactional
+    public void handleDonationCancelledEvent(DonationCancelledEvent event) {
+        System.out.println("========================================");
+        System.out.println("Processing Donation Cancellation");
+        System.out.println("Donation ID: " + event.getDonationId());
+        System.out.println("Donor User ID: " + event.getDonorUserId());
+        System.out.println("Reason: " + event.getCancellationReason());
+        System.out.println("========================================");
+
+        try {
+            donationRepository.findById(event.getDonationId())
+                    .ifPresent(donation -> {
+                        donation.setStatus(DonationStatus.CANCELLED_BY_DONOR);
+                        donationRepository.save(donation);
+                        System.out.println("✓ Updated donation " + donation.getDonationId() +
+                                " status to CANCELLED_BY_DONOR in matching-service");
+                    });
+
+            List<MatchStatus> activeStatuses = Arrays.asList(
+                    MatchStatus.PENDING,
+                    MatchStatus.DONOR_CONFIRMED,
+                    MatchStatus.RECIPIENT_CONFIRMED
+            );
+
+            List<MatchResult> activeMatches = matchResultRepository
+                    .findByDonationIdAndStatusIn(event.getDonationId(), activeStatuses);
+
+            if (activeMatches.isEmpty()) {
+                System.out.println("No active matches found for donation " + event.getDonationId());
+                return;
+            }
+
+            System.out.println("Found " + activeMatches.size() + " active matches to expire");
+
+            int expiredCount = 0;
+            for (MatchResult match : activeMatches) {
+                try {
+                    match.setStatus(MatchStatus.CANCELLED_BY_DONOR);
+                    match.setExpiryReason("DONATION_CANCELLED_BY_DONOR: " +
+                            event.getCancellationReason());
+                    match.setExpiredAt(LocalDateTime.now());
+                    matchResultRepository.save(match);
+                    expiredCount++;
+                    System.out.println("Expired match " + match.getId() +
+                            " | Donation: " + match.getDonationId() +
+                            " - Request: " + match.getReceiveRequestId());
+                } catch (Exception e) {
+                    System.err.println("Failed to expire match " + match.getId() +
+                            ": " + e.getMessage());
+                }
+            }
+
+            System.out.println("Successfully expired " + expiredCount + " out of " +
+                    activeMatches.size() + " matches for donation " +
+                    event.getDonationId());
+            System.out.println("========================================");
+
+        } catch (Exception e) {
+            System.err.println("Error handling donation cancellation event: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
+    }
+
+    @Transactional
+    public void handleRequestCancelledEvent(RequestCancelledEvent event) {
+        System.out.println("========================================");
+        System.out.println("Processing Request Cancellation");
+        System.out.println("Request ID: " + event.getRequestId());
+        System.out.println("Recipient User ID: " + event.getRecipientUserId());
+        System.out.println("Reason: " + event.getCancellationReason());
+        System.out.println("========================================");
+
+        try {
+            receiveRequestRepository.findById(event.getRequestId())
+                    .ifPresent(request -> {
+                        request.setStatus(RequestStatus.CANCELLED_BY_RECIPIENT);
+                        receiveRequestRepository.save(request);
+                        System.out.println("✓ Updated request " + request.getReceiveRequestId() +
+                                " status to CANCELLED_BY_RECIPIENT in matching-service");
+                    });
+
+            List<MatchStatus> activeStatuses = Arrays.asList(
+                    MatchStatus.PENDING,
+                    MatchStatus.DONOR_CONFIRMED,
+                    MatchStatus.RECIPIENT_CONFIRMED
+            );
+
+            List<MatchResult> activeMatches = matchResultRepository
+                    .findByReceiveRequestIdAndStatusIn(event.getRequestId(), activeStatuses);
+
+            if (activeMatches.isEmpty()) {
+                System.out.println("No active matches found for request " + event.getRequestId());
+                return;
+            }
+
+            System.out.println("Found " + activeMatches.size() + " active matches to expire");
+
+            int expiredCount = 0;
+            for (MatchResult match : activeMatches) {
+                try {
+                    match.setStatus(MatchStatus.CANCELLED_BY_RECIPIENT);
+                    match.setExpiryReason("REQUEST_CANCELLED_BY_RECIPIENT: " +
+                            event.getCancellationReason());
+                    match.setExpiredAt(LocalDateTime.now());
+                    matchResultRepository.save(match);
+                    expiredCount++;
+                    System.out.println("Expired match " + match.getId() +
+                            " | Donation: " + match.getDonationId() +
+                            " - Request: " + match.getReceiveRequestId());
+                } catch (Exception e) {
+                    System.err.println("Failed to expire match " + match.getId() +
+                            ": " + e.getMessage());
+                }
+            }
+
+            System.out.println("Successfully expired " + expiredCount + " out of " +
+                    activeMatches.size() + " matches for request " +
+                    event.getRequestId());
+            System.out.println("========================================");
+
+        } catch (Exception e) {
+            System.err.println("Error handling request cancellation event: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
+    }
+
 
 }

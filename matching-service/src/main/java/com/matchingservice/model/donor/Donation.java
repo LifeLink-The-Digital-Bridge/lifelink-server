@@ -50,4 +50,8 @@ public class Donation {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private DonationStatus status;
+
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
 }

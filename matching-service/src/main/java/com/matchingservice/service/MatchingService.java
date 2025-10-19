@@ -49,4 +49,14 @@ public interface MatchingService {
     boolean hasAccessToDonorSnapshot(UUID donationId, UUID userId);
 
     boolean hasAccessToRecipientSnapshot(UUID requestId, UUID userId);
+
+    String donorRejectMatch(UUID matchId, UUID userId, String rejectionReason);
+
+    String recipientRejectMatch(UUID matchId, UUID userId, String rejectionReason);
+
+    String donorWithdrawConfirmation(UUID matchId, UUID userId, String withdrawalReason);
+
+    String recipientWithdrawConfirmation(UUID matchId, UUID userId, String withdrawalReason);
+
+    String recipientConfirmCompletion(UUID matchId, UUID userId, CompletionConfirmationDTO details);
 }

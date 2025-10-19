@@ -2,13 +2,19 @@ package com.matchingservice.controller;
 
 import com.matchingservice.aop.RequireRole;
 import com.matchingservice.dto.*;
+import com.matchingservice.enums.MatchStatus;
 import com.matchingservice.exceptions.ResourceNotFoundException;
+import com.matchingservice.model.MatchResult;
+import com.matchingservice.repository.MatchResultRepository;
 import com.matchingservice.service.MatchingService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -17,6 +23,7 @@ import java.util.UUID;
 public class MatchingController {
 
     private final MatchingService matchingService;
+    private final MatchResultRepository matchResultRepository;
 
     @PostMapping("/manual-match")
     public ResponseEntity<ManualMatchResponse> manualMatch(@RequestBody ManualMatchRequest request) {
@@ -79,7 +86,7 @@ public class MatchingController {
 
     @RequireRole("RECIPIENT")
     @GetMapping("/donor-details/{userId}")
-    public ResponseEntity<DonorDTO> getDonorDetails(@PathVariable UUID userId){
+    public ResponseEntity<DonorDTO> getDonorDetails(@PathVariable UUID userId) {
         try {
             DonorDTO donorDTO = matchingService.getDonorByUserId(userId);
             return ResponseEntity.ok(donorDTO);
@@ -90,7 +97,7 @@ public class MatchingController {
 
     @RequireRole("DONOR")
     @GetMapping("/recipient-details/{userId}")
-    public ResponseEntity<RecipientDTO> getRecipientDetails(@PathVariable UUID userId){
+    public ResponseEntity<RecipientDTO> getRecipientDetails(@PathVariable UUID userId) {
         try {
             RecipientDTO recipientDTO = matchingService.getRecipientByUserId(userId);
             return ResponseEntity.ok(recipientDTO);
@@ -173,4 +180,93 @@ public class MatchingController {
         boolean isConfirmed = matchingService.isMatchConfirmed(matchId);
         return ResponseEntity.ok(isConfirmed);
     }
+
+    @RequireRole("DONOR")
+    @PostMapping("/donor/reject/{matchId}")
+    public ResponseEntity<?> donorRejectMatch(@PathVariable UUID matchId, @RequestHeader("id") UUID userId, @RequestBody Map<String, String> body) {
+        try {
+            String reason = body.getOrDefault("reason", "Not specified");
+            String result = matchingService.donorRejectMatch(matchId, userId, reason);
+            return ResponseEntity.ok(Map.of("message", result));
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @RequireRole("RECIPIENT")
+    @PostMapping("/recipient/reject/{matchId}")
+    public ResponseEntity<?> recipientRejectMatch(@PathVariable UUID matchId, @RequestHeader("id") UUID userId, @RequestBody Map<String, String> body) {
+        try {
+            String reason = body.getOrDefault("reason", "Not specified");
+            String result = matchingService.recipientRejectMatch(matchId, userId, reason);
+            return ResponseEntity.ok(Map.of("message", result));
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @RequireRole("DONOR")
+    @PostMapping("/donor/withdraw/{matchId}")
+    public ResponseEntity<?> donorWithdrawConfirmation(@PathVariable UUID matchId, @RequestHeader("id") UUID userId, @RequestBody Map<String, String> body) {
+        try {
+            String reason = body.getOrDefault("reason", "Not specified");
+            String result = matchingService.donorWithdrawConfirmation(matchId, userId, reason);
+            return ResponseEntity.ok(Map.of("message", result));
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @RequireRole("RECIPIENT")
+    @PostMapping("/recipient/withdraw/{matchId}")
+    public ResponseEntity<?> recipientWithdrawConfirmation(@PathVariable UUID matchId, @RequestHeader("id") UUID userId, @RequestBody Map<String, String> body) {
+        try {
+            String reason = body.getOrDefault("reason", "Not specified");
+            String result = matchingService.recipientWithdrawConfirmation(matchId, userId, reason);
+            return ResponseEntity.ok(Map.of("message", result));
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+
+    @RequireRole("RECIPIENT")
+    @PostMapping("/recipient/confirm-completion/{matchId}")
+    public ResponseEntity<?> recipientConfirmCompletion(@PathVariable UUID matchId, @RequestHeader("id") UUID userId, @Valid @RequestBody CompletionConfirmationDTO details) {
+        try {
+            String result = matchingService.recipientConfirmCompletion(matchId, userId, details);
+            return ResponseEntity.ok(Map.of("message", result, "matchId", matchId, "completedAt", LocalDateTime.now()));
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Check if recipient can confirm completion for a match
+     */
+    @RequireRole("RECIPIENT")
+    @GetMapping("/recipient/can-confirm-completion/{matchId}")
+    public ResponseEntity<?> canConfirmCompletion(@PathVariable UUID matchId, @RequestHeader("id") UUID userId) {
+        try {
+            MatchResult match = matchResultRepository.findById(matchId).orElseThrow(() -> new ResourceNotFoundException("Match not found"));
+
+            boolean canConfirm = match.getRecipientUserId().equals(userId) && match.getStatus() == MatchStatus.CONFIRMED && match.getCompletedAt() == null;
+
+            return ResponseEntity.ok(Map.of("canConfirm", canConfirm, "status", match.getStatus(), "alreadyCompleted", match.getCompletedAt() != null));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+
 }

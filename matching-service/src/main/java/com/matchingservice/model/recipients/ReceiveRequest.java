@@ -62,4 +62,8 @@ public class ReceiveRequest {
 
     @Column
     private String notes;
+
+    @Column(name = "fulfilled_at")
+    private LocalDateTime fulfilledAt;
+
 }

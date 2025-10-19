@@ -1,11 +1,13 @@
 package com.matchingservice.model;
 
+import com.matchingservice.enums.ConfirmerType;
 import com.matchingservice.enums.MatchStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -17,7 +19,6 @@ import java.util.UUID;
         @Index(name = "idx_request_compatibility", columnList = "receiveRequestId, compatibilityScore"),
         @Index(name = "idx_status_matched_at", columnList = "status, matchedAt")
 })
-
 @Data
 @EqualsAndHashCode(callSuper = false)
 public class MatchResult {
@@ -104,6 +105,45 @@ public class MatchResult {
 
     @Column(name = "expiry_reason", length = 500)
     private String expiryReason;
+
+    @Column(name = "first_confirmer")
+    @Enumerated(EnumType.STRING)
+    private ConfirmerType firstConfirmer;
+
+    @Column(name = "first_confirmed_at")
+    private LocalDateTime firstConfirmedAt;
+
+    @Column(name = "confirmation_expires_at")
+    private LocalDateTime confirmationExpiresAt;
+
+    @Column(name = "withdrawal_reason", length = 500)
+    private String withdrawalReason;
+
+    @Column(name = "withdrawn_at")
+    private LocalDateTime withdrawnAt;
+
+    @Column(name = "withdrawn_by")
+    @Enumerated(EnumType.STRING)
+    private ConfirmerType withdrawnBy;
+
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
+    @Column(name = "completion_confirmed_by")
+    private UUID completionConfirmedBy;
+
+    @Column(name = "completion_notes", length = 500)
+    private String completionNotes;
+
+    @Column(name = "received_date")
+    private LocalDate receivedDate;
+
+    @Column(name = "recipient_rating")
+    private Integer recipientRating;
+
+    @Column(name = "hospital_name", length = 200)
+    private String hospitalName;
+
 
     @PrePersist
     public void setDefaults() {

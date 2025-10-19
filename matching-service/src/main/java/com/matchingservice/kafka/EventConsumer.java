@@ -1,13 +1,7 @@
 package com.matchingservice.kafka;
 
-import com.matchingservice.kafka.event.donor_events.DonorEvent;
-import com.matchingservice.kafka.event.donor_events.DonationEvent;
-import com.matchingservice.kafka.event.donor_events.DonorHLAProfileEvent;
-import com.matchingservice.kafka.event.donor_events.DonorLocationEvent;
-import com.matchingservice.kafka.event.recipient_events.RecipientEvent;
-import com.matchingservice.kafka.event.recipient_events.ReceiveRequestEvent;
-import com.matchingservice.kafka.event.recipient_events.RecipientHLAProfileEvent;
-import com.matchingservice.kafka.event.recipient_events.RecipientLocationEvent;
+import com.matchingservice.kafka.event.donor_events.*;
+import com.matchingservice.kafka.event.recipient_events.*;
 import com.matchingservice.service.MatchingEventHandlerService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -65,5 +59,17 @@ public class EventConsumer {
     public void consumeRecipientHLAProfileEvent(RecipientHLAProfileEvent event) {
         System.out.println("Received RecipientHLAProfileEvent: " + event);
         handler.handleRecipientHLAProfileEvent(event);
+    }
+
+    @KafkaListener(topics = "donation-cancelled", groupId = "matching-service-group", containerFactory = "donationCancelledKafkaListenerFactory")
+    public void consumeDonationCancelledEvent(DonationCancelledEvent event) {
+        System.out.println("Received DonationCancelledEvent: " + event);
+        handler.handleDonationCancelledEvent(event);
+    }
+
+    @KafkaListener(topics = "request-cancelled", groupId = "matching-service-group", containerFactory = "requestCancelledKafkaListenerFactory")
+    public void consumeRequestCancelledEvent(RequestCancelledEvent event) {
+        System.out.println("Received RequestCancelledEvent: " + event);
+        handler.handleRequestCancelledEvent(event);
     }
 }

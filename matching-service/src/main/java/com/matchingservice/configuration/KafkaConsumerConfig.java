@@ -158,4 +158,32 @@ public class KafkaConsumerConfig {
         factory.setConsumerFactory(recipientHlaProfileConsumerFactory());
         return factory;
     }
+
+    @Bean
+    public ConsumerFactory<String, DonationCancelledEvent> donationCancelledConsumerFactory() {
+        Map<String, Object> props = new HashMap<>(baseConsumerProps());
+        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, DonationCancelledEvent.class.getName());
+        return new DefaultKafkaConsumerFactory<>(props);
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, DonationCancelledEvent> donationCancelledKafkaListenerFactory() {
+        var factory = new ConcurrentKafkaListenerContainerFactory<String, DonationCancelledEvent>();
+        factory.setConsumerFactory(donationCancelledConsumerFactory());
+        return factory;
+    }
+
+    @Bean
+    public ConsumerFactory<String, RequestCancelledEvent> requestCancelledConsumerFactory() {
+        Map<String, Object> props = new HashMap<>(baseConsumerProps());
+        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, RequestCancelledEvent.class.getName());
+        return new DefaultKafkaConsumerFactory<>(props);
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, RequestCancelledEvent> requestCancelledKafkaListenerFactory() {
+        var factory = new ConcurrentKafkaListenerContainerFactory<String, RequestCancelledEvent>();
+        factory.setConsumerFactory(requestCancelledConsumerFactory());
+        return factory;
+    }
 }

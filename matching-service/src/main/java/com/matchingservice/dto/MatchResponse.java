@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -41,6 +42,13 @@ public class MatchResponse {
     private Double urgencyPriorityScore;
     private String matchReason;
     private Integer priorityRank;
+
+    private LocalDateTime completedAt;
+    private LocalDate receivedDate;
+    private Boolean canConfirmCompletion;
+    private String completionNotes;
+    private Integer recipientRating;
+    private String hospitalName;
 
     public static MatchResponse fromMatchResult(MatchResult matchResult) {
         return MatchResponse.builder()

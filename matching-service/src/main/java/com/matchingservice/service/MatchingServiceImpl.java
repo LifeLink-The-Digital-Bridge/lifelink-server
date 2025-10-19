@@ -1,6 +1,7 @@
 package com.matchingservice.service;
 
 import com.matchingservice.dto.*;
+import com.matchingservice.enums.ConfirmerType;
 import com.matchingservice.enums.DonationStatus;
 import com.matchingservice.enums.MatchStatus;
 import com.matchingservice.enums.RequestStatus;
@@ -45,36 +46,58 @@ public class MatchingServiceImpl implements MatchingService {
     @Override
     @Transactional
     public ManualMatchResponse manualMatch(ManualMatchRequest request) {
-        System.out.println("Attempting manual match: Donation " + request.getDonationId() +
-                " with ReceiveRequest " + request.getReceiveRequestId());
+        System.out.println("========================================");
+        System.out.println("Attempting manual match:");
+        System.out.println("Donation ID: " + request.getDonationId());
+        System.out.println("Request ID: " + request.getReceiveRequestId());
+        System.out.println("========================================");
 
         try {
-            Donation donation = donationRepository.findById(request.getDonationId())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Donation not found with ID: " + request.getDonationId()));
-            ReceiveRequest receiveRequest = receiveRequestRepository.findById(request.getReceiveRequestId())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "ReceiveRequest not found with ID: " + request.getReceiveRequestId()));
+            Donation donation = donationRepository.findById(request.getDonationId()).orElseThrow(() -> new ResourceNotFoundException("Donation not found with ID: " + request.getDonationId()));
+
+            if (donation.getStatus() == DonationStatus.COMPLETED || donation.getStatus() == DonationStatus.CANCELLED_BY_DONOR || donation.getStatus() == DonationStatus.CANCELLED_DUE_TO_MATCH_FAILURE || donation.getStatus() == DonationStatus.EXPIRED || donation.getStatus() == DonationStatus.WITHDRAWN || donation.getStatus() == DonationStatus.IN_PROGRESS) {
+
+                throw new IllegalStateException("Donation is not available for matching. Current status: " + donation.getStatus());
+            }
+
+            boolean alreadyMatched = matchResultRepository.existsConfirmedMatchByDonationId(request.getDonationId());
+
+            if (alreadyMatched) {
+                throw new IllegalStateException("This donation is already matched and confirmed with another recipient");
+            }
+
+            ReceiveRequest receiveRequest = receiveRequestRepository.findById(request.getReceiveRequestId()).orElseThrow(() -> new ResourceNotFoundException("ReceiveRequest not found with ID: " + request.getReceiveRequestId()));
+
+            if (receiveRequest.getStatus() == RequestStatus.FULFILLED || receiveRequest.getStatus() == RequestStatus.CANCELLED_BY_RECIPIENT || receiveRequest.getStatus() == RequestStatus.CANCELLED_DUE_TO_MATCH_FAILURE || receiveRequest.getStatus() == RequestStatus.EXPIRED || receiveRequest.getStatus() == RequestStatus.WITHDRAWN || receiveRequest.getStatus() == RequestStatus.IN_PROGRESS) {
+
+                throw new IllegalStateException("Request is not available for matching. Current status: " + receiveRequest.getStatus());
+            }
+
+            boolean requestAlreadyFulfilled = matchResultRepository.existsConfirmedMatchByRequestId(request.getReceiveRequestId());
+
+            if (requestAlreadyFulfilled) {
+                throw new IllegalStateException("This request has already been fulfilled with another donor");
+            }
 
             DonorLocation donorLocation = null;
             if (request.getDonorLocationId() != null) {
-                donorLocation = donorLocationRepository
-                        .findTopByLocationIdOrderByEventTimestampDesc(request.getDonorLocationId())
-                        .orElseThrow(() -> new ResourceNotFoundException(
-                                "Donor location not found with ID: " + request.getDonorLocationId()));
+                donorLocation = donorLocationRepository.findTopByLocationIdOrderByEventTimestampDesc(request.getDonorLocationId()).orElseThrow(() -> new ResourceNotFoundException("Donor location not found with ID: " + request.getDonorLocationId()));
+
+                if (!donorLocation.getDonor().getDonorId().equals(donation.getDonorId())) {
+                    throw new IllegalArgumentException("Location ID " + request.getDonorLocationId() + " does not belong to the donor of this donation");
+                }
             }
 
             RecipientLocation recipientLocation = null;
             if (request.getRecipientLocationId() != null) {
-                recipientLocation = recipientLocationRepository
-                        .findTopByLocationIdOrderByEventTimestampDesc(request.getRecipientLocationId())
-                        .orElseThrow(() -> new ResourceNotFoundException(
-                                "Recipient location not found with ID: " + request.getRecipientLocationId()));
+                recipientLocation = recipientLocationRepository.findTopByLocationIdOrderByEventTimestampDesc(request.getRecipientLocationId()).orElseThrow(() -> new ResourceNotFoundException("Recipient location not found with ID: " + request.getRecipientLocationId()));
+
+                if (!recipientLocation.getRecipient().getRecipientId().equals(receiveRequest.getRecipientId())) {
+                    throw new IllegalArgumentException("Location ID " + request.getRecipientLocationId() + " does not belong to the recipient of this request");
+                }
             }
 
-            Recipient recipient = recipientRepository
-                    .findTopByRecipientIdOrderByEventTimestampDesc(receiveRequest.getRecipientId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Recipient not found"));
+            Recipient recipient = recipientRepository.findTopByRecipientIdOrderByEventTimestampDesc(receiveRequest.getRecipientId()).orElseThrow(() -> new ResourceNotFoundException("Recipient not found"));
 
             MatchResult matchResult = new MatchResult();
             matchResult.setDonationId(donation.getDonationId());
@@ -90,91 +113,71 @@ public class MatchingServiceImpl implements MatchingService {
 
             MatchResult savedMatchResult = matchResultRepository.save(matchResult);
 
-            System.out.println("Successfully created manual match result: " + savedMatchResult.getId());
-            ManualMatchResponse.MatchDetails matchDetails = ManualMatchResponse.MatchDetails.builder()
-                    .donationId(donation.getDonationId())
-                    .receiveRequestId(receiveRequest.getReceiveRequestId())
-                    .donorUserId(donation.getDonor().getUserId())
-                    .recipientUserId(recipient.getUserId())
-                    .donationType(donation.getDonationType() != null ? donation.getDonationType().toString() : null)
-                    .requestType(receiveRequest.getRequestType() != null ? receiveRequest.getRequestType().toString() : null)
-                    .bloodType(donation.getBloodType() != null ? donation.getBloodType().toString() : null)
-                    .matchType("DONOR_TO_RECIPIENT")
-                    .build();
+            System.out.println("========================================");
+            System.out.println("✓ Successfully created manual match");
+            System.out.println("Match ID: " + savedMatchResult.getId());
+            System.out.println("Status: PENDING");
+            System.out.println("========================================");
 
-            return ManualMatchResponse.builder()
-                    .success(true)
-                    .message("Manual match successful. MatchResult ID: " + savedMatchResult.getId())
-                    .matchResultId(savedMatchResult.getId())
-                    .matchDetails(matchDetails)
-                    .build();
-        } catch (ResourceNotFoundException e) {
-            System.err.println("Validation Error during manual match: " + e.getMessage());
-            return ManualMatchResponse.builder()
-                    .success(false)
-                    .message(e.getMessage())
-                    .matchResultId(null)
-                    .matchDetails(null)
-                    .build();
+            ManualMatchResponse.MatchDetails matchDetails = ManualMatchResponse.MatchDetails.builder().donationId(donation.getDonationId()).receiveRequestId(receiveRequest.getReceiveRequestId()).donorUserId(donation.getDonor().getUserId()).recipientUserId(recipient.getUserId()).donationType(donation.getDonationType() != null ? donation.getDonationType().toString() : null).requestType(receiveRequest.getRequestType() != null ? receiveRequest.getRequestType().toString() : null).bloodType(donation.getBloodType() != null ? donation.getBloodType().toString() : null).matchType("DONOR_TO_RECIPIENT").build();
+
+            return ManualMatchResponse.builder().success(true).message("Manual match successful. MatchResult ID: " + savedMatchResult.getId()).matchResultId(savedMatchResult.getId()).matchDetails(matchDetails).build();
+
+        } catch (ResourceNotFoundException | IllegalStateException | IllegalArgumentException e) {
+            System.err.println("========================================");
+            System.err.println("✗ Validation Error during manual match");
+            System.err.println("Error: " + e.getMessage());
+            System.err.println("========================================");
+
+            return ManualMatchResponse.builder().success(false).message(e.getMessage()).matchResultId(null).matchDetails(null).build();
+
         } catch (Exception e) {
-            System.err.println("Error during manual match: " + e.getMessage());
+            System.err.println("========================================");
+            System.err.println("✗ Unexpected Error during manual match");
+            System.err.println("Error: " + e.getMessage());
             e.printStackTrace();
-            return ManualMatchResponse.builder()
-                    .success(false)
-                    .message("Failed to perform manual match: " + e.getMessage())
-                    .matchResultId(null)
-                    .matchDetails(null)
-                    .build();
+            System.err.println("========================================");
+
+            return ManualMatchResponse.builder().success(false).message("Failed to perform manual match: " + e.getMessage()).matchResultId(null).matchDetails(null).build();
         }
     }
 
+
     @Override
     public List<MatchResponse> getAllMatches() {
-        return matchResultRepository.findAll()
-                .stream()
-                .map(matchResult -> enrichMatchResponse(matchResult, "DONOR_TO_RECIPIENT"))
-                .collect(Collectors.toList());
+        return matchResultRepository.findAll().stream().map(matchResult -> enrichMatchResponse(matchResult, "DONOR_TO_RECIPIENT")).collect(Collectors.toList());
     }
 
     private MatchResponse enrichMatchResponse(MatchResult matchResult, String matchType) {
         MatchResponse response = MatchResponse.fromMatchResult(matchResult);
         response.setMatchType(matchType);
 
-        donationRepository.findById(matchResult.getDonationId())
-                .ifPresent(donation -> {
-                    response.setDonationType(donation.getDonationType() != null ? donation.getDonationType().toString() : null);
-                    response.setBloodType(donation.getBloodType() != null ? donation.getBloodType().toString() : null);
-                });
+        donationRepository.findById(matchResult.getDonationId()).ifPresent(donation -> {
+            response.setDonationType(donation.getDonationType() != null ? donation.getDonationType().toString() : null);
+            response.setBloodType(donation.getBloodType() != null ? donation.getBloodType().toString() : null);
+        });
 
-        receiveRequestRepository.findById(matchResult.getReceiveRequestId())
-                .ifPresent(request -> {
-                    response.setRequestType(request.getRequestType() != null ? request.getRequestType().toString() : null);
-                });
+        receiveRequestRepository.findById(matchResult.getReceiveRequestId()).ifPresent(request -> {
+            response.setRequestType(request.getRequestType() != null ? request.getRequestType().toString() : null);
+        });
 
         return response;
     }
 
     @Override
     public List<MatchResponse> getMatchesByDonation(UUID donationId) {
-        return matchResultRepository.findByDonationIdOrderByCompatibilityScoreDesc(donationId)
-                .stream()
-                .map(matchResult -> enrichMatchResponse(matchResult, "DONOR_TO_RECIPIENT"))
-                .collect(Collectors.toList());
+        return matchResultRepository.findByDonationIdOrderByCompatibilityScoreDesc(donationId).stream().map(matchResult -> enrichMatchResponse(matchResult, "DONOR_TO_RECIPIENT")).collect(Collectors.toList());
     }
 
     @Override
     public List<MatchResponse> getMatchesByRequest(UUID receiveRequestId) {
-        return matchResultRepository.findByReceiveRequestIdOrderByCompatibilityScoreDesc(receiveRequestId)
-                .stream()
-                .map(matchResult -> enrichMatchResponse(matchResult, "RECIPIENT_TO_DONOR"))
-                .collect(Collectors.toList());
+        return matchResultRepository.findByReceiveRequestIdOrderByCompatibilityScoreDesc(receiveRequestId).stream().map(matchResult -> enrichMatchResponse(matchResult, "RECIPIENT_TO_DONOR")).collect(Collectors.toList());
     }
 
     @Override
     @Transactional
     public String donorConfirmMatch(UUID matchId, UUID userId) {
-        MatchResult matchResult = matchResultRepository.findById(matchId)
-                .orElseThrow(() -> new ResourceNotFoundException("Match not found with ID: " + matchId));
+        MatchResult matchResult = matchResultRepository.findByIdWithLock(matchId).orElseThrow(() -> new ResourceNotFoundException("Match not found with ID: " + matchId));
 
         if (!matchResult.getDonorUserId().equals(userId)) {
             throw new IllegalStateException("Only the donor can confirm this match");
@@ -184,8 +187,29 @@ public class MatchingServiceImpl implements MatchingService {
             return "Donor has already confirmed this match";
         }
 
+        if (matchResult.getStatus() == MatchStatus.EXPIRED || matchResult.getStatus() == MatchStatus.CANCELLED_BY_DONOR || matchResult.getStatus() == MatchStatus.CANCELLED_BY_RECIPIENT || matchResult.getStatus() == MatchStatus.REJECTED) {
+
+            throw new IllegalStateException("This match is no longer available. Status: " + matchResult.getStatus());
+        }
+
+        boolean donationAlreadyConfirmed = matchResultRepository.existsConfirmedMatchByDonationId(matchResult.getDonationId());
+
+        if (donationAlreadyConfirmed) {
+            matchResult.setStatus(MatchStatus.EXPIRED);
+            matchResult.setExpiryReason("DONATION_ALREADY_CONFIRMED_ELSEWHERE");
+            matchResult.setExpiredAt(LocalDateTime.now());
+            matchResultRepository.save(matchResult);
+            throw new IllegalStateException("This donation is no longer available - it has been confirmed with another recipient");
+        }
+
         matchResult.setDonorConfirmed(true);
         matchResult.setDonorConfirmedAt(LocalDateTime.now());
+
+        if (matchResult.getFirstConfirmer() == null) {
+            matchResult.setFirstConfirmer(ConfirmerType.DONOR);
+            matchResult.setFirstConfirmedAt(LocalDateTime.now());
+            matchResult.setConfirmationExpiresAt(LocalDateTime.now().plusHours(48));
+        }
 
         if (matchResult.getRecipientConfirmed()) {
             finalizeMatch(matchResult);
@@ -193,15 +217,17 @@ public class MatchingServiceImpl implements MatchingService {
             return "Match fully confirmed! Both donor and recipient have agreed. Donation process initiated.";
         }
 
+        matchResult.setStatus(MatchStatus.DONOR_CONFIRMED);
         matchResultRepository.save(matchResult);
-        return "Donor confirmation recorded. Waiting for recipient confirmation.";
+
+        return "Donor confirmation recorded. Waiting for recipient confirmation. " + "Recipient has 48 hours to confirm.";
     }
+
 
     @Override
     @Transactional
     public String recipientConfirmMatch(UUID matchId, UUID userId) {
-        MatchResult matchResult = matchResultRepository.findById(matchId)
-                .orElseThrow(() -> new ResourceNotFoundException("Match not found with ID: " + matchId));
+        MatchResult matchResult = matchResultRepository.findByIdWithLock(matchId).orElseThrow(() -> new ResourceNotFoundException("Match not found with ID: " + matchId));
 
         if (!matchResult.getRecipientUserId().equals(userId)) {
             throw new IllegalStateException("Only the recipient can confirm this match");
@@ -211,8 +237,29 @@ public class MatchingServiceImpl implements MatchingService {
             return "Recipient has already confirmed this match";
         }
 
+        if (matchResult.getStatus() == MatchStatus.EXPIRED || matchResult.getStatus() == MatchStatus.CANCELLED_BY_DONOR || matchResult.getStatus() == MatchStatus.CANCELLED_BY_RECIPIENT || matchResult.getStatus() == MatchStatus.REJECTED) {
+
+            throw new IllegalStateException("This match is no longer available. Status: " + matchResult.getStatus());
+        }
+
+        boolean requestAlreadyFulfilled = matchResultRepository.existsConfirmedMatchByRequestId(matchResult.getReceiveRequestId());
+
+        if (requestAlreadyFulfilled) {
+            matchResult.setStatus(MatchStatus.EXPIRED);
+            matchResult.setExpiryReason("REQUEST_ALREADY_FULFILLED_ELSEWHERE");
+            matchResult.setExpiredAt(LocalDateTime.now());
+            matchResultRepository.save(matchResult);
+            throw new IllegalStateException("This request has already been fulfilled with another donor");
+        }
+
         matchResult.setRecipientConfirmed(true);
         matchResult.setRecipientConfirmedAt(LocalDateTime.now());
+
+        if (matchResult.getFirstConfirmer() == null) {
+            matchResult.setFirstConfirmer(ConfirmerType.RECIPIENT);
+            matchResult.setFirstConfirmedAt(LocalDateTime.now());
+            matchResult.setConfirmationExpiresAt(LocalDateTime.now().plusHours(48));
+        }
 
         if (matchResult.getDonorConfirmed()) {
             finalizeMatch(matchResult);
@@ -220,9 +267,12 @@ public class MatchingServiceImpl implements MatchingService {
             return "Match fully confirmed! Both donor and recipient have agreed. Donation process initiated.";
         }
 
+        matchResult.setStatus(MatchStatus.RECIPIENT_CONFIRMED);
         matchResultRepository.save(matchResult);
-        return "Recipient confirmation recorded. Waiting for donor confirmation.";
+
+        return "Recipient confirmation recorded. Waiting for donor confirmation. " + "Donor has 48 hours to confirm.";
     }
+
 
     private void finalizeMatch(MatchResult matchResult) {
         matchResult.setIsConfirmed(true);
@@ -230,87 +280,94 @@ public class MatchingServiceImpl implements MatchingService {
 
         expireConflictingMatches(matchResult);
 
-        donationRepository.findById(matchResult.getDonationId())
-                .ifPresent(donation -> {
-                    donation.setStatus(DonationStatus.COMPLETED);
-                    donationRepository.save(donation);
-                });
+        donationRepository.findById(matchResult.getDonationId()).ifPresent(donation -> {
+            donation.setStatus(DonationStatus.IN_PROGRESS);
+            donationRepository.save(donation);
+        });
 
-        receiveRequestRepository.findById(matchResult.getReceiveRequestId())
-                .ifPresent(request -> {
-                    request.setStatus(RequestStatus.FULFILLED);
-                    receiveRequestRepository.save(request);
-                });
+        receiveRequestRepository.findById(matchResult.getReceiveRequestId()).ifPresent(request -> {
+            request.setStatus(RequestStatus.IN_PROGRESS);
+            receiveRequestRepository.save(request);
+        });
 
         try {
-            donorServiceClient.updateDonationStatusToCompleted(matchResult.getDonationId());
+            donorServiceClient.updateDonationStatus(matchResult.getDonationId(), DonationStatus.IN_PROGRESS);
         } catch (Exception e) {
             System.err.println("Failed to update donation status in donor-service: " + e.getMessage());
         }
 
         try {
-            recipientServiceClient.updateRequestStatusToFulfilled(matchResult.getReceiveRequestId());
+            recipientServiceClient.updateRequestStatus(matchResult.getReceiveRequestId(), RequestStatus.IN_PROGRESS);
         } catch (Exception e) {
             System.err.println("Failed to update request status in recipient-service: " + e.getMessage());
         }
     }
 
+
     @Transactional
     public void expireConflictingMatches(MatchResult confirmedMatch) {
-        matchResultRepository.expirePendingDonationMatches(
-                confirmedMatch.getDonationId(),
-                confirmedMatch.getId()
-        );
+        matchResultRepository.expirePendingDonationMatches(confirmedMatch.getDonationId(), confirmedMatch.getId());
 
-        matchResultRepository.expirePendingRequestMatches(
-                confirmedMatch.getReceiveRequestId(),
-                confirmedMatch.getId()
-        );
+        matchResultRepository.expirePendingRequestMatches(confirmedMatch.getReceiveRequestId(), confirmedMatch.getId());
 
-        System.out.println("Expired conflicting matches for donation: " + confirmedMatch.getDonationId() +
-                " and request: " + confirmedMatch.getReceiveRequestId());
+        System.out.println("Expired conflicting matches for donation: " + confirmedMatch.getDonationId() + " and request: " + confirmedMatch.getReceiveRequestId());
     }
 
     @Override
     public List<MatchResponse> getMatchesForDonor(UUID donorUserId) {
-        return matchResultRepository.findByDonorUserIdOrderByMatchedAtDesc(donorUserId)
-                .stream()
-                .filter(match -> match.getStatus() != MatchStatus.EXPIRED)
-                .map(matchResult -> enrichMatchResponse(matchResult, "DONOR_TO_RECIPIENT"))
-                .collect(Collectors.toList());
+        return matchResultRepository.findByDonorUserIdOrderByMatchedAtDesc(donorUserId).stream().filter(match -> match.getStatus() != MatchStatus.EXPIRED && match.getStatus() != MatchStatus.CANCELLED_BY_DONOR && match.getStatus() != MatchStatus.CANCELLED_BY_RECIPIENT).map(matchResult -> {
+            MatchResponse response = enrichMatchResponse(matchResult, "DONOR_TO_RECIPIENT");
+
+            response.setCompletedAt(matchResult.getCompletedAt());
+            response.setReceivedDate(matchResult.getReceivedDate());
+            response.setCompletionNotes(matchResult.getCompletionNotes());
+            response.setRecipientRating(matchResult.getRecipientRating());
+            response.setHospitalName(matchResult.getHospitalName());
+            response.setCanConfirmCompletion(false);
+
+            return response;
+        }).collect(Collectors.toList());
     }
+
 
     @Override
     public List<MatchResponse> getMatchesForRecipient(UUID recipientUserId) {
-        return matchResultRepository.findByRecipientUserIdOrderByMatchedAtDesc(recipientUserId)
-                .stream()
-                .filter(match -> match.getStatus() != MatchStatus.EXPIRED)
-                .map(matchResult -> enrichMatchResponse(matchResult, "RECIPIENT_TO_DONOR"))
-                .collect(Collectors.toList());
+        return matchResultRepository.findByRecipientUserIdOrderByMatchedAtDesc(recipientUserId).stream().filter(match -> match.getStatus() != MatchStatus.EXPIRED && match.getStatus() != MatchStatus.CANCELLED_BY_DONOR && match.getStatus() != MatchStatus.CANCELLED_BY_RECIPIENT).map(matchResult -> {
+            MatchResponse response = enrichMatchResponse(matchResult, "RECIPIENT_TO_DONOR");
+
+            response.setCompletedAt(matchResult.getCompletedAt());
+            response.setReceivedDate(matchResult.getReceivedDate());
+            response.setCompletionNotes(matchResult.getCompletionNotes());
+            response.setRecipientRating(matchResult.getRecipientRating());
+            response.setHospitalName(matchResult.getHospitalName());
+
+            if (matchResult.getCompletedAt() != null) {
+                response.setCanConfirmCompletion(false);
+            } else if (matchResult.getStatus() == MatchStatus.CONFIRMED) {
+                response.setCanConfirmCompletion(true);
+            } else {
+                response.setCanConfirmCompletion(false);
+            }
+
+            return response;
+        }).collect(Collectors.toList());
     }
 
 
     @Override
     public boolean hasAccessToDonation(UUID donationId, UUID userId) {
-        return donationRepository.findById(donationId)
-                .map(donation -> donation.getDonor().getUserId().equals(userId))
-                .orElse(false)
-                || matchResultRepository.existsByDonationIdAndRecipientUserId(donationId, userId);
+        return donationRepository.findById(donationId).map(donation -> donation.getDonor().getUserId().equals(userId)).orElse(false) || matchResultRepository.existsByDonationIdAndRecipientUserId(donationId, userId);
     }
 
 
     @Override
     public boolean hasAccessToRequest(UUID requestId, UUID userId) {
-        return receiveRequestRepository.findById(requestId)
-                .map(request -> request.getRecipient().getUserId().equals(userId))
-                .orElse(false)
-                || matchResultRepository.existsByReceiveRequestIdAndDonorUserId(requestId, userId);
+        return receiveRequestRepository.findById(requestId).map(request -> request.getRecipient().getUserId().equals(userId)).orElse(false) || matchResultRepository.existsByReceiveRequestIdAndDonorUserId(requestId, userId);
     }
 
     @Override
     public boolean hasAccessToDonorSnapshot(UUID donationId, UUID userId) {
-        Donation donation = donationRepository.findById(donationId)
-                .orElseThrow(() -> new ResourceNotFoundException("Donation not found"));
+        Donation donation = donationRepository.findById(donationId).orElseThrow(() -> new ResourceNotFoundException("Donation not found"));
 
         if (donation.getDonor().getUserId().equals(userId)) {
             return true;
@@ -321,8 +378,7 @@ public class MatchingServiceImpl implements MatchingService {
 
     @Override
     public boolean hasAccessToRecipientSnapshot(UUID requestId, UUID userId) {
-        ReceiveRequest request = receiveRequestRepository.findById(requestId)
-                .orElseThrow(() -> new ResourceNotFoundException("Request not found"));
+        ReceiveRequest request = receiveRequestRepository.findById(requestId).orElseThrow(() -> new ResourceNotFoundException("Request not found"));
 
         if (request.getRecipient().getUserId().equals(userId)) {
             return true;
@@ -332,48 +388,41 @@ public class MatchingServiceImpl implements MatchingService {
     }
 
 
-
     @Override
     public DonationDTO getDonationById(UUID donationId) {
-        Donation donation = donationRepository.findById(donationId)
-                .orElseThrow(() -> new ResourceNotFoundException("Donation not found"));
+        Donation donation = donationRepository.findById(donationId).orElseThrow(() -> new ResourceNotFoundException("Donation not found"));
 
         return convertToDTO(donation);
     }
 
     @Override
     public ReceiveRequestDTO getRequestById(UUID requestId) {
-        ReceiveRequest request = receiveRequestRepository.findById(requestId)
-                .orElseThrow(() -> new ResourceNotFoundException("Request not found"));
+        ReceiveRequest request = receiveRequestRepository.findById(requestId).orElseThrow(() -> new ResourceNotFoundException("Request not found"));
 
         return convertToDTO(request);
     }
 
     @Override
     public DonorDTO getDonorByUserId(UUID userId) {
-        Donor donor = donorRepository.findLatestByUserId(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Donor not found for user: " + userId));
+        Donor donor = donorRepository.findLatestByUserId(userId).orElseThrow(() -> new ResourceNotFoundException("Donor not found for user: " + userId));
         return convertDonorToDTO(donor);
     }
 
     @Override
     public RecipientDTO getRecipientByUserId(UUID userId) {
-        Recipient recipient = recipientRepository.findLatestByUserId(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Recipient not found for user: " + userId));
+        Recipient recipient = recipientRepository.findLatestByUserId(userId).orElseThrow(() -> new ResourceNotFoundException("Recipient not found for user: " + userId));
         return convertRecipientToDTO(recipient);
     }
 
     public DonorDTO getDonorSnapshotByDonation(UUID donationId) {
-        Donation donation = donationRepository.findById(donationId)
-                .orElseThrow(() -> new ResourceNotFoundException("Donation not found with id: " + donationId));
+        Donation donation = donationRepository.findById(donationId).orElseThrow(() -> new ResourceNotFoundException("Donation not found with id: " + donationId));
 
         Donor historicalDonor = donation.getDonor();
         return convertDonorToDTO(historicalDonor);
     }
 
     public RecipientDTO getRecipientSnapshotByRequest(UUID requestId) {
-        ReceiveRequest request = receiveRequestRepository.findById(requestId)
-                .orElseThrow(() -> new ResourceNotFoundException("Request not found with id: " + requestId));
+        ReceiveRequest request = receiveRequestRepository.findById(requestId).orElseThrow(() -> new ResourceNotFoundException("Request not found with id: " + requestId));
 
         Recipient historicalRecipient = request.getRecipient();
         return convertRecipientToDTO(historicalRecipient);
@@ -381,45 +430,269 @@ public class MatchingServiceImpl implements MatchingService {
 
     @Override
     public List<MatchResponse> getActiveMatchesForUser(UUID userId) {
-        List<MatchResult> donorMatches = matchResultRepository.findByDonorUserIdOrderByMatchedAtDesc(userId)
-                .stream()
-                .filter(match -> match.getStatus() == MatchStatus.PENDING || match.getStatus() == MatchStatus.CONFIRMED)
-                .collect(Collectors.toList());
+        List<MatchResult> donorMatches = matchResultRepository.findByDonorUserIdOrderByMatchedAtDesc(userId).stream().filter(match -> match.getStatus() == MatchStatus.PENDING || match.getStatus() == MatchStatus.DONOR_CONFIRMED || match.getStatus() == MatchStatus.RECIPIENT_CONFIRMED || match.getStatus() == MatchStatus.CONFIRMED).collect(Collectors.toList());
 
-        List<MatchResult> recipientMatches = matchResultRepository.findByRecipientUserIdOrderByMatchedAtDesc(userId)
-                .stream()
-                .filter(match -> match.getStatus() == MatchStatus.PENDING || match.getStatus() == MatchStatus.CONFIRMED)
-                .collect(Collectors.toList());
+        List<MatchResult> recipientMatches = matchResultRepository.findByRecipientUserIdOrderByMatchedAtDesc(userId).stream().filter(match -> match.getStatus() == MatchStatus.PENDING || match.getStatus() == MatchStatus.DONOR_CONFIRMED || match.getStatus() == MatchStatus.RECIPIENT_CONFIRMED || match.getStatus() == MatchStatus.CONFIRMED).collect(Collectors.toList());
 
         List<MatchResult> allActiveMatches = new ArrayList<>();
         allActiveMatches.addAll(donorMatches);
         allActiveMatches.addAll(recipientMatches);
 
-        return allActiveMatches.stream()
-                .distinct()
-                .sorted((m1, m2) -> m2.getMatchedAt().compareTo(m1.getMatchedAt()))
-                .map(match -> {
-                    boolean isDonor = match.getDonorUserId().equals(userId);
-                    return enrichMatchResponse(match, isDonor ? "DONOR_TO_RECIPIENT" : "RECIPIENT_TO_DONOR");
-                })
-                .collect(Collectors.toList());
+        return allActiveMatches.stream().distinct().sorted((m1, m2) -> m2.getMatchedAt().compareTo(m1.getMatchedAt())).map(match -> {
+            boolean isDonor = match.getDonorUserId().equals(userId);
+            return enrichMatchResponse(match, isDonor ? "DONOR_TO_RECIPIENT" : "RECIPIENT_TO_DONOR");
+        }).collect(Collectors.toList());
     }
 
     @Override
     public List<MatchResponse> getPendingMatchesForUser(UUID userId) {
-        return getActiveMatchesForUser(userId)
-                .stream()
-                .filter(match -> MatchStatus.PENDING.equals(match.getStatus()))
-                .collect(Collectors.toList());
+        return getActiveMatchesForUser(userId).stream().filter(match -> MatchStatus.PENDING.equals(match.getStatus())).collect(Collectors.toList());
     }
 
     @Override
     public List<MatchResponse> getConfirmedMatchesForUser(UUID userId) {
-        return getActiveMatchesForUser(userId)
-                .stream()
-                .filter(match -> MatchStatus.CONFIRMED.equals(match.getStatus()))
-                .collect(Collectors.toList());
+        return getActiveMatchesForUser(userId).stream().filter(match -> MatchStatus.CONFIRMED.equals(match.getStatus())).collect(Collectors.toList());
     }
+
+
+    @Override
+    @Transactional
+    public String donorRejectMatch(UUID matchId, UUID userId, String rejectionReason) {
+        MatchResult matchResult = matchResultRepository.findByIdWithLock(matchId).orElseThrow(() -> new ResourceNotFoundException("Match not found with ID: " + matchId));
+
+        if (!matchResult.getDonorUserId().equals(userId)) {
+            throw new IllegalStateException("Only the donor can reject this match");
+        }
+
+        if (matchResult.getStatus() == MatchStatus.CONFIRMED) {
+            throw new IllegalStateException("Cannot reject confirmed match. Use withdrawal instead.");
+        }
+
+        if (matchResult.getStatus() == MatchStatus.EXPIRED || matchResult.getStatus() == MatchStatus.REJECTED) {
+            throw new IllegalStateException("This match is no longer active");
+        }
+
+        matchResult.setStatus(MatchStatus.REJECTED);
+        matchResult.setExpiryReason("REJECTED_BY_DONOR: " + rejectionReason);
+        matchResult.setExpiredAt(LocalDateTime.now());
+        matchResultRepository.save(matchResult);
+
+        System.out.println("Donor " + userId + " rejected match " + matchId + ": " + rejectionReason);
+
+        return "Match rejected successfully. This match will no longer appear in your list.";
+    }
+
+    @Override
+    @Transactional
+    public String recipientRejectMatch(UUID matchId, UUID userId, String rejectionReason) {
+        MatchResult matchResult = matchResultRepository.findByIdWithLock(matchId).orElseThrow(() -> new ResourceNotFoundException("Match not found with ID: " + matchId));
+
+        if (!matchResult.getRecipientUserId().equals(userId)) {
+            throw new IllegalStateException("Only the recipient can reject this match");
+        }
+
+        if (matchResult.getStatus() == MatchStatus.CONFIRMED) {
+            throw new IllegalStateException("Cannot reject confirmed match. Use withdrawal instead.");
+        }
+
+        if (matchResult.getStatus() == MatchStatus.EXPIRED || matchResult.getStatus() == MatchStatus.REJECTED) {
+            throw new IllegalStateException("This match is no longer active");
+        }
+
+        matchResult.setStatus(MatchStatus.REJECTED);
+        matchResult.setExpiryReason("REJECTED_BY_RECIPIENT: " + rejectionReason);
+        matchResult.setExpiredAt(LocalDateTime.now());
+        matchResultRepository.save(matchResult);
+
+        System.out.println("Recipient " + userId + " rejected match " + matchId + ": " + rejectionReason);
+
+        return "Match rejected successfully. This match will no longer appear in your list.";
+    }
+
+    @Override
+    @Transactional
+    public String donorWithdrawConfirmation(UUID matchId, UUID userId, String withdrawalReason) {
+        MatchResult matchResult = matchResultRepository.findByIdWithLock(matchId).orElseThrow(() -> new ResourceNotFoundException("Match not found with ID: " + matchId));
+
+        if (!matchResult.getDonorUserId().equals(userId)) {
+            throw new IllegalStateException("Only the donor can withdraw from this match");
+        }
+
+        if (matchResult.getStatus() == MatchStatus.REJECTED || matchResult.getStatus() == MatchStatus.EXPIRED || matchResult.getStatus() == MatchStatus.CANCELLED_BY_DONOR || matchResult.getStatus() == MatchStatus.CANCELLED_BY_RECIPIENT) {
+
+            throw new IllegalStateException("Cannot withdraw from this match. Current status: " + matchResult.getStatus());
+        }
+
+        if (!matchResult.getDonorConfirmed()) {
+            throw new IllegalStateException("You haven't confirmed this match yet");
+        }
+
+        if (matchResult.getStatus() == MatchStatus.CONFIRMED) {
+            if (matchResult.getDonorConfirmedAt() != null && LocalDateTime.now().isBefore(matchResult.getDonorConfirmedAt().plusHours(2))) {
+
+                matchResult.setStatus(MatchStatus.EXPIRED);
+                matchResult.setExpiryReason("WITHDRAWN_BY_DONOR_WITHIN_GRACE_PERIOD: " + withdrawalReason);
+                matchResult.setExpiredAt(LocalDateTime.now());
+                matchResult.setWithdrawnBy(ConfirmerType.DONOR);
+                matchResult.setWithdrawalReason(withdrawalReason);
+                matchResult.setWithdrawnAt(LocalDateTime.now());
+
+                donationRepository.findById(matchResult.getDonationId()).ifPresent(donation -> {
+                    donation.setStatus(DonationStatus.AVAILABLE);
+                    donationRepository.save(donation);
+                });
+
+                receiveRequestRepository.findById(matchResult.getReceiveRequestId()).ifPresent(request -> {
+                    request.setStatus(RequestStatus.ACTIVE);
+                    receiveRequestRepository.save(request);
+                });
+
+                matchResultRepository.save(matchResult);
+
+                return "Match withdrawn successfully within grace period. " + "Both donation and request are now available for matching again.";
+            } else {
+                throw new IllegalStateException("Grace period expired. Please contact support for withdrawal assistance.");
+            }
+        }
+
+        matchResult.setDonorConfirmed(false);
+        matchResult.setDonorConfirmedAt(null);
+        matchResult.setStatus(MatchStatus.PENDING);
+        matchResult.setFirstConfirmer(null);
+        matchResult.setFirstConfirmedAt(null);
+        matchResult.setConfirmationExpiresAt(null);
+        matchResultRepository.save(matchResult);
+
+        return "Confirmation withdrawn successfully. Match is now pending again.";
+    }
+
+
+    @Override
+    @Transactional
+    public String recipientWithdrawConfirmation(UUID matchId, UUID userId, String withdrawalReason) {
+        MatchResult matchResult = matchResultRepository.findByIdWithLock(matchId).orElseThrow(() -> new ResourceNotFoundException("Match not found with ID: " + matchId));
+
+        if (!matchResult.getRecipientUserId().equals(userId)) {
+            throw new IllegalStateException("Only the recipient can withdraw from this match");
+        }
+
+        if (matchResult.getStatus() == MatchStatus.REJECTED || matchResult.getStatus() == MatchStatus.EXPIRED || matchResult.getStatus() == MatchStatus.CANCELLED_BY_DONOR || matchResult.getStatus() == MatchStatus.CANCELLED_BY_RECIPIENT) {
+
+            throw new IllegalStateException("Cannot withdraw from this match. Current status: " + matchResult.getStatus());
+        }
+
+        if (!matchResult.getRecipientConfirmed()) {
+            throw new IllegalStateException("You haven't confirmed this match yet");
+        }
+
+        if (matchResult.getStatus() == MatchStatus.CONFIRMED) {
+            if (matchResult.getRecipientConfirmedAt() != null && LocalDateTime.now().isBefore(matchResult.getRecipientConfirmedAt().plusHours(2))) {
+
+                matchResult.setStatus(MatchStatus.EXPIRED);
+                matchResult.setExpiryReason("WITHDRAWN_BY_RECIPIENT_WITHIN_GRACE_PERIOD: " + withdrawalReason);
+                matchResult.setExpiredAt(LocalDateTime.now());
+                matchResult.setWithdrawnBy(ConfirmerType.RECIPIENT);
+                matchResult.setWithdrawalReason(withdrawalReason);
+                matchResult.setWithdrawnAt(LocalDateTime.now());
+
+                donationRepository.findById(matchResult.getDonationId()).ifPresent(donation -> {
+                    donation.setStatus(DonationStatus.AVAILABLE);
+                    donationRepository.save(donation);
+                });
+
+                receiveRequestRepository.findById(matchResult.getReceiveRequestId()).ifPresent(request -> {
+                    request.setStatus(RequestStatus.ACTIVE);
+                    receiveRequestRepository.save(request);
+                });
+
+                matchResultRepository.save(matchResult);
+
+                return "Match withdrawn successfully within grace period. " + "Both donation and request are now available for matching again.";
+            } else {
+                throw new IllegalStateException("Grace period expired. Please contact support for withdrawal assistance.");
+            }
+        }
+
+        matchResult.setRecipientConfirmed(false);
+        matchResult.setRecipientConfirmedAt(null);
+        matchResult.setStatus(MatchStatus.PENDING);
+        matchResult.setFirstConfirmer(null);
+        matchResult.setFirstConfirmedAt(null);
+        matchResult.setConfirmationExpiresAt(null);
+        matchResultRepository.save(matchResult);
+
+        return "Confirmation withdrawn successfully. Match is now pending again.";
+    }
+
+
+    @Override
+    @Transactional
+    public String recipientConfirmCompletion(UUID matchId, UUID userId, CompletionConfirmationDTO details) {
+        System.out.println("========================================");
+        System.out.println("Recipient confirming completion for match: " + matchId);
+        System.out.println("User ID: " + userId);
+        System.out.println("========================================");
+
+        MatchResult match = matchResultRepository.findByIdWithLock(matchId).orElseThrow(() -> new ResourceNotFoundException("Match not found with ID: " + matchId));
+
+        if (!match.getRecipientUserId().equals(userId)) {
+            throw new IllegalStateException("Only the recipient of this match can confirm completion");
+        }
+
+        if (match.getStatus() != MatchStatus.CONFIRMED) {
+            throw new IllegalStateException("Can only confirm completion for confirmed matches. Current status: " + match.getStatus());
+        }
+
+        if (match.getCompletedAt() != null) {
+            throw new IllegalStateException("This match has already been marked as completed on " + match.getCompletedAt());
+        }
+
+        match.setCompletedAt(LocalDateTime.now());
+        match.setCompletionConfirmedBy(userId);
+        match.setCompletionNotes(details.getNotes());
+        match.setReceivedDate(details.getReceivedDate());
+        match.setRecipientRating(details.getRating());
+        match.setHospitalName(details.getHospitalName());
+
+        donationRepository.findById(match.getDonationId()).ifPresent(donation -> {
+            donation.setStatus(DonationStatus.COMPLETED);
+            donation.setCompletedAt(LocalDateTime.now());
+            donationRepository.save(donation);
+            System.out.println("✓ Updated donation " + donation.getDonationId() + " to COMPLETED");
+        });
+
+        receiveRequestRepository.findById(match.getReceiveRequestId()).ifPresent(request -> {
+            request.setStatus(RequestStatus.FULFILLED);
+            request.setFulfilledAt(LocalDateTime.now());
+            receiveRequestRepository.save(request);
+            System.out.println("✓ Updated request " + request.getReceiveRequestId() + " to FULFILLED");
+        });
+
+        try {
+            donorServiceClient.updateDonationStatus(match.getDonationId(), DonationStatus.COMPLETED);
+            System.out.println("✓ Updated donation status in donor-service");
+        } catch (Exception e) {
+            System.err.println("⚠ Failed to update donor-service: " + e.getMessage());
+        }
+
+        try {
+            recipientServiceClient.updateRequestStatus(match.getReceiveRequestId(), RequestStatus.FULFILLED);
+            System.out.println("✓ Updated request status in recipient-service");
+        } catch (Exception e) {
+            System.err.println("⚠ Failed to update recipient-service: " + e.getMessage());
+        }
+
+        matchResultRepository.save(match);
+
+        System.out.println("========================================");
+        System.out.println("✓ Match " + matchId + " marked as COMPLETED");
+        System.out.println("✓ Donation → COMPLETED");
+        System.out.println("✓ Request → FULFILLED");
+        System.out.println("========================================");
+
+        return "Thank you for confirming! The donation has been marked as successfully completed. " + "The donor will be notified of your confirmation.";
+    }
+
 
     private DonorDTO convertDonorToDTO(Donor donor) {
         DonorDTO dto = new DonorDTO();
@@ -479,13 +752,9 @@ public class MatchingServiceImpl implements MatchingService {
             dto.setEligibilityCriteria(eligibility);
         }
 
-        donorHLAProfileRepository.findTopByDonor_DonorIdOrderByEventTimestampDesc(donor.getDonorId())
-                .ifPresent(hlaProfile -> dto.setHlaProfile(convertHLAProfileToDTO(hlaProfile)));
+        donorHLAProfileRepository.findTopByDonor_DonorIdOrderByEventTimestampDesc(donor.getDonorId()).ifPresent(hlaProfile -> dto.setHlaProfile(convertHLAProfileToDTO(hlaProfile)));
 
-        List<LocationDTO> locations = donorLocationRepository.findLatestLocationsByDonorId(donor.getDonorId())
-                .stream()
-                .map(this::convertLocationToDTO)
-                .collect(Collectors.toList());
+        List<LocationDTO> locations = donorLocationRepository.findLatestLocationsByDonorId(donor.getDonorId()).stream().map(this::convertLocationToDTO).collect(Collectors.toList());
         dto.setLocations(locations);
 
         return dto;
@@ -544,13 +813,9 @@ public class MatchingServiceImpl implements MatchingService {
             dto.setEligibilityCriteria(eligibility);
         }
 
-        recipientHLAProfileRepository.findTopByRecipient_RecipientIdOrderByEventTimestampDesc(recipient.getRecipientId())
-                .ifPresent(hlaProfile -> dto.setHlaProfile(convertHLAProfileToDTO(hlaProfile)));
+        recipientHLAProfileRepository.findTopByRecipient_RecipientIdOrderByEventTimestampDesc(recipient.getRecipientId()).ifPresent(hlaProfile -> dto.setHlaProfile(convertHLAProfileToDTO(hlaProfile)));
 
-        List<LocationDTO> locations = recipientLocationRepository.findLatestLocationsByRecipientId(recipient.getRecipientId())
-                .stream()
-                .map(this::convertLocationToDTO)
-                .collect(Collectors.toList());
+        List<LocationDTO> locations = recipientLocationRepository.findLatestLocationsByRecipientId(recipient.getRecipientId()).stream().map(this::convertLocationToDTO).collect(Collectors.toList());
         dto.setLocations(locations);
 
         return dto;
@@ -700,9 +965,7 @@ public class MatchingServiceImpl implements MatchingService {
     }
 
     private Double calculateDistance(DonorLocation donorLoc, RecipientLocation recipientLoc) {
-        if (donorLoc == null || recipientLoc == null ||
-                donorLoc.getLatitude() == null || donorLoc.getLongitude() == null ||
-                recipientLoc.getLatitude() == null || recipientLoc.getLongitude() == null) {
+        if (donorLoc == null || recipientLoc == null || donorLoc.getLatitude() == null || donorLoc.getLongitude() == null || recipientLoc.getLatitude() == null || recipientLoc.getLongitude() == null) {
             return null;
         }
 
@@ -710,9 +973,7 @@ public class MatchingServiceImpl implements MatchingService {
 
         double latDistance = Math.toRadians(recipientLoc.getLatitude() - donorLoc.getLatitude());
         double lonDistance = Math.toRadians(recipientLoc.getLongitude() - donorLoc.getLongitude());
-        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
-                + Math.cos(Math.toRadians(donorLoc.getLatitude())) * Math.cos(Math.toRadians(recipientLoc.getLatitude()))
-                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2) + Math.cos(Math.toRadians(donorLoc.getLatitude())) * Math.cos(Math.toRadians(recipientLoc.getLatitude())) * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
         return R * c;
@@ -720,8 +981,6 @@ public class MatchingServiceImpl implements MatchingService {
 
     @Override
     public boolean isMatchConfirmed(UUID matchId) {
-        return matchResultRepository.findById(matchId)
-                .map(matchResult -> Boolean.TRUE.equals(matchResult.getIsConfirmed()))
-                .orElse(false);
+        return matchResultRepository.findById(matchId).map(matchResult -> Boolean.TRUE.equals(matchResult.getIsConfirmed())).orElse(false);
     }
 }
