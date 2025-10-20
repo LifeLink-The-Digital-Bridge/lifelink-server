@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -512,15 +513,11 @@ public class MatchingServiceImpl implements MatchingService {
     @Override
     @Transactional
     public String donorWithdrawConfirmation(UUID matchId, UUID userId, String withdrawalReason) {
-        MatchResult matchResult = matchResultRepository.findByIdWithLock(matchId).orElseThrow(() -> new ResourceNotFoundException("Match not found with ID: " + matchId));
+        MatchResult matchResult = matchResultRepository.findByIdWithLock(matchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Match not found with ID: " + matchId));
 
         if (!matchResult.getDonorUserId().equals(userId)) {
             throw new IllegalStateException("Only the donor can withdraw from this match");
-        }
-
-        if (matchResult.getStatus() == MatchStatus.REJECTED || matchResult.getStatus() == MatchStatus.EXPIRED || matchResult.getStatus() == MatchStatus.CANCELLED_BY_DONOR || matchResult.getStatus() == MatchStatus.CANCELLED_BY_RECIPIENT) {
-
-            throw new IllegalStateException("Cannot withdraw from this match. Current status: " + matchResult.getStatus());
         }
 
         if (!matchResult.getDonorConfirmed()) {
@@ -528,11 +525,13 @@ public class MatchingServiceImpl implements MatchingService {
         }
 
         if (matchResult.getStatus() == MatchStatus.CONFIRMED) {
-            if (matchResult.getDonorConfirmedAt() != null && LocalDateTime.now().isBefore(matchResult.getDonorConfirmedAt().plusHours(2))) {
+            if (matchResult.getDonorConfirmedAt() != null &&
+                    LocalDateTime.now().isBefore(matchResult.getDonorConfirmedAt().plusHours(2))) {
 
-                matchResult.setStatus(MatchStatus.EXPIRED);
-                matchResult.setExpiryReason("WITHDRAWN_BY_DONOR_WITHIN_GRACE_PERIOD: " + withdrawalReason);
-                matchResult.setExpiredAt(LocalDateTime.now());
+                matchResult.setDonorConfirmed(false);
+                matchResult.setDonorConfirmedAt(null);
+                matchResult.setStatus(MatchStatus.RECIPIENT_CONFIRMED);
+                matchResult.setIsConfirmed(false);
                 matchResult.setWithdrawnBy(ConfirmerType.DONOR);
                 matchResult.setWithdrawalReason(withdrawalReason);
                 matchResult.setWithdrawnAt(LocalDateTime.now());
@@ -542,16 +541,13 @@ public class MatchingServiceImpl implements MatchingService {
                     donationRepository.save(donation);
                 });
 
-                receiveRequestRepository.findById(matchResult.getReceiveRequestId()).ifPresent(request -> {
-                    request.setStatus(RequestStatus.ACTIVE);
-                    receiveRequestRepository.save(request);
-                });
-
                 matchResultRepository.save(matchResult);
 
-                return "Match withdrawn successfully within grace period. " + "Both donation and request are now available for matching again.";
+                return "Match withdrawn successfully within grace period. " +
+                        "Your confirmation has been removed. The recipient's confirmation is preserved.";
             } else {
-                throw new IllegalStateException("Grace period expired. Please contact support for withdrawal assistance.");
+                throw new IllegalStateException(
+                        "Grace period expired. Please contact support for withdrawal assistance.");
             }
         }
 
@@ -566,18 +562,20 @@ public class MatchingServiceImpl implements MatchingService {
         return "Confirmation withdrawn successfully. Match is now pending again.";
     }
 
-
     @Override
     @Transactional
     public String recipientWithdrawConfirmation(UUID matchId, UUID userId, String withdrawalReason) {
-        MatchResult matchResult = matchResultRepository.findByIdWithLock(matchId).orElseThrow(() -> new ResourceNotFoundException("Match not found with ID: " + matchId));
+        MatchResult matchResult = matchResultRepository.findByIdWithLock(matchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Match not found with ID: " + matchId));
 
         if (!matchResult.getRecipientUserId().equals(userId)) {
             throw new IllegalStateException("Only the recipient can withdraw from this match");
         }
 
-        if (matchResult.getStatus() == MatchStatus.REJECTED || matchResult.getStatus() == MatchStatus.EXPIRED || matchResult.getStatus() == MatchStatus.CANCELLED_BY_DONOR || matchResult.getStatus() == MatchStatus.CANCELLED_BY_RECIPIENT) {
-
+        if (matchResult.getStatus() == MatchStatus.REJECTED ||
+                matchResult.getStatus() == MatchStatus.EXPIRED ||
+                matchResult.getStatus() == MatchStatus.CANCELLED_BY_DONOR ||
+                matchResult.getStatus() == MatchStatus.CANCELLED_BY_RECIPIENT) {
             throw new IllegalStateException("Cannot withdraw from this match. Current status: " + matchResult.getStatus());
         }
 
@@ -586,19 +584,16 @@ public class MatchingServiceImpl implements MatchingService {
         }
 
         if (matchResult.getStatus() == MatchStatus.CONFIRMED) {
-            if (matchResult.getRecipientConfirmedAt() != null && LocalDateTime.now().isBefore(matchResult.getRecipientConfirmedAt().plusHours(2))) {
+            if (matchResult.getRecipientConfirmedAt() != null &&
+                    LocalDateTime.now().isBefore(matchResult.getRecipientConfirmedAt().plusHours(2))) {
 
-                matchResult.setStatus(MatchStatus.EXPIRED);
-                matchResult.setExpiryReason("WITHDRAWN_BY_RECIPIENT_WITHIN_GRACE_PERIOD: " + withdrawalReason);
-                matchResult.setExpiredAt(LocalDateTime.now());
+                matchResult.setRecipientConfirmed(false);
+                matchResult.setRecipientConfirmedAt(null);
+                matchResult.setStatus(MatchStatus.DONOR_CONFIRMED);
+                matchResult.setIsConfirmed(false);
                 matchResult.setWithdrawnBy(ConfirmerType.RECIPIENT);
                 matchResult.setWithdrawalReason(withdrawalReason);
                 matchResult.setWithdrawnAt(LocalDateTime.now());
-
-                donationRepository.findById(matchResult.getDonationId()).ifPresent(donation -> {
-                    donation.setStatus(DonationStatus.AVAILABLE);
-                    donationRepository.save(donation);
-                });
 
                 receiveRequestRepository.findById(matchResult.getReceiveRequestId()).ifPresent(request -> {
                     request.setStatus(RequestStatus.ACTIVE);
@@ -607,9 +602,11 @@ public class MatchingServiceImpl implements MatchingService {
 
                 matchResultRepository.save(matchResult);
 
-                return "Match withdrawn successfully within grace period. " + "Both donation and request are now available for matching again.";
+                return "Match withdrawn successfully within grace period. " +
+                        "Your confirmation has been removed. The donor's confirmation is preserved.";
             } else {
-                throw new IllegalStateException("Grace period expired. Please contact support for withdrawal assistance.");
+                throw new IllegalStateException(
+                        "Grace period expired. Please contact support for withdrawal assistance.");
             }
         }
 
@@ -626,6 +623,36 @@ public class MatchingServiceImpl implements MatchingService {
 
 
     @Override
+    public Map<String, Object> canConfirmCompletion(UUID matchId, UUID userId) {
+        MatchResult match = matchResultRepository.findById(matchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Match not found"));
+
+        if (match.getStatus() == MatchStatus.REJECTED ||
+                match.getStatus() == MatchStatus.EXPIRED ||
+                match.getStatus() == MatchStatus.CANCELLED_BY_DONOR ||
+                match.getStatus() == MatchStatus.CANCELLED_BY_RECIPIENT) {
+
+            return Map.of(
+                    "canConfirm", false,
+                    "status", match.getStatus().toString(),
+                    "alreadyCompleted", match.getCompletedAt() != null,
+                    "reason", "Match is in terminal status: " + match.getStatus()
+            );
+        }
+
+        boolean canConfirm = match.getRecipientUserId().equals(userId) &&
+                match.getStatus() == MatchStatus.CONFIRMED &&
+                match.getCompletedAt() == null;
+
+        return Map.of(
+                "canConfirm", canConfirm,
+                "status", match.getStatus().toString(),
+                "alreadyCompleted", match.getCompletedAt() != null
+        );
+    }
+
+
+    @Override
     @Transactional
     public String recipientConfirmCompletion(UUID matchId, UUID userId, CompletionConfirmationDTO details) {
         System.out.println("========================================");
@@ -633,18 +660,30 @@ public class MatchingServiceImpl implements MatchingService {
         System.out.println("User ID: " + userId);
         System.out.println("========================================");
 
-        MatchResult match = matchResultRepository.findByIdWithLock(matchId).orElseThrow(() -> new ResourceNotFoundException("Match not found with ID: " + matchId));
+        MatchResult match = matchResultRepository.findByIdWithLock(matchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Match not found with ID: " + matchId));
 
         if (!match.getRecipientUserId().equals(userId)) {
             throw new IllegalStateException("Only the recipient of this match can confirm completion");
         }
 
+        if (match.getStatus() == MatchStatus.REJECTED ||
+                match.getStatus() == MatchStatus.EXPIRED ||
+                match.getStatus() == MatchStatus.CANCELLED_BY_DONOR ||
+                match.getStatus() == MatchStatus.CANCELLED_BY_RECIPIENT) {
+
+            throw new IllegalStateException(
+                    "Cannot confirm completion for this match. Current status: " + match.getStatus());
+        }
+
         if (match.getStatus() != MatchStatus.CONFIRMED) {
-            throw new IllegalStateException("Can only confirm completion for confirmed matches. Current status: " + match.getStatus());
+            throw new IllegalStateException(
+                    "Can only confirm completion for confirmed matches. Current status: " + match.getStatus());
         }
 
         if (match.getCompletedAt() != null) {
-            throw new IllegalStateException("This match has already been marked as completed on " + match.getCompletedAt());
+            throw new IllegalStateException(
+                    "This match has already been marked as completed on " + match.getCompletedAt());
         }
 
         match.setCompletedAt(LocalDateTime.now());
@@ -690,7 +729,8 @@ public class MatchingServiceImpl implements MatchingService {
         System.out.println("✓ Request → FULFILLED");
         System.out.println("========================================");
 
-        return "Thank you for confirming! The donation has been marked as successfully completed. " + "The donor will be notified of your confirmation.";
+        return "Thank you for confirming! The donation has been marked as successfully completed. " +
+                "The donor will be notified of your confirmation.";
     }
 
 

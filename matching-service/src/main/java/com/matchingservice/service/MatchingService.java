@@ -3,6 +3,7 @@ package com.matchingservice.service;
 import com.matchingservice.dto.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public interface MatchingService {
@@ -59,4 +60,6 @@ public interface MatchingService {
     String recipientWithdrawConfirmation(UUID matchId, UUID userId, String withdrawalReason);
 
     String recipientConfirmCompletion(UUID matchId, UUID userId, CompletionConfirmationDTO details);
+
+    Map<String, Object> canConfirmCompletion(UUID matchId, UUID userId);
 }
