@@ -1,5 +1,6 @@
 package com.matchingservice.dto;
 
+import com.matchingservice.enums.ConfirmerType;
 import com.matchingservice.enums.MatchStatus;
 import com.matchingservice.model.MatchResult;
 import lombok.AllArgsConstructor;
@@ -50,6 +51,17 @@ public class MatchResponse {
     private Integer recipientRating;
     private String hospitalName;
 
+    private LocalDateTime confirmationExpiresAt;
+    private ConfirmerType firstConfirmer;
+    private LocalDateTime firstConfirmedAt;
+
+    private ConfirmerType withdrawnBy;
+    private LocalDateTime withdrawnAt;
+    private String withdrawalReason;
+
+    private LocalDateTime withdrawalGracePeriodExpiresAt;
+    private LocalDateTime reconfirmationWindowExpiresAt;
+
     public static MatchResponse fromMatchResult(MatchResult matchResult) {
         return MatchResponse.builder()
                 .matchResultId(matchResult.getId())
@@ -75,6 +87,31 @@ public class MatchResponse {
                 .urgencyPriorityScore(matchResult.getUrgencyPriorityScore())
                 .matchReason(matchResult.getMatchReason())
                 .priorityRank(matchResult.getPriorityRank())
+                .completedAt(matchResult.getCompletedAt())
+                .receivedDate(matchResult.getReceivedDate())
+                .canConfirmCompletion(matchResult.getCompletedAt() == null)
+                .completionNotes(matchResult.getCompletionNotes())
+                .recipientRating(matchResult.getRecipientRating())
+                .hospitalName(matchResult.getHospitalName())
+                .confirmationExpiresAt(matchResult.getConfirmationExpiresAt())
+                .firstConfirmer(matchResult.getFirstConfirmer())
+                .firstConfirmedAt(matchResult.getFirstConfirmedAt())
+                .withdrawnBy(matchResult.getWithdrawnBy())
+                .withdrawnAt(matchResult.getWithdrawnAt())
+                .withdrawalReason(matchResult.getWithdrawalReason())
+                .withdrawalGracePeriodExpiresAt(
+                        matchResult.getDonorConfirmedAt() != null
+                                ? matchResult.getDonorConfirmedAt().plusHours(2)
+                                : matchResult.getRecipientConfirmedAt() != null
+                                ? matchResult.getRecipientConfirmedAt().plusHours(2)
+                                : null
+                )
+                .reconfirmationWindowExpiresAt(
+                        matchResult.getStatus() == MatchStatus.WITHDRAWN && matchResult.getWithdrawnAt() != null
+                                ? matchResult.getWithdrawnAt().plusHours(2)
+                                : null
+                )
                 .build();
     }
+
 }

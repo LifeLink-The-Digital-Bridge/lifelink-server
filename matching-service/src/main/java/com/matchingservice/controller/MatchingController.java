@@ -22,9 +22,9 @@ public class MatchingController {
     private final MatchingService matchingService;
 
     @PostMapping("/manual-match")
-    public ResponseEntity<ManualMatchResponse> manualMatch(@RequestBody ManualMatchRequest request) {
+    public ResponseEntity<ManualMatchResponse> manualMatch(@Valid @RequestBody ManualMatchRequest request) {
         ManualMatchResponse response = matchingService.manualMatch(request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.status(response.isSuccess() ? 200 : 400).body(response);
     }
 
     @RequireRole("DONOR")

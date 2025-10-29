@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Data
@@ -15,6 +16,7 @@ public class ManualMatchResponse {
     private String message;
     private UUID matchResultId;
     private MatchDetails matchDetails;
+    private ErrorDetails error;
 
     @Data
     @NoArgsConstructor
@@ -29,5 +31,18 @@ public class ManualMatchResponse {
         private String requestType;
         private String bloodType;
         private String matchType;
+        private LocalDateTime matchedAt;
+        private String status;
+        private Double distance;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class ErrorDetails {
+        private String errorType;
+        private String errorMessage;
+        private LocalDateTime timestamp;
     }
 }

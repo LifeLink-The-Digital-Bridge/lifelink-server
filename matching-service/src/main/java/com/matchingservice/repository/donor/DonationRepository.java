@@ -34,4 +34,6 @@ public interface DonationRepository extends JpaRepository<Donation, UUID> {
 
     @Query("SELECT d FROM Donation d WHERE d.donor.userId = :userId ORDER BY d.eventTimestamp DESC")
     List<Donation> findByUserIdOrderByEventTimestampDesc(@Param("userId") UUID userId);
+
+    List<Donation> findByStatus(DonationStatus status);
 }

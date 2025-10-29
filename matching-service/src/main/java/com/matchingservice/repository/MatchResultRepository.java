@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -66,4 +67,15 @@ public interface MatchResultRepository extends JpaRepository<MatchResult, UUID> 
 
     @Query("SELECT CASE WHEN COUNT(m) > 0 THEN true ELSE false END " + "FROM MatchResult m WHERE m.receiveRequestId = :requestId " + "AND m.status = 'CONFIRMED'")
     boolean existsConfirmedMatchByRequestId(@Param("requestId") UUID requestId);
+
+    @Query("""
+        SELECT m FROM MatchResult m 
+        WHERE m.status IN ('DONOR_CONFIRMED', 'RECIPIENT_CONFIRMED')
+        AND m.confirmationExpiresAt IS NOT NULL
+        AND m.confirmationExpiresAt < :now
+        """)
+    List<MatchResult> findExpiredPartialConfirmations(@Param("now") LocalDateTime now);
+
+    boolean existsByDonationIdAndReceiveRequestId(UUID donationId, UUID receiveRequestId);
+
 }
