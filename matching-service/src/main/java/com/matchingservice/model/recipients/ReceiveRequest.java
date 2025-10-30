@@ -23,6 +23,9 @@ public class ReceiveRequest {
     @Column(nullable = false)
     private UUID recipientId;
 
+    @Column(nullable = false)
+    private UUID userId;
+
     @ManyToOne
     @JoinColumn(name = "location_db_id", referencedColumnName = "id")
     private RecipientLocation location;

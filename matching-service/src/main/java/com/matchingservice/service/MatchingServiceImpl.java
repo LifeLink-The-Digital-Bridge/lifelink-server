@@ -30,6 +30,10 @@ public class MatchingServiceImpl implements MatchingService {
     private final ReceiveRequestRepository receiveRequestRepository;
     private final DonorRepository donorRepository;
     private final RecipientRepository recipientRepository;
+    private final DonorLocationRepository donorLocationRepository;
+    private final RecipientLocationRepository recipientLocationRepository;
+    private final DonorHLAProfileRepository donorHLAProfileRepository;
+    private final RecipientHLAProfileRepository recipientHLAProfileRepository;
 
     private final DonorServiceClient donorServiceClient;
     private final RecipientServiceClient recipientServiceClient;
@@ -42,6 +46,10 @@ public class MatchingServiceImpl implements MatchingService {
 
         if (!match.getDonorUserId().equals(userId)) {
             throw new IllegalStateException("Only the donor of this match can confirm");
+        }
+
+        if (match.getStatus() == MatchStatus.COMPLETED) {
+            throw new IllegalStateException("Cannot confirm a completed match");
         }
 
         if (match.getStatus() == MatchStatus.REJECTED) {
@@ -145,6 +153,10 @@ public class MatchingServiceImpl implements MatchingService {
             throw new IllegalStateException("Only the recipient of this match can confirm");
         }
 
+        if (match.getStatus() == MatchStatus.COMPLETED) {
+            throw new IllegalStateException("Cannot confirm a completed match");
+        }
+
         if (match.getStatus() == MatchStatus.REJECTED) {
             throw new IllegalStateException("This match has been rejected and cannot be confirmed");
         }
@@ -246,6 +258,10 @@ public class MatchingServiceImpl implements MatchingService {
             throw new IllegalStateException("Only the donor of this match can reject it");
         }
 
+        if (match.getStatus() == MatchStatus.COMPLETED) {
+            throw new IllegalStateException("Cannot reject a completed match");
+        }
+
         if (match.getStatus() == MatchStatus.CONFIRMED) {
             LocalDateTime confirmedAt = match.getDonorConfirmedAt();
             if (confirmedAt != null && LocalDateTime.now().isAfter(confirmedAt.plusHours(2))) {
@@ -262,6 +278,11 @@ public class MatchingServiceImpl implements MatchingService {
 
         if (match.getStatus() == MatchStatus.EXPIRED) {
             throw new IllegalStateException("This match has already expired");
+        }
+
+        if (match.getStatus() == MatchStatus.CANCELLED_BY_DONOR ||
+                match.getStatus() == MatchStatus.CANCELLED_BY_RECIPIENT) {
+            throw new IllegalStateException("Cannot reject a cancelled match");
         }
 
         match.setStatus(MatchStatus.REJECTED);
@@ -286,6 +307,10 @@ public class MatchingServiceImpl implements MatchingService {
             throw new IllegalStateException("Only the recipient of this match can reject it");
         }
 
+        if (match.getStatus() == MatchStatus.COMPLETED) {
+            throw new IllegalStateException("Cannot reject a completed match");
+        }
+
         if (match.getStatus() == MatchStatus.CONFIRMED) {
             LocalDateTime confirmedAt = match.getRecipientConfirmedAt();
             if (confirmedAt != null && LocalDateTime.now().isAfter(confirmedAt.plusHours(2))) {
@@ -302,6 +327,11 @@ public class MatchingServiceImpl implements MatchingService {
 
         if (match.getStatus() == MatchStatus.EXPIRED) {
             throw new IllegalStateException("This match has already expired");
+        }
+
+        if (match.getStatus() == MatchStatus.CANCELLED_BY_DONOR ||
+                match.getStatus() == MatchStatus.CANCELLED_BY_RECIPIENT) {
+            throw new IllegalStateException("Cannot reject a cancelled match");
         }
 
         match.setStatus(MatchStatus.REJECTED);
@@ -324,6 +354,10 @@ public class MatchingServiceImpl implements MatchingService {
 
         if (!match.getDonorUserId().equals(userId)) {
             throw new IllegalStateException("Only the donor of this match can withdraw");
+        }
+
+        if (match.getStatus() == MatchStatus.COMPLETED) {
+            throw new IllegalStateException("Cannot withdraw a completed match");
         }
 
         if (match.getStatus() != MatchStatus.CONFIRMED &&
@@ -367,6 +401,10 @@ public class MatchingServiceImpl implements MatchingService {
 
         if (!match.getRecipientUserId().equals(userId)) {
             throw new IllegalStateException("Only the recipient of this match can withdraw");
+        }
+
+        if (match.getStatus() == MatchStatus.COMPLETED) {
+            throw new IllegalStateException("Cannot withdraw a completed match");
         }
 
         if (match.getStatus() != MatchStatus.CONFIRMED &&
@@ -516,9 +554,11 @@ public class MatchingServiceImpl implements MatchingService {
 
     @Override
     public List<MatchResponse> getMatchesForDonor(UUID userId) {
-        return matchResultRepository.findByDonorUserIdOrderByMatchedAtDesc(userId)
-                .stream()
-                .map(MatchResponse::fromMatchResult)
+        log.info("Fetching donor matches for userId: {}", userId);
+        List<MatchResult> matches = matchResultRepository.findByDonorUserIdOrderByMatchedAtDesc(userId);
+        log.info("Found {} matches for donor userId: {}", matches.size(), userId);
+        return matches.stream()
+                .map(matchResult -> enrichMatchResponse(matchResult, "DONOR_TO_RECIPIENT"))
                 .collect(Collectors.toList());
     }
 
@@ -526,7 +566,7 @@ public class MatchingServiceImpl implements MatchingService {
     public List<MatchResponse> getMatchesForRecipient(UUID userId) {
         return matchResultRepository.findByRecipientUserIdOrderByMatchedAtDesc(userId)
                 .stream()
-                .map(MatchResponse::fromMatchResult)
+                .map(matchResult -> enrichMatchResponse(matchResult, "RECIPIENT_TO_DONOR"))
                 .collect(Collectors.toList());
     }
 
@@ -534,7 +574,7 @@ public class MatchingServiceImpl implements MatchingService {
     public List<MatchResponse> getAllMatches() {
         return matchResultRepository.findAll()
                 .stream()
-                .map(MatchResponse::fromMatchResult)
+                .map(matchResult -> enrichMatchResponse(matchResult, "DONOR_TO_RECIPIENT"))
                 .collect(Collectors.toList());
     }
 
@@ -542,7 +582,7 @@ public class MatchingServiceImpl implements MatchingService {
     public List<MatchResponse> getMatchesByDonation(UUID donationId) {
         return matchResultRepository.findByDonationIdOrderByCompatibilityScoreDesc(donationId)
                 .stream()
-                .map(MatchResponse::fromMatchResult)
+                .map(matchResult -> enrichMatchResponse(matchResult, "DONOR_TO_RECIPIENT"))
                 .collect(Collectors.toList());
     }
 
@@ -550,9 +590,26 @@ public class MatchingServiceImpl implements MatchingService {
     public List<MatchResponse> getMatchesByRequest(UUID requestId) {
         return matchResultRepository.findByReceiveRequestIdOrderByCompatibilityScoreDesc(requestId)
                 .stream()
-                .map(MatchResponse::fromMatchResult)
+                .map(matchResult -> enrichMatchResponse(matchResult, "RECIPIENT_TO_DONOR"))
                 .collect(Collectors.toList());
     }
+
+    private MatchResponse enrichMatchResponse(MatchResult matchResult, String matchType) {
+        MatchResponse response = MatchResponse.fromMatchResult(matchResult);
+        response.setMatchType(matchType);
+
+        donationRepository.findById(matchResult.getDonationId()).ifPresent(donation -> {
+            response.setDonationType(donation.getDonationType() != null ? donation.getDonationType().toString() : null);
+            response.setBloodType(donation.getBloodType() != null ? donation.getBloodType().toString() : null);
+        });
+
+        receiveRequestRepository.findById(matchResult.getReceiveRequestId()).ifPresent(request -> {
+            response.setRequestType(request.getRequestType() != null ? request.getRequestType().toString() : null);
+        });
+
+        return response;
+    }
+
 
     @Override
     public boolean isMatchConfirmed(UUID matchId) {
@@ -576,7 +633,7 @@ public class MatchingServiceImpl implements MatchingService {
                         match.getStatus() != MatchStatus.COMPLETED &&
                         match.getStatus() != MatchStatus.CANCELLED_BY_DONOR &&
                         match.getStatus() != MatchStatus.CANCELLED_BY_RECIPIENT)
-                .map(MatchResponse::fromMatchResult)
+                .map(m -> enrichMatchResponse(m, "COMBINED"))
                 .collect(Collectors.toList());
     }
 
@@ -727,6 +784,7 @@ public class MatchingServiceImpl implements MatchingService {
     }
 
     @Override
+    @Transactional
     public ManualMatchResponse manualMatch(ManualMatchRequest request) {
         try {
             Donation donation = donationRepository.findById(request.getDonationId())
@@ -740,15 +798,112 @@ public class MatchingServiceImpl implements MatchingService {
                 return buildErrorResponse("INCOMPATIBLE", compatibilityError);
             }
 
+            boolean matchExists = matchResultRepository.existsByDonationIdAndReceiveRequestId(
+                    donation.getDonationId(),
+                    receiveRequest.getReceiveRequestId()
+            );
+
+            if (matchExists) {
+                return buildErrorResponse("DUPLICATE", "Match already exists between this donation and request");
+            }
+
             MatchResult matchResult = createMatchResult(donation, receiveRequest);
             MatchResult savedMatchResult = matchResultRepository.save(matchResult);
 
-            return buildSuccessResponse(savedMatchResult);
+            updateDonationStatus(donation.getDonationId(), DonationStatus.MATCHED);
+            updateRequestStatus(receiveRequest.getReceiveRequestId(), RequestStatus.MATCHED);
 
+            return buildSuccessResponse(savedMatchResult, donation, receiveRequest);
+
+        } catch (ResourceNotFoundException e) {
+            return buildErrorResponse("NOT_FOUND", e.getMessage());
         } catch (Exception e) {
+            log.error("Error creating manual match: {}", e.getMessage(), e);
             return buildErrorResponse("ERROR", e.getMessage());
         }
     }
+
+    private MatchResult createMatchResult(Donation donation, ReceiveRequest request) {
+        MatchResult match = new MatchResult();
+        match.setDonationId(donation.getDonationId());
+        match.setReceiveRequestId(request.getReceiveRequestId());
+        match.setDonorUserId(donation.getUserId());
+        match.setRecipientUserId(request.getUserId());
+        match.setDonorLocationId(donation.getLocation() != null ? donation.getLocation().getLocationId() : null);
+        match.setRecipientLocationId(request.getLocation() != null ? request.getLocation().getLocationId() : null);
+
+        if (donation.getLocation() != null && request.getLocation() != null) {
+            double distance = calculateDistance(
+                    donation.getLocation().getLatitude(),
+                    donation.getLocation().getLongitude(),
+                    request.getLocation().getLatitude(),
+                    request.getLocation().getLongitude()
+            );
+            match.setDistance(distance);
+        }
+
+        match.setStatus(MatchStatus.PENDING);
+        match.setMatchedAt(LocalDateTime.now());
+        match.setIsConfirmed(false);
+        match.setDonorConfirmed(false);
+        match.setRecipientConfirmed(false);
+        match.setCompatibilityScore(1.0);
+        match.setMatchReason("Manual match by admin");
+
+        return match;
+    }
+
+    private ManualMatchResponse buildSuccessResponse(MatchResult match, Donation donation, ReceiveRequest request) {
+        ManualMatchResponse.MatchDetails details = ManualMatchResponse.MatchDetails.builder()
+                .donationId(match.getDonationId())
+                .receiveRequestId(match.getReceiveRequestId())
+                .donorUserId(match.getDonorUserId())
+                .recipientUserId(match.getRecipientUserId())
+                .donationType(donation.getDonationType().name())
+                .requestType(request.getRequestType().name())
+                .bloodType(donation.getBloodType() != null ? donation.getBloodType().name() : null)
+                .matchType("MANUAL")
+                .matchedAt(match.getMatchedAt())
+                .status(match.getStatus().name())
+                .distance(match.getDistance())
+                .build();
+
+        return ManualMatchResponse.builder()
+                .success(true)
+                .matchResultId(match.getId())
+                .message("Match created successfully")
+                .matchDetails(details)
+                .build();
+    }
+
+    private ManualMatchResponse buildErrorResponse(String errorType, String message) {
+        ManualMatchResponse.ErrorDetails error = ManualMatchResponse.ErrorDetails.builder()
+                .errorType(errorType)
+                .errorMessage(message)
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        return ManualMatchResponse.builder()
+                .success(false)
+                .message(message)
+                .error(error)
+                .build();
+    }
+
+    private double calculateDistance(Double lat1, Double lon1, Double lat2, Double lon2) {
+        if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) {
+            return 0.0;
+        }
+        final double R = 6371;
+        double latDistance = Math.toRadians(lat2 - lat1);
+        double lonDistance = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    }
+
 
     private String validateCompatibility(Donation donation, ReceiveRequest request) {
         if (!donation.getDonationType().toString().equals(request.getRequestType().toString())) {
@@ -757,32 +912,6 @@ public class MatchingServiceImpl implements MatchingService {
         return null;
     }
 
-    private MatchResult createMatchResult(Donation donation, ReceiveRequest request) {
-        MatchResult match = new MatchResult();
-        match.setDonationId(donation.getDonationId());
-        match.setReceiveRequestId(request.getReceiveRequestId());
-        match.setDonorUserId(donation.getUserId());
-        match.setRecipientUserId(request.getRecipient().getUserId());
-        match.setStatus(MatchStatus.PENDING);
-        match.setMatchedAt(LocalDateTime.now());
-        match.setIsConfirmed(false);
-        return match;
-    }
-
-    private ManualMatchResponse buildSuccessResponse(MatchResult match) {
-        return ManualMatchResponse.builder()
-                .success(true)
-                .matchResultId(match.getId())
-                .message("Match created successfully")
-                .build();
-    }
-
-    private ManualMatchResponse buildErrorResponse(String errorType, String message) {
-        return ManualMatchResponse.builder()
-                .success(false)
-                .message(message)
-                .build();
-    }
 
     private DonorDTO convertDonorToDTO(Donor donor) {
         DonorDTO dto = new DonorDTO();
@@ -790,6 +919,63 @@ public class MatchingServiceImpl implements MatchingService {
         dto.setUserId(donor.getUserId());
         dto.setRegistrationDate(donor.getRegistrationDate());
         dto.setStatus(donor.getStatus());
+
+        if (donor.getMedicalDetails() != null) {
+            DonorDTO.DonorMedicalDetailsDTO medicalDetails = new DonorDTO.DonorMedicalDetailsDTO();
+            medicalDetails.setMedicalDetailsId(donor.getMedicalDetails().getMedicalDetailsId());
+            medicalDetails.setBloodGlucoseLevel(donor.getMedicalDetails().getBloodGlucoseLevel());
+            medicalDetails.setHasDiabetes(donor.getMedicalDetails().getHasDiabetes());
+            medicalDetails.setHemoglobinLevel(donor.getMedicalDetails().getHemoglobinLevel());
+            medicalDetails.setBloodPressure(donor.getMedicalDetails().getBloodPressure());
+            medicalDetails.setHasDiseases(donor.getMedicalDetails().getHasDiseases());
+            medicalDetails.setTakingMedication(donor.getMedicalDetails().getTakingMedication());
+            medicalDetails.setDiseaseDescription(donor.getMedicalDetails().getDiseaseDescription());
+            medicalDetails.setCurrentMedications(donor.getMedicalDetails().getCurrentMedications());
+            medicalDetails.setLastMedicalCheckup(donor.getMedicalDetails().getLastMedicalCheckup());
+            medicalDetails.setMedicalHistory(donor.getMedicalDetails().getMedicalHistory());
+            medicalDetails.setHasInfectiousDiseases(donor.getMedicalDetails().getHasInfectiousDiseases());
+            medicalDetails.setInfectiousDiseaseDetails(donor.getMedicalDetails().getInfectiousDiseaseDetails());
+            medicalDetails.setCreatinineLevel(donor.getMedicalDetails().getCreatinineLevel());
+            medicalDetails.setLiverFunctionTests(donor.getMedicalDetails().getLiverFunctionTests());
+            medicalDetails.setCardiacStatus(donor.getMedicalDetails().getCardiacStatus());
+            medicalDetails.setPulmonaryFunction(donor.getMedicalDetails().getPulmonaryFunction());
+            medicalDetails.setOverallHealthStatus(donor.getMedicalDetails().getOverallHealthStatus());
+            dto.setMedicalDetails(medicalDetails);
+        }
+
+        if (donor.getEligibilityCriteria() != null) {
+            DonorDTO.DonorEligibilityCriteriaDTO eligibility = new DonorDTO.DonorEligibilityCriteriaDTO();
+            eligibility.setEligibilityCriteriaId(donor.getEligibilityCriteria().getEligibilityCriteriaId());
+            eligibility.setWeight(donor.getEligibilityCriteria().getWeight());
+            eligibility.setAge(donor.getEligibilityCriteria().getAge());
+            eligibility.setDob(donor.getEligibilityCriteria().getDob());
+            eligibility.setMedicalClearance(donor.getEligibilityCriteria().getMedicalClearance());
+            eligibility.setRecentTattooOrPiercing(donor.getEligibilityCriteria().getRecentTattooOrPiercing());
+            eligibility.setRecentTravelDetails(donor.getEligibilityCriteria().getRecentTravelDetails());
+            eligibility.setRecentVaccination(donor.getEligibilityCriteria().getRecentVaccination());
+            eligibility.setRecentSurgery(donor.getEligibilityCriteria().getRecentSurgery());
+            eligibility.setChronicDiseases(donor.getEligibilityCriteria().getChronicDiseases());
+            eligibility.setAllergies(donor.getEligibilityCriteria().getAllergies());
+            eligibility.setLastDonationDate(donor.getEligibilityCriteria().getLastDonationDate());
+            eligibility.setHeight(donor.getEligibilityCriteria().getHeight());
+            eligibility.setBodyMassIndex(donor.getEligibilityCriteria().getBodyMassIndex());
+            eligibility.setBodySize(donor.getEligibilityCriteria().getBodySize());
+            eligibility.setIsLivingDonor(donor.getEligibilityCriteria().getIsLivingDonor());
+            eligibility.setSmokingStatus(donor.getEligibilityCriteria().getSmokingStatus());
+            eligibility.setPackYears(donor.getEligibilityCriteria().getPackYears());
+            eligibility.setQuitSmokingDate(donor.getEligibilityCriteria().getQuitSmokingDate());
+            eligibility.setAlcoholStatus(donor.getEligibilityCriteria().getAlcoholStatus());
+            eligibility.setDrinksPerWeek(donor.getEligibilityCriteria().getDrinksPerWeek());
+            eligibility.setQuitAlcoholDate(donor.getEligibilityCriteria().getQuitAlcoholDate());
+            eligibility.setAlcoholAbstinenceMonths(donor.getEligibilityCriteria().getAlcoholAbstinenceMonths());
+            dto.setEligibilityCriteria(eligibility);
+        }
+
+        donorHLAProfileRepository.findTopByDonor_DonorIdOrderByEventTimestampDesc(donor.getDonorId()).ifPresent(hlaProfile -> dto.setHlaProfile(convertHLAProfileToDTO(hlaProfile)));
+
+        List<LocationDTO> locations = donorLocationRepository.findLatestLocationsByDonorId(donor.getDonorId()).stream().map(this::convertLocationToDTO).collect(Collectors.toList());
+        dto.setLocations(locations);
+
         return dto;
     }
 
@@ -798,6 +984,59 @@ public class MatchingServiceImpl implements MatchingService {
         dto.setRecipientId(recipient.getRecipientId());
         dto.setUserId(recipient.getUserId());
         dto.setAvailability(recipient.getAvailability());
+
+        if (recipient.getMedicalDetails() != null) {
+            RecipientDTO.RecipientMedicalDetailsDTO medicalDetails = new RecipientDTO.RecipientMedicalDetailsDTO();
+            medicalDetails.setMedicalDetailsId(recipient.getMedicalDetails().getMedicalDetailsId());
+            medicalDetails.setHemoglobinLevel(recipient.getMedicalDetails().getHemoglobinLevel());
+            medicalDetails.setBloodGlucoseLevel(recipient.getMedicalDetails().getBloodGlucoseLevel());
+            medicalDetails.setHasDiabetes(recipient.getMedicalDetails().getHasDiabetes());
+            medicalDetails.setBloodPressure(recipient.getMedicalDetails().getBloodPressure());
+            medicalDetails.setDiagnosis(recipient.getMedicalDetails().getDiagnosis());
+            medicalDetails.setAllergies(recipient.getMedicalDetails().getAllergies());
+            medicalDetails.setCurrentMedications(recipient.getMedicalDetails().getCurrentMedications());
+            medicalDetails.setAdditionalNotes(recipient.getMedicalDetails().getAdditionalNotes());
+            medicalDetails.setHasInfectiousDiseases(recipient.getMedicalDetails().getHasInfectiousDiseases());
+            medicalDetails.setInfectiousDiseaseDetails(recipient.getMedicalDetails().getInfectiousDiseaseDetails());
+            medicalDetails.setCreatinineLevel(recipient.getMedicalDetails().getCreatinineLevel());
+            medicalDetails.setLiverFunctionTests(recipient.getMedicalDetails().getLiverFunctionTests());
+            medicalDetails.setCardiacStatus(recipient.getMedicalDetails().getCardiacStatus());
+            medicalDetails.setPulmonaryFunction(recipient.getMedicalDetails().getPulmonaryFunction());
+            medicalDetails.setOverallHealthStatus(recipient.getMedicalDetails().getOverallHealthStatus());
+            dto.setMedicalDetails(medicalDetails);
+        }
+
+        if (recipient.getEligibilityCriteria() != null) {
+            RecipientDTO.RecipientEligibilityCriteriaDTO eligibility = new RecipientDTO.RecipientEligibilityCriteriaDTO();
+            eligibility.setEligibilityCriteriaId(recipient.getEligibilityCriteria().getEligibilityCriteriaId());
+            eligibility.setAgeEligible(recipient.getEligibilityCriteria().getAgeEligible());
+            eligibility.setAge(recipient.getEligibilityCriteria().getAge());
+            eligibility.setDob(recipient.getEligibilityCriteria().getDob());
+            eligibility.setWeightEligible(recipient.getEligibilityCriteria().getWeightEligible());
+            eligibility.setWeight(recipient.getEligibilityCriteria().getWeight());
+            eligibility.setMedicallyEligible(recipient.getEligibilityCriteria().getMedicallyEligible());
+            eligibility.setLegalClearance(recipient.getEligibilityCriteria().getLegalClearance());
+            eligibility.setNotes(recipient.getEligibilityCriteria().getNotes());
+            eligibility.setLastReviewed(recipient.getEligibilityCriteria().getLastReviewed());
+            eligibility.setHeight(recipient.getEligibilityCriteria().getHeight());
+            eligibility.setBodyMassIndex(recipient.getEligibilityCriteria().getBodyMassIndex());
+            eligibility.setBodySize(recipient.getEligibilityCriteria().getBodySize());
+            eligibility.setIsLivingDonor(recipient.getEligibilityCriteria().getIsLivingDonor());
+            eligibility.setSmokingStatus(recipient.getEligibilityCriteria().getSmokingStatus());
+            eligibility.setPackYears(recipient.getEligibilityCriteria().getPackYears());
+            eligibility.setQuitSmokingDate(recipient.getEligibilityCriteria().getQuitSmokingDate());
+            eligibility.setAlcoholStatus(recipient.getEligibilityCriteria().getAlcoholStatus());
+            eligibility.setDrinksPerWeek(recipient.getEligibilityCriteria().getDrinksPerWeek());
+            eligibility.setQuitAlcoholDate(recipient.getEligibilityCriteria().getQuitAlcoholDate());
+            eligibility.setAlcoholAbstinenceMonths(recipient.getEligibilityCriteria().getAlcoholAbstinenceMonths());
+            dto.setEligibilityCriteria(eligibility);
+        }
+
+        recipientHLAProfileRepository.findTopByRecipient_RecipientIdOrderByEventTimestampDesc(recipient.getRecipientId()).ifPresent(hlaProfile -> dto.setHlaProfile(convertHLAProfileToDTO(hlaProfile)));
+
+        List<LocationDTO> locations = recipientLocationRepository.findLatestLocationsByRecipientId(recipient.getRecipientId()).stream().map(this::convertLocationToDTO).collect(Collectors.toList());
+        dto.setLocations(locations);
+
         return dto;
     }
 
@@ -809,20 +1048,138 @@ public class MatchingServiceImpl implements MatchingService {
         dto.setDonationDate(donation.getDonationDate());
         dto.setStatus(donation.getStatus());
         dto.setBloodType(donation.getBloodType());
+
+        if (donation instanceof BloodDonation) {
+            dto.setQuantity(((BloodDonation) donation).getQuantity());
+        } else if (donation instanceof OrganDonation) {
+            OrganDonation organ = (OrganDonation) donation;
+            dto.setOrganType(organ.getOrganType());
+            dto.setIsCompatible(organ.getIsCompatible());
+            dto.setOrganQuality(organ.getOrganQuality());
+            dto.setOrganViabilityExpiry(organ.getOrganViabilityExpiry());
+            dto.setColdIschemiaTime(organ.getColdIschemiaTime());
+            dto.setOrganPerfused(organ.getOrganPerfused());
+            dto.setOrganWeight(organ.getOrganWeight());
+            dto.setOrganSize(organ.getOrganSize());
+            dto.setFunctionalAssessment(organ.getFunctionalAssessment());
+            dto.setHasAbnormalities(organ.getHasAbnormalities());
+            dto.setAbnormalityDescription(organ.getAbnormalityDescription());
+        } else if (donation instanceof TissueDonation) {
+            TissueDonation tissue = (TissueDonation) donation;
+            dto.setTissueType(tissue.getTissueType());
+            dto.setQuantity(tissue.getQuantity());
+        } else if (donation instanceof StemCellDonation) {
+            StemCellDonation stemCell = (StemCellDonation) donation;
+            dto.setStemCellType(stemCell.getStemCellType());
+            dto.setQuantity(stemCell.getQuantity());
+        }
+
+        if (donation.getLocation() != null) {
+            dto.setLocation(convertLocationToDTO(donation.getLocation()));
+        }
+
         return dto;
     }
 
-    private ReceiveRequestDTO convertToDTO(ReceiveRequest request) {
+    private ReceiveRequestDTO convertToDTO(ReceiveRequest receiveRequest) {
         ReceiveRequestDTO dto = new ReceiveRequestDTO();
-        dto.setId(request.getReceiveRequestId());
-        dto.setRecipientId(request.getRecipientId());
-        dto.setRequestType(request.getRequestType());
-        dto.setRequestedBloodType(request.getRequestedBloodType());
-        dto.setRequestedOrgan(request.getRequestedOrgan());
-        dto.setUrgencyLevel(request.getUrgencyLevel());
-        dto.setQuantity(request.getQuantity());
-        dto.setRequestDate(request.getRequestDate());
-        dto.setStatus(request.getStatus());
+        dto.setId(receiveRequest.getReceiveRequestId());
+        dto.setRecipientId(receiveRequest.getRecipientId());
+        dto.setRequestType(receiveRequest.getRequestType());
+        dto.setRequestedBloodType(receiveRequest.getRequestedBloodType());
+        dto.setRequestedOrgan(receiveRequest.getRequestedOrgan());
+        dto.setRequestedTissue(receiveRequest.getRequestedTissue());
+        dto.setRequestedStemCellType(receiveRequest.getRequestedStemCellType());
+        dto.setUrgencyLevel(receiveRequest.getUrgencyLevel());
+        dto.setQuantity(receiveRequest.getQuantity());
+        dto.setRequestDate(receiveRequest.getRequestDate());
+        dto.setStatus(receiveRequest.getStatus());
+        dto.setNotes(receiveRequest.getNotes());
+
+        if (receiveRequest.getLocation() != null) {
+            dto.setLocation(convertLocationToDTO(receiveRequest.getLocation()));
+        }
+
         return dto;
     }
+    private LocationDTO convertLocationToDTO(DonorLocation location) {
+        LocationDTO dto = new LocationDTO();
+        dto.setLocationId(location.getLocationId());
+        dto.setAddressLine(location.getAddressLine());
+        dto.setLandmark(location.getLandmark());
+        dto.setArea(location.getArea());
+        dto.setCity(location.getCity());
+        dto.setDistrict(location.getDistrict());
+        dto.setState(location.getState());
+        dto.setCountry(location.getCountry());
+        dto.setPincode(location.getPincode());
+        dto.setLatitude(location.getLatitude());
+        dto.setLongitude(location.getLongitude());
+        return dto;
+    }
+
+    private LocationDTO convertLocationToDTO(RecipientLocation location) {
+        LocationDTO dto = new LocationDTO();
+        dto.setLocationId(location.getLocationId());
+        dto.setAddressLine(location.getAddressLine());
+        dto.setLandmark(location.getLandmark());
+        dto.setArea(location.getArea());
+        dto.setCity(location.getCity());
+        dto.setDistrict(location.getDistrict());
+        dto.setState(location.getState());
+        dto.setCountry(location.getCountry());
+        dto.setPincode(location.getPincode());
+        dto.setLatitude(location.getLatitude());
+        dto.setLongitude(location.getLongitude());
+        return dto;
+    }
+
+    private HLAProfileDTO convertHLAProfileToDTO(DonorHLAProfile hlaProfile) {
+        HLAProfileDTO dto = new HLAProfileDTO();
+        dto.setId(hlaProfile.getId());
+        dto.setHlaA1(hlaProfile.getHlaA1());
+        dto.setHlaA2(hlaProfile.getHlaA2());
+        dto.setHlaB1(hlaProfile.getHlaB1());
+        dto.setHlaB2(hlaProfile.getHlaB2());
+        dto.setHlaC1(hlaProfile.getHlaC1());
+        dto.setHlaC2(hlaProfile.getHlaC2());
+        dto.setHlaDR1(hlaProfile.getHlaDR1());
+        dto.setHlaDR2(hlaProfile.getHlaDR2());
+        dto.setHlaDQ1(hlaProfile.getHlaDQ1());
+        dto.setHlaDQ2(hlaProfile.getHlaDQ2());
+        dto.setHlaDP1(hlaProfile.getHlaDP1());
+        dto.setHlaDP2(hlaProfile.getHlaDP2());
+        dto.setTestingDate(hlaProfile.getTestingDate());
+        dto.setTestingMethod(hlaProfile.getTestingMethod());
+        dto.setLaboratoryName(hlaProfile.getLaboratoryName());
+        dto.setCertificationNumber(hlaProfile.getCertificationNumber());
+        dto.setHlaString(hlaProfile.getHlaString());
+        dto.setIsHighResolution(hlaProfile.getIsHighResolution());
+        return dto;
+    }
+
+    private HLAProfileDTO convertHLAProfileToDTO(RecipientHLAProfile hlaProfile) {
+        HLAProfileDTO dto = new HLAProfileDTO();
+        dto.setId(hlaProfile.getId());
+        dto.setHlaA1(hlaProfile.getHlaA1());
+        dto.setHlaA2(hlaProfile.getHlaA2());
+        dto.setHlaB1(hlaProfile.getHlaB1());
+        dto.setHlaB2(hlaProfile.getHlaB2());
+        dto.setHlaC1(hlaProfile.getHlaC1());
+        dto.setHlaC2(hlaProfile.getHlaC2());
+        dto.setHlaDR1(hlaProfile.getHlaDR1());
+        dto.setHlaDR2(hlaProfile.getHlaDR2());
+        dto.setHlaDQ1(hlaProfile.getHlaDQ1());
+        dto.setHlaDQ2(hlaProfile.getHlaDQ2());
+        dto.setHlaDP1(hlaProfile.getHlaDP1());
+        dto.setHlaDP2(hlaProfile.getHlaDP2());
+        dto.setTestingDate(hlaProfile.getTestingDate());
+        dto.setTestingMethod(hlaProfile.getTestingMethod());
+        dto.setLaboratoryName(hlaProfile.getLaboratoryName());
+        dto.setCertificationNumber(hlaProfile.getCertificationNumber());
+        dto.setHlaString(hlaProfile.getHlaString());
+        dto.setIsHighResolution(hlaProfile.getIsHighResolution());
+        return dto;
+    }
+
 }

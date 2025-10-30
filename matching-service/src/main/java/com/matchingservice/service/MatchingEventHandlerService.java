@@ -208,7 +208,7 @@ public class MatchingEventHandlerService {
         donation.setDonationId(group.donationEvent.getDonationId());
         donation.setDonor(savedDonor);
         donation.setDonorId(savedDonor.getDonorId());
-        donation.setUserId(group.donationEvent.getDonorId());
+        donation.setUserId(savedDonor.getUserId());
         donation.setDonationType(group.donationEvent.getDonationType());
         donation.setBloodType(group.donationEvent.getBloodType());
         donation.setDonationDate(group.donationEvent.getDonationDate());
@@ -417,6 +417,7 @@ public class MatchingEventHandlerService {
         request.setReceiveRequestId(group.receiveRequestEvent.getReceiveRequestId());
         request.setRecipient(savedRecipient);
         request.setRecipientId(savedRecipient.getRecipientId());
+        request.setUserId(savedRecipient.getUserId());
         request.setRequestType(group.receiveRequestEvent.getRequestType());
         request.setRequestedBloodType(group.receiveRequestEvent.getRequestedBloodType());
         request.setRequestedOrgan(group.receiveRequestEvent.getRequestedOrgan());
