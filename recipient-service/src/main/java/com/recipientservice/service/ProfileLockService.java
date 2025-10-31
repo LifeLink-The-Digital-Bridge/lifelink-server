@@ -21,7 +21,6 @@ public class ProfileLockService {
 
     private static final List<RequestStatus> LOCKING_STATUSES = Arrays.asList(
             RequestStatus.PENDING,
-            RequestStatus.ACTIVE,
             RequestStatus.MATCHED,
             RequestStatus.IN_PROGRESS
     );
@@ -35,7 +34,8 @@ public class ProfileLockService {
             return null;
         }
 
-        List<ReceiveRequest> activeRequests = receiveRequestRepository.findByRecipientIdAndStatusIn(recipientId, LOCKING_STATUSES);
+        List<ReceiveRequest> activeRequests = receiveRequestRepository
+                .findByRecipientIdAndStatusIn(recipientId, LOCKING_STATUSES);
 
         StringBuilder reason = new StringBuilder("Your profile is locked due to:\n\n");
 
