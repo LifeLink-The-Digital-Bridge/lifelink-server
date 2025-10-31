@@ -21,7 +21,6 @@ public class ProfileLockService {
 
     private static final List<DonationStatus> LOCKING_STATUSES = Arrays.asList(
             DonationStatus.PENDING,
-            DonationStatus.AVAILABLE,
             DonationStatus.MATCHED,
             DonationStatus.IN_PROGRESS
     );

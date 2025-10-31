@@ -1,12 +1,10 @@
 package com.donorservice.dto;
 
 import com.donorservice.enums.DonorStatus;
-import jakarta.persistence.PrePersist;
 import lombok.Data;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.UUID;
 
 @Data
 public class RegisterDonor {
@@ -18,11 +16,8 @@ public class RegisterDonor {
     private List<LocationDTO> addresses;
     private HLAProfileDTO hlaProfile;
 
-    @PrePersist
-    public void setRegistrationDate() {
-        if (registrationDate == null) {
-            registrationDate = LocalDate.now();
-        }
+    public RegisterDonor() {
+        this.registrationDate = LocalDate.now();
+        this.status = DonorStatus.ACTIVE;
     }
 }
-

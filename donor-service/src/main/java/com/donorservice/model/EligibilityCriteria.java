@@ -11,65 +11,64 @@ import java.time.LocalDate;
 @Entity
 @Table(name = "eligibility_criteria")
 public class EligibilityCriteria {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @OneToOne
-    @JoinColumn(name = "donor_id", referencedColumnName = "id")
+    @JoinColumn(name = "donor_id", referencedColumnName = "id", nullable = false)
     private Donor donor;
 
     @Column(nullable = false)
     private Boolean ageEligible;
 
-    @Column
+    @Column(nullable = false)
     private Integer age;
 
-    @Column
+    @Column(nullable = false)
     private LocalDate dob;
 
     @Column(nullable = false)
     private Boolean weightEligible;
 
-    @Column
+    @Column(nullable = false)
     private Double weight;
 
     @Column(nullable = false)
-    private Boolean medicalClearance;
+    private Boolean medicalClearance = false;
 
     @Column(nullable = false)
-    private Boolean recentTattooOrPiercing;
+    private Boolean recentTattooOrPiercing = false;
 
-    @Column
+    @Column(columnDefinition = "TEXT")
     private String recentTravelDetails;
 
-    @Column
-    private Boolean recentVaccination;
+    @Column(nullable = false)
+    private Boolean recentVaccination = false;
 
-    @Column
-    private Boolean recentSurgery;
+    @Column(nullable = false)
+    private Boolean recentSurgery = false;
 
-    @Column
+    @Column(columnDefinition = "TEXT")
     private String chronicDiseases;
 
-    @Column
+    @Column(columnDefinition = "TEXT")
     private String allergies;
 
     @Column
     private LocalDate lastDonationDate;
 
-    @Column
+    @Column(nullable = false)
     private Double height;
 
-    @Column
+    @Column(nullable = false)
     private Double bodyMassIndex;
 
     @Column
     private String bodySize;
 
     @Column(nullable = false)
-    private Boolean isLivingDonor;
+    private Boolean isLivingDonor = false;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "smoking_status")
@@ -94,3 +93,4 @@ public class EligibilityCriteria {
     @Column(name = "alcohol_abstinence_months")
     private Integer alcoholAbstinenceMonths;
 }
+
