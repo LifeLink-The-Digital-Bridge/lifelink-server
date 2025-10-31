@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 import java.time.LocalDate;
+
 @Data
 @Entity
 @Table(name = "medical_details")
@@ -14,7 +15,7 @@ public class MedicalDetails {
     private Long id;
 
     @OneToOne
-    @JoinColumn(name = "donor_id", referencedColumnName = "id")
+    @JoinColumn(name = "donor_id", referencedColumnName = "id", nullable = false)
     private Donor donor;
 
     @Column(nullable = false)
@@ -23,17 +24,17 @@ public class MedicalDetails {
     @Column
     private Double bloodGlucoseLevel;
 
-    @Column
-    private Boolean hasDiabetes;
+    @Column(nullable = false)
+    private Boolean hasDiabetes = false;
 
     @Column(nullable = false)
     private String bloodPressure;
 
     @Column(nullable = false)
-    private Boolean hasDiseases;
+    private Boolean hasDiseases = false;
 
     @Column(nullable = false)
-    private Boolean takingMedication;
+    private Boolean takingMedication = false;
 
     @Column
     private String diseaseDescription;
@@ -41,30 +42,30 @@ public class MedicalDetails {
     @Column
     private String currentMedications;
 
-    @Column
+    @Column(nullable = false)
     private LocalDate lastMedicalCheckup;
 
-    @Column
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String medicalHistory;
 
-    @Column
-    private Boolean hasInfectiousDiseases;
+    @Column(nullable = false)
+    private Boolean hasInfectiousDiseases = false;
 
     @Column
     private String infectiousDiseaseDetails;
 
-    @Column
+    @Column(nullable = false)
     private Double creatinineLevel;
 
-    @Column
+    @Column(nullable = false)
     private String liverFunctionTests;
 
-    @Column
+    @Column(nullable = false)
     private String cardiacStatus;
 
-    @Column
+    @Column(nullable = false)
     private Double pulmonaryFunction;
 
-    @Column
+    @Column(nullable = false)
     private String overallHealthStatus;
 }
