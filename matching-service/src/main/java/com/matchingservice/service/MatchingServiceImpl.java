@@ -906,11 +906,52 @@ public class MatchingServiceImpl implements MatchingService {
 
 
     private String validateCompatibility(Donation donation, ReceiveRequest request) {
-        if (!donation.getDonationType().toString().equals(request.getRequestType().toString())) {
-            return "Type mismatch";
+        if (donation.getUserId().equals(request.getUserId())) {
+            return "Cannot match donation and request from the same user";
         }
+
+        if (!donation.getDonationType().toString().equals(request.getRequestType().toString())) {
+            return "Donation type (" + donation.getDonationType() + ") does not match request type (" + request.getRequestType() + ")";
+        }
+
+        if (donation.getStatus() != DonationStatus.PENDING && donation.getStatus() != DonationStatus.MATCHED) {
+            return "Donation must be in PENDING or MATCHED status, current status: " + donation.getStatus();
+        }
+
+        if (request.getStatus() != RequestStatus.PENDING && request.getStatus() != RequestStatus.MATCHED) {
+            return "Request must be in PENDING or MATCHED status, current status: " + request.getStatus();
+        }
+
+        if (donation.getBloodType() != null && request.getRequestedBloodType() != null) {
+            if (!donation.getBloodType().equals(request.getRequestedBloodType())) {
+                return "Blood type mismatch: Donation is " + donation.getBloodType() + ", Request needs " + request.getRequestedBloodType();
+            }
+        }
+
+        if (donation instanceof OrganDonation && request.getRequestedOrgan() != null) {
+            OrganDonation organ = (OrganDonation) donation;
+            if (!organ.getOrganType().equals(request.getRequestedOrgan())) {
+                return "Organ type mismatch: Donation is " + organ.getOrganType() + ", Request needs " + request.getRequestedOrgan();
+            }
+        }
+
+        if (donation instanceof TissueDonation && request.getRequestedTissue() != null) {
+            TissueDonation tissue = (TissueDonation) donation;
+            if (!tissue.getTissueType().equals(request.getRequestedTissue())) {
+                return "Tissue type mismatch: Donation is " + tissue.getTissueType() + ", Request needs " + request.getRequestedTissue();
+            }
+        }
+
+        if (donation instanceof StemCellDonation && request.getRequestedStemCellType() != null) {
+            StemCellDonation stemCell = (StemCellDonation) donation;
+            if (!stemCell.getStemCellType().equals(request.getRequestedStemCellType())) {
+                return "Stem cell type mismatch: Donation is " + stemCell.getStemCellType() + ", Request needs " + request.getRequestedStemCellType();
+            }
+        }
+
         return null;
     }
+
 
 
     private DonorDTO convertDonorToDTO(Donor donor) {

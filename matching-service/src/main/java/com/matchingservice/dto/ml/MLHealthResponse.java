@@ -1,4 +1,3 @@
-// MLHealthResponse.java
 package com.matchingservice.dto.ml;
 
 import lombok.AllArgsConstructor;

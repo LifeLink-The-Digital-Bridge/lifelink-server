@@ -37,13 +37,15 @@ public class MLMatchingSchedulerService {
     @Value("${ml.service.enabled:true}")
     private boolean mlServiceEnabled;
 
-    @Value("${ml.fallback.rule-based:true}")
-    private boolean fallbackToRuleBased;
-
-    @Scheduled(cron = "0 */10 * * * *")
+    @Scheduled(cron = "0 */2 * * * *")
     @Transactional
     public void runBatchMatching() {
         log.info("Starting scheduled batch matching at {}", LocalDateTime.now());
+
+        if (!mlServiceEnabled) {
+            log.warn("ML service is disabled. Skipping batch matching.");
+            return;
+        }
 
         try {
             List<ReceiveRequest> pendingRequests = receiveRequestRepository
@@ -88,14 +90,7 @@ public class MLMatchingSchedulerService {
                 log.info("Matching {} requests with {} donations for type: {}",
                         typeRequests.size(), typeDonations.size(), requestType);
 
-                int matchesForType;
-                if (mlServiceEnabled) {
-                    matchesForType = performMLMatching(typeRequests, typeDonations);
-                } else {
-                    log.warn("ML service disabled, using rule-based matching");
-                    matchesForType = performRuleBasedMatching(typeRequests, typeDonations);
-                }
-
+                int matchesForType = performMLMatching(typeRequests, typeDonations);
                 totalMatchesCreated += matchesForType;
 
                 log.info("Created {} matches for type: {}", matchesForType, requestType);
@@ -137,10 +132,6 @@ public class MLMatchingSchedulerService {
 
             if (!mlResponse.getSuccess()) {
                 log.error("ML service returned error: {}", mlResponse.getError());
-                if (fallbackToRuleBased) {
-                    log.warn("Falling back to rule-based matching");
-                    return performRuleBasedMatching(requests, donations);
-                }
                 return 0;
             }
 
@@ -148,10 +139,6 @@ public class MLMatchingSchedulerService {
 
         } catch (Exception e) {
             log.error("ML service error: {}", e.getMessage());
-            if (fallbackToRuleBased) {
-                log.warn("Falling back to rule-based matching");
-                return performRuleBasedMatching(requests, donations);
-            }
             return 0;
         }
     }
@@ -463,101 +450,5 @@ public class MLMatchingSchedulerService {
         }
 
         return builder.build();
-    }
-
-    private int performRuleBasedMatching(List<ReceiveRequest> requests, List<Donation> donations) {
-        int matchCount = 0;
-        for (ReceiveRequest request : requests) {
-            for (Donation donation : donations) {
-                if (isCompatible(donation, request)) {
-                    boolean exists = matchResultRepository
-                            .existsByDonationIdAndReceiveRequestId(
-                                    donation.getDonationId(),
-                                    request.getReceiveRequestId()
-                            );
-                    if (!exists) {
-                        createMatchResult(donation, request);
-                        matchCount++;
-                    }
-                }
-            }
-        }
-        return matchCount;
-    }
-
-    private boolean isCompatible(Donation donation, ReceiveRequest request) {
-        if (!donation.getDonationType().name().equals(request.getRequestType().name())) {
-            return false;
-        }
-        if (donation.getBloodType() != null && request.getRequestedBloodType() != null) {
-            if (donation.getBloodType() != request.getRequestedBloodType()) {
-                if (donation.getBloodType() != BloodType.O_NEGATIVE) {
-                    return false;
-                }
-            }
-        }
-        if (donation.getDonationType() == DonationType.ORGAN) {
-            OrganDonation organDonation = (OrganDonation) donation;
-            if (organDonation.getOrganType() != request.getRequestedOrgan()) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private void createMatchResult(Donation donation, ReceiveRequest request) {
-        MatchResult matchResult = new MatchResult();
-        matchResult.setDonationId(donation.getDonationId());
-        matchResult.setReceiveRequestId(request.getReceiveRequestId());
-        matchResult.setDonorUserId(donation.getUserId());
-        matchResult.setRecipientUserId(request.getRecipient().getUserId());
-        matchResult.setDonorLocationId(donation.getLocation().getLocationId());
-        matchResult.setRecipientLocationId(request.getLocation().getLocationId());
-
-        double distance = calculateDistance(
-                donation.getLocation().getLatitude(),
-                donation.getLocation().getLongitude(),
-                request.getLocation().getLatitude(),
-                request.getLocation().getLongitude()
-        );
-        matchResult.setDistance(distance);
-
-        matchResult.setCompatibilityScore(0.75);
-        matchResult.setBloodCompatibilityScore(1.0);
-        matchResult.setLocationCompatibilityScore(distance < 100 ? 0.9 : 0.7);
-        matchResult.setMedicalCompatibilityScore(0.8);
-        matchResult.setUrgencyPriorityScore(getUrgencyScore(request.getUrgencyLevel()));
-
-        matchResult.setMatchReason("Rule-based matching (ML fallback)");
-        matchResult.setStatus(MatchStatus.PENDING);
-        matchResult.setMatchedAt(LocalDateTime.now());
-        matchResult.setIsConfirmed(false);
-        matchResult.setDonorConfirmed(false);
-        matchResult.setRecipientConfirmed(false);
-
-        matchResultRepository.save(matchResult);
-    }
-
-    private double calculateDistance(Double lat1, Double lon1, Double lat2, Double lon2) {
-        if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) {
-            return 9999.0;
-        }
-        final double R = 6371;
-        double latDistance = Math.toRadians(lat2 - lat1);
-        double lonDistance = Math.toRadians(lon2 - lon1);
-        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
-                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
-    }
-
-    private double getUrgencyScore(UrgencyLevel urgency) {
-        return switch (urgency) {
-            case LOW -> 0.25;
-            case MEDIUM -> 0.50;
-            case HIGH -> 0.75;
-            case CRITICAL -> 1.00;
-        };
     }
 }

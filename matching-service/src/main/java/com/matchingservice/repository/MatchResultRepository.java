@@ -76,6 +76,15 @@ public interface MatchResultRepository extends JpaRepository<MatchResult, UUID> 
         """)
     List<MatchResult> findExpiredPartialConfirmations(@Param("now") LocalDateTime now);
 
-    boolean existsByDonationIdAndReceiveRequestId(UUID donationId, UUID receiveRequestId);
+    @Query("""
+        SELECT m FROM MatchResult m 
+        WHERE m.matchedAt < :timeoutThreshold
+        AND m.status IN :statuses
+        """)
+    List<MatchResult> findExpiredMatches(
+            @Param("statuses") List<MatchStatus> statuses,
+            @Param("timeoutThreshold") LocalDateTime timeoutThreshold
+    );
 
+    boolean existsByDonationIdAndReceiveRequestId(UUID donationId, UUID receiveRequestId);
 }
