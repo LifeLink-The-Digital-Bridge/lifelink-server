@@ -43,13 +43,29 @@ class BloodMatchingService:
         return R * c
 
     def prepare_features(self, donation, recipient):
-        features = {}
+        donor_blood = str(donation.bloodType).replace('BloodType.', '').strip()
+        recipient_blood = str(recipient.requestedBloodType).replace('BloodType.', '').strip()
 
+        BLOOD_COMPATIBILITY = {
+            'O_NEGATIVE': ['O_NEGATIVE', 'O_POSITIVE', 'A_NEGATIVE', 'A_POSITIVE', 'B_NEGATIVE', 'B_POSITIVE',
+                           'AB_NEGATIVE', 'AB_POSITIVE'],
+            'O_POSITIVE': ['O_POSITIVE', 'A_POSITIVE', 'B_POSITIVE', 'AB_POSITIVE'],
+            'A_NEGATIVE': ['A_NEGATIVE', 'A_POSITIVE', 'AB_NEGATIVE', 'AB_POSITIVE'],
+            'A_POSITIVE': ['A_POSITIVE', 'AB_POSITIVE'],
+            'B_NEGATIVE': ['B_NEGATIVE', 'B_POSITIVE', 'AB_NEGATIVE', 'AB_POSITIVE'],
+            'B_POSITIVE': ['B_POSITIVE', 'AB_POSITIVE'],
+            'AB_NEGATIVE': ['AB_NEGATIVE', 'AB_POSITIVE'],
+            'AB_POSITIVE': ['AB_POSITIVE']
+        }
+
+        is_compatible = recipient_blood in BLOOD_COMPATIBILITY.get(donor_blood, [])
+        blood_compatible = 1 if is_compatible else 0
+
+        features = {}
         features['donor_age'] = donation.age or 35
         features['donor_weight'] = donation.weight or 70.0
         features['donor_height'] = donation.height or 175.0
         features['donor_bmi'] = donation.bmi or 23.0
-        features['donor_blood_type'] = str(donation.bloodType).replace('BloodType.', '').strip()
         features['donor_hemoglobin'] = donation.hemoglobinLevel or 14.0
         features['donor_blood_glucose'] = donation.bloodGlucoseLevel or 100.0
         features['donor_has_diabetes'] = int(donation.hasDiabetes or False)
@@ -60,9 +76,9 @@ class BloodMatchingService:
         features['donor_recent_vaccination'] = int(donation.recentVaccination or False)
         features['donor_recent_surgery'] = int(donation.recentSurgery or False)
         features['donor_days_since_last_donation'] = donation.daysSinceLastDonation or 180
-        features['donor_smoking'] = str(donation.smokingStatus or 'NEVER_SMOKED').replace('SmokingStatus.','').strip()
+        features['donor_smoking'] = str(donation.smokingStatus or 'NEVER_SMOKED').replace('SmokingStatus.', '').strip()
         features['donor_pack_years'] = donation.packYears or 0
-        features['donor_alcohol'] = str(donation.alcoholStatus or 'NO_ALCOHOL_USE').replace('AlcoholStatus.','').strip()
+        features['donor_alcohol'] = str(donation.alcoholStatus or 'NO_ALCOHOL_USE').replace('AlcoholStatus.', '').strip()
         features['donor_drinks_per_week'] = donation.drinksPerWeek or 0
         features['donor_latitude'] = donation.latitude or 17.4399
         features['donor_longitude'] = donation.longitude or 78.3489
@@ -72,7 +88,6 @@ class BloodMatchingService:
         features['recipient_weight'] = recipient.weight or 65.0
         features['recipient_height'] = recipient.height or 170.0
         features['recipient_bmi'] = recipient.bmi or 22.5
-        features['recipient_blood_type'] = str(recipient.requestedBloodType).replace('BloodType.', '').strip()
         features['recipient_hemoglobin'] = recipient.hemoglobinLevel or 11.0
         features['recipient_blood_glucose'] = recipient.bloodGlucoseLevel or 110.0
         features['recipient_has_diabetes'] = int(recipient.hasDiabetes or False)
@@ -91,12 +106,10 @@ class BloodMatchingService:
             features['donor_latitude'], features['donor_longitude'],
             features['recipient_latitude'], features['recipient_longitude']
         )
-        features['distance_km'] = distance
-        features['same_area'] = 0
+
         features['donation_quantity'] = donation.quantity or 450.0
         features['request_quantity'] = recipient.quantity or 450.0
-        features['quantity_match'] = features['donation_quantity'] / features['request_quantity'] if features['request_quantity'] > 0 else 0.0
-        features['blood_compatible'] = 1
+        features['blood_compatible'] = blood_compatible
 
         return features
 

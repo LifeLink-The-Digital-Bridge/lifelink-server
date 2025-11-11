@@ -18,9 +18,8 @@ warnings.filterwarnings('ignore')
 
 
 def train_model():
-    """Train ML model with realistic data"""
     print("\n" + "=" * 100)
-    print("TRAINING ML MODEL WITH REALISTIC BLOOD TYPE COMBINATIONS")
+    print("TRAINING ML MODEL - BLOOD TYPES EXCLUDED, USING BLOOD_COMPATIBLE ONLY")
     print("=" * 100 + "\n")
 
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -33,7 +32,7 @@ def train_model():
     data_file = os.path.join(data_dir, 'blood_matching_training_data.csv')
 
     if not os.path.exists(data_file):
-        print(f"❌ Error: Training data not found at {data_file}")
+        print(f"Error: Training data not found at {data_file}")
         print("   Run: python scripts/generate_training_data.py")
         return
 
@@ -42,7 +41,8 @@ def train_model():
     print(f"   Match distribution: {df['is_good_match'].value_counts().to_dict()}\n")
 
     exclude_cols = [
-        'distance_km', 'same_area', 'blood_compatible', 'match_score', 'is_good_match'
+        'distance_km', 'match_score', 'is_good_match',
+        'donor_blood_type', 'recipient_blood_type'
     ]
 
     feature_cols = [col for col in df.columns if col not in exclude_cols]
@@ -54,8 +54,8 @@ def train_model():
     print(f"Target distribution: {y.value_counts().to_dict()}\n")
 
     categorical_features = [
-        'donor_blood_type', 'donor_smoking', 'donor_alcohol',
-        'recipient_blood_type', 'recipient_urgency', 'recipient_smoking', 'recipient_alcohol',
+        'donor_smoking', 'donor_alcohol',
+        'recipient_urgency', 'recipient_smoking', 'recipient_alcohol',
         'donor_body_size', 'recipient_body_size'
     ]
 
@@ -66,7 +66,7 @@ def train_model():
             le = LabelEncoder()
             X[col] = le.fit_transform(X[col].astype(str))
             label_encoders[col] = le
-            print(f"  ✓ {col}")
+            print(f"  {col}")
 
     print("\nSplitting data (80-20)...")
     X_train, X_test, y_train, y_test = train_test_split(
@@ -79,7 +79,7 @@ def train_model():
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
-    print("  ✓ Features scaled")
+    print("  Features scaled")
 
     class_weights = compute_class_weight('balanced', classes=np.unique(y_train), y=y_train)
     class_weight_dict = {i: class_weights[i] for i in range(len(class_weights))}
@@ -103,7 +103,7 @@ def train_model():
     )
 
     xgb_model.fit(X_train_scaled, y_train)
-    print("✓ Model training complete")
+    print("Model training complete")
 
     print("\nEvaluating model...")
     y_pred = xgb_model.predict(X_test_scaled)
@@ -136,13 +136,13 @@ def train_model():
     with open(os.path.join(ml_artifacts_dir, 'feature_columns.pkl'), 'wb') as f:
         pickle.dump(feature_cols, f)
 
-    print("  ✓ Model saved")
-    print("  ✓ Scaler saved")
-    print("  ✓ Label encoders saved")
-    print("  ✓ Feature columns saved")
+    print("  Model saved")
+    print("  Scaler saved")
+    print("  Label encoders saved")
+    print("  Feature columns saved")
 
     metadata = {
-        'model_type': 'XGBoost (Realistic Blood Types)',
+        'model_type': 'XGBoost (Blood Types Excluded)',
         'accuracy': float(accuracy),
         'precision': float(precision),
         'recall': float(recall),
@@ -161,7 +161,7 @@ def train_model():
     with open(os.path.join(ml_artifacts_dir, 'model_metadata.json'), 'w') as f:
         json.dump(metadata, f, indent=4)
 
-    print("  ✓ Metadata saved")
+    print("  Metadata saved")
 
     print("\n" + "=" * 100)
     print("MODEL TRAINING COMPLETE")
@@ -181,7 +181,7 @@ def train_model():
         'Test Samples': f"{len(X_test):,}"
     }, indent=2))
 
-    print(f"\n All artifacts saved to: {ml_artifacts_dir}\n")
+    print(f"\nAll artifacts saved to: {ml_artifacts_dir}\n")
 
 
 if __name__ == '__main__':

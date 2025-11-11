@@ -16,7 +16,8 @@ BLOOD_TYPE_DISTRIBUTION = {
 }
 
 BLOOD_COMPATIBILITY = {
-    'O_NEGATIVE': ['O_NEGATIVE', 'O_POSITIVE', 'A_NEGATIVE', 'A_POSITIVE', 'B_NEGATIVE', 'B_POSITIVE', 'AB_NEGATIVE', 'AB_POSITIVE'],
+    'O_NEGATIVE': ['O_NEGATIVE', 'O_POSITIVE', 'A_NEGATIVE', 'A_POSITIVE', 'B_NEGATIVE', 'B_POSITIVE', 'AB_NEGATIVE',
+                   'AB_POSITIVE'],
     'O_POSITIVE': ['O_POSITIVE', 'A_POSITIVE', 'B_POSITIVE', 'AB_POSITIVE'],
     'A_NEGATIVE': ['A_NEGATIVE', 'A_POSITIVE', 'AB_NEGATIVE', 'AB_POSITIVE'],
     'A_POSITIVE': ['A_POSITIVE', 'AB_POSITIVE'],
@@ -28,8 +29,8 @@ BLOOD_COMPATIBILITY = {
 
 BLOOD_TYPES = list(BLOOD_COMPATIBILITY.keys())
 URGENCY_LEVELS = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
-SMOKING_STATUS = ['NEVER_SMOKED', 'FORMER_SMOKER', 'CURRENT_SMOKER']
-ALCOHOL_STATUS = ['NO_ALCOHOL_USE', 'MODERATE_USE', 'HEAVY_USE']
+SMOKING_STATUS = ['NEVER_SMOKED', 'FORMER_SMOKER', 'CURRENT_SMOKER', 'OCCASIONAL_SMOKER']
+ALCOHOL_STATUS = ['NO_ALCOHOL_USE', 'MODERATE_USE', 'HEAVY_USE', 'FORMER_USER']
 
 random.seed(42)
 np.random.seed(42)
@@ -51,8 +52,15 @@ def calculate_bmi_and_size(weight, height):
     return bmi, body_size
 
 
+def apply_distance_offset(donor_lat, donor_lon, distance_km):
+    lat_offset = (distance_km / 111.0) * random.choice([-1, 1])
+    lon_offset = (distance_km / (111.0 * np.cos(np.radians(donor_lat)))) * random.choice([-1, 1])
+    return donor_lat + lat_offset, donor_lon + lon_offset
+
+
 def generate_donor():
-    blood_type = np.random.choice(list(BLOOD_TYPE_DISTRIBUTION.keys()), p=list(BLOOD_TYPE_DISTRIBUTION.values()))
+    blood_type = np.random.choice(list(BLOOD_TYPE_DISTRIBUTION.keys()),
+                                  p=list(BLOOD_TYPE_DISTRIBUTION.values()))
 
     age = random.randint(18, 65)
     weight = round(random.uniform(50, 100), 1)
@@ -74,7 +82,7 @@ def generate_donor():
     smoking = random.choice(SMOKING_STATUS)
     pack_years = random.randint(0, 20) if smoking != "NEVER_SMOKED" else 0
     alcohol = random.choice(ALCOHOL_STATUS)
-    drinks_per_week = random.randint(0, 14) if alcohol != "NO_ALCOHOL_USE" else 0
+    drinks_per_week = random.randint(0, 14) if alcohol not in ["NO_ALCOHOL_USE", "FORMER_USER"] else 0
 
     lat = random.uniform(17.3, 17.5)
     lon = random.uniform(78.3, 78.6)
@@ -107,7 +115,8 @@ def generate_donor():
 
 
 def generate_recipient():
-    blood_type = np.random.choice(list(BLOOD_TYPE_DISTRIBUTION.keys()), p=list(BLOOD_TYPE_DISTRIBUTION.values()))
+    blood_type = np.random.choice(list(BLOOD_TYPE_DISTRIBUTION.keys()),
+                                  p=list(BLOOD_TYPE_DISTRIBUTION.values()))
 
     age = random.randint(18, 80)
     weight = round(random.uniform(45, 110), 1)
@@ -125,7 +134,7 @@ def generate_recipient():
     smoking = random.choice(SMOKING_STATUS)
     pack_years = random.randint(0, 30) if smoking != "NEVER_SMOKED" else 0
     alcohol = random.choice(ALCOHOL_STATUS)
-    drinks_per_week = random.randint(0, 14) if alcohol != "NO_ALCOHOL_USE" else 0
+    drinks_per_week = random.randint(0, 14) if alcohol not in ["NO_ALCOHOL_USE", "FORMER_USER"] else 0
 
     lat = random.uniform(17.3, 17.5)
     lon = random.uniform(78.3, 78.6)
@@ -152,6 +161,64 @@ def generate_recipient():
         'recipient_longitude': round(lon, 4),
         'request_quantity': quantity_needed
     }
+
+
+def generate_compatible_pair():
+    donor = generate_donor()
+    donor_blood = donor['donor_blood_type']
+
+    compatible_types = BLOOD_COMPATIBILITY[donor_blood]
+
+    compatible_weights = [BLOOD_TYPE_DISTRIBUTION[bt] for bt in compatible_types]
+    total_weight = sum(compatible_weights)
+    normalized_weights = [w / total_weight for w in compatible_weights]
+
+    recipient_blood = np.random.choice(compatible_types, p=normalized_weights)
+
+    recipient = generate_recipient()
+    recipient['recipient_blood_type'] = recipient_blood
+
+    distance_km = np.random.choice(
+        [0.5, 2, 5, 10, 15, 20, 25],
+        p=[0.2, 0.25, 0.2, 0.15, 0.1, 0.07, 0.03]
+    )
+
+    recipient['recipient_latitude'], recipient['recipient_longitude'] = apply_distance_offset(
+        donor['donor_latitude'], donor['donor_longitude'], distance_km
+    )
+
+    if random.random() < 0.7:
+        recipient['request_quantity'] = donor['donation_quantity']
+
+    return donor, recipient
+
+
+def generate_incompatible_pair():
+    donor = generate_donor()
+    donor_blood = donor['donor_blood_type']
+
+    compatible_types = BLOOD_COMPATIBILITY[donor_blood]
+    all_types = set(BLOOD_TYPES)
+    incompatible_types = list(all_types - set(compatible_types))
+
+    if not incompatible_types:
+        return generate_incompatible_pair()
+
+    recipient_blood = random.choice(incompatible_types)
+
+    recipient = generate_recipient()
+    recipient['recipient_blood_type'] = recipient_blood
+
+    distance_km = np.random.choice(
+        [0.5, 2, 5, 10, 15, 20, 25],
+        p=[0.2, 0.25, 0.2, 0.15, 0.1, 0.07, 0.03]
+    )
+
+    recipient['recipient_latitude'], recipient['recipient_longitude'] = apply_distance_offset(
+        donor['donor_latitude'], donor['donor_longitude'], distance_km
+    )
+
+    return donor, recipient
 
 
 def calculate_match_quality(donor, recipient):
@@ -207,68 +274,115 @@ def calculate_match_quality(donor, recipient):
 
 
 def generate_training_dataset(num_samples=50000):
-    print("\n" + ("=" * 100))
-    print(f"GENERATING {num_samples:,} REALISTIC TRAINING SAMPLES")
-    print("=" * 100 + "\n")
+    print(f"\n{'=' * 100}")
+    print(f"GENERATING {num_samples:,} SAMPLES - 25% SAME / 35% CROSS / 40% INCOMPATIBLE")
+    print(f"{'=' * 100}\n")
 
     data = []
     good_matches = 0
     incompatible = 0
     total_distance = 0
 
-    for i in range(num_samples):
+    same_type_ratio = 0.25
+    cross_type_ratio = 0.35
+    incompatible_ratio = 0.40
+
+    same_type_samples = int(num_samples * same_type_ratio)
+    cross_type_samples = int(num_samples * cross_type_ratio)
+    incompatible_samples = int(num_samples * incompatible_ratio)
+
+    print(f"Generating {same_type_samples:,} SAME-TYPE pairs...")
+    for i in range(same_type_samples):
         if (i + 1) % 5000 == 0:
-            print(f"Generated {i + 1:,} samples... (Good: {good_matches}, Incompatible: {incompatible})")
+            print(f"  Same-type: {i + 1:,}/{same_type_samples:,}")
 
         donor = generate_donor()
         recipient = generate_recipient()
+        recipient['recipient_blood_type'] = donor['donor_blood_type']
+
+        distance_km = np.random.choice([0.5, 2, 5, 10, 15, 20, 25], p=[0.2, 0.25, 0.2, 0.15, 0.1, 0.07, 0.03])
+        recipient['recipient_latitude'], recipient['recipient_longitude'] = apply_distance_offset(
+            donor['donor_latitude'], donor['donor_longitude'], distance_km
+        )
+        if random.random() < 0.7:
+            recipient['request_quantity'] = donor['donation_quantity']
 
         distance = calculate_distance(
             donor['donor_latitude'], donor['donor_longitude'],
             recipient['recipient_latitude'], recipient['recipient_longitude']
         )
         total_distance += distance
-
         match_quality = calculate_match_quality(donor, recipient)
-
-        is_blood_compatible = donor['donor_blood_type'] in BLOOD_COMPATIBILITY.get(
-            recipient['recipient_blood_type'], []
-        )
-
-        if not is_blood_compatible:
-            is_good_match = 0
-            incompatible += 1
-        else:
-            is_good_match = int(match_quality >= 0.6)
-            if is_good_match:
-                good_matches += 1
+        is_good_match = int(match_quality >= 0.6)
+        if is_good_match:
+            good_matches += 1
 
         sample = {
             **donor,
             **recipient,
             'distance_km': round(distance, 2),
-            'same_area': 0,
-            'blood_compatible': int(is_blood_compatible),
+            'blood_compatible': 1,
             'match_score': round(match_quality, 3),
             'is_good_match': is_good_match
         }
+        data.append(sample)
 
+    print(f"\nGenerating {cross_type_samples:,} CROSS-TYPE COMPATIBLE pairs...")
+    for i in range(cross_type_samples):
+        if (i + 1) % 5000 == 0:
+            print(f"  Cross-type: {i + 1:,}/{cross_type_samples:,}")
+
+        donor, recipient = generate_compatible_pair()
+        distance = calculate_distance(
+            donor['donor_latitude'], donor['donor_longitude'],
+            recipient['recipient_latitude'], recipient['recipient_longitude']
+        )
+        total_distance += distance
+        match_quality = calculate_match_quality(donor, recipient)
+        is_good_match = int(match_quality >= 0.6)
+        if is_good_match:
+            good_matches += 1
+
+        sample = {
+            **donor,
+            **recipient,
+            'distance_km': round(distance, 2),
+            'blood_compatible': 1,
+            'match_score': round(match_quality, 3),
+            'is_good_match': is_good_match
+        }
+        data.append(sample)
+
+    print(f"\nGenerating {incompatible_samples:,} INCOMPATIBLE pairs...")
+    for i in range(incompatible_samples):
+        if (i + 1) % 5000 == 0:
+            print(f"  Incompatible: {i + 1:,}/{incompatible_samples:,}")
+
+        donor, recipient = generate_incompatible_pair()
+        distance = calculate_distance(
+            donor['donor_latitude'], donor['donor_longitude'],
+            recipient['recipient_latitude'], recipient['recipient_longitude']
+        )
+        total_distance += distance
+        incompatible += 1
+
+        sample = {
+            **donor,
+            **recipient,
+            'distance_km': round(distance, 2),
+            'blood_compatible': 0,
+            'match_score': 0.0,
+            'is_good_match': 0
+        }
         data.append(sample)
 
     df = pd.DataFrame(data)
-
-    print("\n" + ("=" * 100))
-    print("DATASET GENERATION COMPLETE - REAL-WORLD DISTRIBUTION")
-    print("=" * 100)
-    print(f"Total samples: {len(df):,}")
-    print(f"Good matches: {good_matches:,} ({good_matches / len(df):.1%})")
-    print(f"Incompatible: {incompatible:,} ({incompatible / len(df):.1%})")
-    print(f"Blood compatible: {df['blood_compatible'].sum():,} ({df['blood_compatible'].sum() / len(df):.1%})")
-    print(f"Avg distance: {total_distance / num_samples:.2f} km")
-    print("\nBlood types distribution:")
-    print(df['donor_blood_type'].value_counts().sort_index())
-    print("\n")
-
+    print(f"\n{'=' * 100}")
+    print("DATASET COMPLETE")
+    print(f"{'=' * 100}")
+    print(
+        f"Total: {len(df):,} | Good: {good_matches:,} ({good_matches / len(df):.1%}) | Incompatible: {incompatible:,}")
+    print(f"Blood compatible: {df['blood_compatible'].sum():,} | Avg distance: {total_distance / num_samples:.2f} km\n")
     return df
 
 

@@ -1,15 +1,14 @@
 {
-    "model_type": "XGBoost (Realistic Blood Types)",
-    "accuracy": 0.9728,
-    "precision": 0.9523271151309591,
-    "recall": 0.9962546816479401,
-    "f1_score": 0.9737957610789981,
-    "auc_score": 0.997576443394674,
-    "cv_auc_mean": 0.9973526308906446,
-    "cv_auc_std": 0.0002987163224768555,
-    "n_features": 41,
+    "model_type": "XGBoost (Blood Types Excluded)",
+    "accuracy": 0.8567,
+    "precision": 0.7540615278257864,
+    "recall": 0.9977132403384404,
+    "f1_score": 0.8589428093316271,
+    "auc_score": 0.8750181402584668,
+    "cv_auc_mean": 0.8755197587919745,
+    "cv_auc_std": 0.0025881017188325926,
+    "n_features": 40,
     "feature_names": [
-        "donor_blood_type",
         "donor_age",
         "donor_weight",
         "donor_height",
@@ -31,7 +30,6 @@
         "donor_latitude",
         "donor_longitude",
         "donation_quantity",
-        "recipient_blood_type",
         "recipient_age",
         "recipient_weight",
         "recipient_height",
@@ -49,13 +47,12 @@
         "recipient_drinks_per_week",
         "recipient_latitude",
         "recipient_longitude",
-        "request_quantity"
+        "request_quantity",
+        "blood_compatible"
     ],
     "categorical_features": [
-        "donor_blood_type",
         "donor_smoking",
         "donor_alcohol",
-        "recipient_blood_type",
         "recipient_urgency",
         "recipient_smoking",
         "recipient_alcohol",
@@ -65,7 +62,7 @@
     "training_samples": 40000,
     "test_samples": 10000,
     "class_weights": {
-        "0": 1.0147133434804667,
-        "1": 0.9857072449482503
+        "0": 0.8885334754986894,
+        "1": 1.1434452003887714
     }
 }
