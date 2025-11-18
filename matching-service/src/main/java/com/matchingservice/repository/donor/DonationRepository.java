@@ -36,4 +36,6 @@ public interface DonationRepository extends JpaRepository<Donation, UUID> {
     List<Donation> findByUserIdOrderByEventTimestampDesc(@Param("userId") UUID userId);
 
     List<Donation> findByStatus(DonationStatus status);
+
+    List<Donation> findByStatusIn(List<DonationStatus> statuses);
 }

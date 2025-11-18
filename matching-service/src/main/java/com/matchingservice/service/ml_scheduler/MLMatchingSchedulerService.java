@@ -1,6 +1,8 @@
 package com.matchingservice.service.ml_scheduler;
 
+import com.matchingservice.client.DonorServiceClient;
 import com.matchingservice.client.MLMatchingClient;
+import com.matchingservice.client.RecipientServiceClient;
 import com.matchingservice.dto.ml.*;
 import com.matchingservice.enums.*;
 import com.matchingservice.model.MatchResult;
@@ -33,6 +35,8 @@ public class MLMatchingSchedulerService {
     private final DonorHLAProfileRepository donorHLAProfileRepository;
     private final RecipientHLAProfileRepository recipientHLAProfileRepository;
     private final MLMatchingClient mlMatchingClient;
+    private final DonorServiceClient donorServiceClient;
+    private final RecipientServiceClient recipientServiceClient;
 
     @Value("${ml.service.enabled:true}")
     private boolean mlServiceEnabled;
@@ -49,22 +53,22 @@ public class MLMatchingSchedulerService {
 
         try {
             List<ReceiveRequest> pendingRequests = receiveRequestRepository
-                    .findByStatus(RequestStatus.PENDING);
+                    .findByStatusIn(List.of(RequestStatus.PENDING, RequestStatus.MATCHED));
 
-            log.info("Found {} pending receive requests", pendingRequests.size());
+            log.info("Found {} pending/matched receive requests", pendingRequests.size());
 
             if (pendingRequests.isEmpty()) {
-                log.info("No pending requests. Skipping batch matching.");
+                log.info("No pending/matched requests. Skipping batch matching.");
                 return;
             }
 
             List<Donation> availableDonations = donationRepository
-                    .findByStatus(DonationStatus.PENDING);
+                    .findByStatusIn(List.of(DonationStatus.PENDING, DonationStatus.MATCHED));
 
-            log.info("Found {} available donations", availableDonations.size());
+            log.info("Found {} pending/matched donations", availableDonations.size());
 
             if (availableDonations.isEmpty()) {
-                log.info("No available donations. Skipping batch matching.");
+                log.info("No pending/matched donations. Skipping batch matching.");
                 return;
             }
 
@@ -155,7 +159,30 @@ public class MLMatchingSchedulerService {
                         );
 
                 if (exists) {
-                    log.debug("Match already exists, skipping");
+                    log.debug("Match already exists for donation {} and request {}, skipping",
+                            mlMatch.getDonationId(), mlMatch.getReceiveRequestId());
+                    continue;
+                }
+
+                Donation donation = donationRepository.findById(mlMatch.getDonationId())
+                        .orElse(null);
+                ReceiveRequest request = receiveRequestRepository.findById(mlMatch.getReceiveRequestId())
+                        .orElse(null);
+
+                if (donation == null) {
+                    log.warn("Donation {} not found, skipping ML match", mlMatch.getDonationId());
+                    continue;
+                }
+
+                if (request == null) {
+                    log.warn("Request {} not found, skipping ML match", mlMatch.getReceiveRequestId());
+                    continue;
+                }
+
+                String validationError = validateCompatibility(donation, request);
+                if (validationError != null) {
+                    log.warn("ML match validation failed for donation {} and request {}: {}",
+                            mlMatch.getDonationId(), mlMatch.getReceiveRequestId(), validationError);
                     continue;
                 }
 
@@ -188,7 +215,9 @@ public class MLMatchingSchedulerService {
                 updateDonationStatus(mlMatch.getDonationId(), DonationStatus.MATCHED);
                 updateRequestStatus(mlMatch.getReceiveRequestId(), RequestStatus.MATCHED);
 
-                log.debug("Created ML match (score: {}, rank: {})",
+                log.info("Created ML match: Donation {} -> Request {} (score: {}, rank: {})",
+                        mlMatch.getDonationId(),
+                        mlMatch.getReceiveRequestId(),
                         matchResult.getCompatibilityScore(),
                         matchResult.getPriorityRank()
                 );
@@ -201,18 +230,74 @@ public class MLMatchingSchedulerService {
         return matchCount;
     }
 
+    private String validateCompatibility(Donation donation, ReceiveRequest request) {
+        if (donation.getUserId().equals(request.getUserId())) {
+            return "Cannot match donation and request from the same user";
+        }
+
+        if (!donation.getDonationType().toString().equals(request.getRequestType().toString())) {
+            return "Donation type (" + donation.getDonationType() + ") does not match request type (" + request.getRequestType() + ")";
+        }
+
+        if (donation.getStatus() != DonationStatus.PENDING && donation.getStatus() != DonationStatus.MATCHED) {
+            return "Donation must be in PENDING or MATCHED status, current status: " + donation.getStatus();
+        }
+
+        if (request.getStatus() != RequestStatus.PENDING && request.getStatus() != RequestStatus.MATCHED) {
+            return "Request must be in PENDING or MATCHED status, current status: " + request.getStatus();
+        }
+
+        if (donation instanceof OrganDonation && request.getRequestedOrgan() != null) {
+            OrganDonation organ = (OrganDonation) donation;
+            if (!organ.getOrganType().equals(request.getRequestedOrgan())) {
+                return "Organ type mismatch: Donation is " + organ.getOrganType() + ", Request needs " + request.getRequestedOrgan();
+            }
+        }
+
+        if (donation instanceof TissueDonation && request.getRequestedTissue() != null) {
+            TissueDonation tissue = (TissueDonation) donation;
+            if (!tissue.getTissueType().equals(request.getRequestedTissue())) {
+                return "Tissue type mismatch: Donation is " + tissue.getTissueType() + ", Request needs " + request.getRequestedTissue();
+            }
+        }
+
+        if (donation instanceof StemCellDonation && request.getRequestedStemCellType() != null) {
+            StemCellDonation stemCell = (StemCellDonation) donation;
+            if (!stemCell.getStemCellType().equals(request.getRequestedStemCellType())) {
+                return "Stem cell type mismatch: Donation is " + stemCell.getStemCellType() + ", Request needs " + request.getRequestedStemCellType();
+            }
+        }
+
+        return null;
+    }
+
+
     private void updateDonationStatus(UUID donationId, DonationStatus newStatus) {
-        donationRepository.findById(donationId).ifPresent(donation -> {
-            donation.setStatus(newStatus);
-            donationRepository.save(donation);
-        });
+        try {
+            donationRepository.findById(donationId).ifPresent(donation -> {
+                donation.setStatus(newStatus);
+                donationRepository.save(donation);
+            });
+
+            donorServiceClient.updateDonationStatus(donationId, newStatus);
+            log.debug("Updated donation {} status to {} in donor service", donationId, newStatus);
+        } catch (Exception e) {
+            log.error("Failed to update donation status in donor service: {}", e.getMessage());
+        }
     }
 
     private void updateRequestStatus(UUID requestId, RequestStatus newStatus) {
-        receiveRequestRepository.findById(requestId).ifPresent(request -> {
-            request.setStatus(newStatus);
-            receiveRequestRepository.save(request);
-        });
+        try {
+            receiveRequestRepository.findById(requestId).ifPresent(request -> {
+                request.setStatus(newStatus);
+                receiveRequestRepository.save(request);
+            });
+
+            recipientServiceClient.updateRequestStatus(requestId, newStatus);
+            log.debug("Updated request {} status to {} in recipient service", requestId, newStatus);
+        } catch (Exception e) {
+            log.error("Failed to update request status in recipient service: {}", e.getMessage());
+        }
     }
 
     private MLRequestData convertToMLRequestData(ReceiveRequest request) {

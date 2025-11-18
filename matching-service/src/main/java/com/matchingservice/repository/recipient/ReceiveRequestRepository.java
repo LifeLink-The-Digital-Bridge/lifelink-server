@@ -41,4 +41,6 @@ public interface ReceiveRequestRepository extends JpaRepository<ReceiveRequest, 
     List<ReceiveRequest> findByUserIdOrderByEventTimestampDesc(@Param("userId") UUID userId);
 
     List<ReceiveRequest> findByStatus(RequestStatus status);
+
+    List<ReceiveRequest> findByStatusIn(List<RequestStatus> statuses);
 }
