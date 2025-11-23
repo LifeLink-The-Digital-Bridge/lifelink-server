@@ -37,6 +37,7 @@ public class MatchingServiceImpl implements MatchingService {
 
     private final DonorServiceClient donorServiceClient;
     private final RecipientServiceClient recipientServiceClient;
+    private final com.matchingservice.kafka.EventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -813,6 +814,9 @@ public class MatchingServiceImpl implements MatchingService {
             updateDonationStatus(donation.getDonationId(), DonationStatus.MATCHED);
             updateRequestStatus(receiveRequest.getReceiveRequestId(), RequestStatus.MATCHED);
 
+            // Publish match found event
+            publishMatchFoundEvent(savedMatchResult);
+
             return buildSuccessResponse(savedMatchResult, donation, receiveRequest);
 
         } catch (ResourceNotFoundException e) {
@@ -820,6 +824,25 @@ public class MatchingServiceImpl implements MatchingService {
         } catch (Exception e) {
             log.error("Error creating manual match: {}", e.getMessage(), e);
             return buildErrorResponse("ERROR", e.getMessage());
+        }
+    }
+
+    private void publishMatchFoundEvent(MatchResult match) {
+        try {
+            com.matchingservice.kafka.event.MatchFoundEvent event = com.matchingservice.kafka.event.MatchFoundEvent.builder()
+                    .matchId(match.getId())
+                    .donationId(match.getDonationId())
+                    .receiveRequestId(match.getReceiveRequestId())
+                    .donorUserId(match.getDonorUserId())
+                    .recipientUserId(match.getRecipientUserId())
+                    .matchedAt(match.getMatchedAt())
+                    .compatibilityScore(match.getCompatibilityScore())
+                    .distance(match.getDistance())
+                    .build();
+            
+            eventPublisher.publishMatchFoundEvent(event);
+        } catch (Exception e) {
+            log.error("Failed to publish match found event", e);
         }
     }
 

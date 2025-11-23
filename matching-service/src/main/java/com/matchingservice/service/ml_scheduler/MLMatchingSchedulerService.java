@@ -38,6 +38,8 @@ public class MLMatchingSchedulerService {
     private final DonorServiceClient donorServiceClient;
     private final RecipientServiceClient recipientServiceClient;
 
+    private final com.matchingservice.kafka.EventPublisher eventPublisher;
+
     @Value("${ml.service.enabled:true}")
     private boolean mlServiceEnabled;
 
@@ -221,6 +223,19 @@ public class MLMatchingSchedulerService {
                         matchResult.getCompatibilityScore(),
                         matchResult.getPriorityRank()
                 );
+
+                com.matchingservice.kafka.event.MatchFoundEvent event = com.matchingservice.kafka.event.MatchFoundEvent.builder()
+                        .matchId(matchResult.getId())
+                        .donationId(matchResult.getDonationId())
+                        .receiveRequestId(matchResult.getReceiveRequestId())
+                        .donorUserId(matchResult.getDonorUserId())
+                        .recipientUserId(matchResult.getRecipientUserId())
+                        .matchedAt(matchResult.getMatchedAt())
+                        .compatibilityScore(matchResult.getCompatibilityScore())
+                        .distance(matchResult.getDistance())
+                        .build();
+
+                eventPublisher.publishMatchFoundEvent(event);
 
             } catch (Exception e) {
                 log.error("Error processing ML match: {}", e.getMessage());
