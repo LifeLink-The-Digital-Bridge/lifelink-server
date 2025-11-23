@@ -494,7 +494,24 @@ public class DonorServiceImpl implements DonorService {
         profileLockService.releaseLock(donation.getDonor().getId());
         boolean profileUnlocked = !profileLockService.isDonorProfileLocked(donation.getDonor().getId());
 
-        DonationCancelledEvent event = DonationCancelledEvent.builder().donationId(donationId).donorId(donation.getDonor().getId()).donorUserId(userId).cancellationReason(request.getReason()).cancelledAt(LocalDateTime.now()).eventType("DONATION_CANCELLED").build();
+        DonationCancelledEvent.DonationCancelledEventBuilder eventBuilder = DonationCancelledEvent.builder()
+                .donationId(donationId)
+                .donorId(donation.getDonor().getId())
+                .donorUserId(userId)
+                .cancellationReason(request.getReason())
+                .cancelledAt(LocalDateTime.now())
+                .eventType("DONATION_CANCELLED")
+                .donationType(donation.getDonationType())
+                .bloodType(donation.getBloodType());
+        
+        switch (donation) {
+            case OrganDonation organDonation -> eventBuilder.organType(organDonation.getOrganType());
+            case TissueDonation tissueDonation -> eventBuilder.tissueType(tissueDonation.getTissueType());
+            case StemCellDonation stemCellDonation -> eventBuilder.stemCellType(stemCellDonation.getStemCellType());
+            default -> {}
+        }
+        
+        DonationCancelledEvent event = eventBuilder.build();
 
         try {
             eventPublisher.publishDonationCancelledEvent(event);

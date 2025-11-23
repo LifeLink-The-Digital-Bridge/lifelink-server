@@ -81,6 +81,16 @@ public class DonorController {
         return donorService.getDonorById(id);
     }
 
+    @InternalOnly
+    @GetMapping("/internal/{id}")
+    public ResponseEntity<DonorDTO> getDonorByIdInternal(@PathVariable UUID id) {
+        DonorDTO donor = donorService.getDonorById(id);
+        if (donor == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(donor);
+    }
+
     @GetMapping("/{donorId}/donations")
     public ResponseEntity<?> getDonations(@PathVariable UUID donorId, @RequestHeader("id") String requesterId) {
 
@@ -156,6 +166,16 @@ public class DonorController {
     public ResponseEntity<ProfileLockInfoDTO> getProfileLockInfo(@RequestHeader("id") UUID userId) {
         ProfileLockInfoDTO lockInfo = donorService.getProfileLockInfo(userId);
         return ResponseEntity.ok(lockInfo);
+    }
+
+    @InternalOnly
+    @GetMapping("/donations/internal/{donationId}")
+    public ResponseEntity<DonationDTO> getDonationByIdInternal(@PathVariable UUID donationId) {
+        DonationDTO donation = donorService.getDonationById(donationId);
+        if (donation == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(donation);
     }
 
 }
