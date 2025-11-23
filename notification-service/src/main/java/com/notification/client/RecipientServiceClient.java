@@ -13,4 +13,7 @@ public interface RecipientServiceClient {
 
     @GetMapping("/recipients/internal/{id}")
     RecipientDTO getRecipientById(@PathVariable("id") UUID id, @RequestHeader("Internal-Access-Token") String internalToken);
+
+    @GetMapping("/recipients/requests/internal/{requestId}")
+    com.notification.dto.ReceiveRequestDTO getReceiveRequestById(@PathVariable("requestId") UUID requestId, @RequestHeader("Internal-Access-Token") String internalToken);
 }

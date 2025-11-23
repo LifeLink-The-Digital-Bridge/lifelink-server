@@ -13,4 +13,7 @@ public interface DonorServiceClient {
 
     @GetMapping("/donors/internal/{id}")
     DonorDTO getDonorById(@PathVariable("id") UUID id, @RequestHeader("Internal-Access-Token") String internalToken);
+
+    @GetMapping("/donors/donations/internal/{donationId}")
+    com.notification.dto.DonationDTO getDonationById(@PathVariable("donationId") UUID donationId, @RequestHeader("Internal-Access-Token") String internalToken);
 }

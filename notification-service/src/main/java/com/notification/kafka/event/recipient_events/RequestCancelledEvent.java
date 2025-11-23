@@ -1,5 +1,6 @@
 package com.notification.kafka.event.recipient_events;
 
+import com.notification.enums.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -20,4 +21,10 @@ public class RequestCancelledEvent {
     private String cancellationReason;
     private LocalDateTime cancelledAt;
     private String eventType;
+    
+    private RequestType requestType;
+    private BloodType requestedBloodType;
+    private OrganType requestedOrgan;
+    private TissueType requestedTissue;
+    private StemCellType requestedStemCellType;
 }

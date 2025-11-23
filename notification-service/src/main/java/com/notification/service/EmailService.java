@@ -300,4 +300,139 @@ public class EmailService {
                 event.getCancellationReason()
         );
     }
+    public void sendMatchFoundEmail(String toEmail, String userName, String otherUserName, String otherUserProfileLink, 
+                                    com.notification.kafka.event.MatchFoundEvent event, boolean isDonor,
+                                    com.notification.dto.DonationDTO donation, com.notification.dto.ReceiveRequestDTO request) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(toEmail);
+            helper.setSubject("Match Found! - LifeLink");
+            helper.setFrom("lifelink590@gmail.com");
+
+            String htmlContent = buildMatchFoundEmailTemplate(userName, otherUserName, otherUserProfileLink, event, isDonor, donation, request);
+            helper.setText(htmlContent, true);
+
+            mailSender.send(message);
+            log.info("Match found email sent successfully to: {}", toEmail);
+        } catch (MessagingException e) {
+            log.error("Failed to send match found email to: {}", toEmail, e);
+        }
+    }
+
+    private String buildMatchFoundEmailTemplate(String userName, String otherUserName, String otherUserProfileLink, 
+                                                com.notification.kafka.event.MatchFoundEvent event, boolean isDonor,
+                                                com.notification.dto.DonationDTO donation, com.notification.dto.ReceiveRequestDTO request) {
+        String roleText = isDonor ? "Recipient" : "Donor";
+        String actionText = isDonor ? "Please review their profile and confirm if you wish to proceed." : "The donor has been notified. Please wait for their confirmation.";
+        
+        String specificType = "";
+        String itemType = isDonor ? "donation" : "request";
+        
+        if (isDonor && donation != null && donation.getDonationType() != null) {
+            switch (donation.getDonationType()) {
+                case BLOOD:
+                    specificType = donation.getBloodType() != null ? donation.getBloodType().replace("_POSITIVE", "+").replace("_NEGATIVE", "-") : "";
+                    break;
+                case ORGAN:
+                    specificType = donation.getOrganType() != null ? donation.getOrganType().replace("_", " ") : "";
+                    break;
+                case TISSUE:
+                    specificType = donation.getTissueType() != null ? donation.getTissueType().replace("_", " ") : "";
+                    break;
+                case STEM_CELL:
+                    specificType = donation.getStemCellType() != null ? donation.getStemCellType().replace("_", " ") : "";
+                    break;
+            }
+            itemType = donation.getDonationType().toString() + " " + itemType;
+        } else if (!isDonor && request != null && request.getRequestType() != null) {
+             switch (request.getRequestType()) {
+                case BLOOD:
+                    specificType = request.getRequestedBloodType() != null ? request.getRequestedBloodType().replace("_POSITIVE", "+").replace("_NEGATIVE", "-") : "";
+                    break;
+                case ORGAN:
+                    specificType = request.getRequestedOrgan() != null ? request.getRequestedOrgan().replace("_", " ") : "";
+                    break;
+                case TISSUE:
+                    specificType = request.getRequestedTissue() != null ? request.getRequestedTissue().replace("_", " ") : "";
+                    break;
+                case STEM_CELL:
+                    specificType = request.getRequestedStemCellType() != null ? request.getRequestedStemCellType().replace("_", " ") : "";
+                    break;
+            }
+            itemType = request.getRequestType().toString() + " " + itemType;
+        }
+        
+        // Capitalize first letter of each word
+        if (!specificType.isEmpty() && !specificType.contains("+") && !specificType.contains("-")) {
+             String[] words = specificType.toLowerCase().split(" ");
+             StringBuilder sb = new StringBuilder();
+             for (String word : words) {
+                 if (word.length() > 0) {
+                     sb.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1)).append(" ");
+                 }
+             }
+             specificType = sb.toString().trim();
+        }
+
+        String typeDescription = (specificType.isEmpty() ? "" : specificType + " ") + itemType;
+
+        return String.format("""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <style>
+                        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                        .header { background: linear-gradient(135deg, #00b09b 0%%, #96c93d 100%%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+                        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+                        .info-box { background: white; padding: 15px; margin: 15px 0; border-left: 4px solid #00b09b; border-radius: 5px; }
+                        .footer { text-align: center; margin-top: 20px; color: #888; font-size: 12px; }
+                        h1 { margin: 0; font-size: 28px; }
+                        .label { font-weight: bold; color: #00b09b; }
+                        .btn { display: inline-block; padding: 10px 20px; background-color: #00b09b; color: white; text-decoration: none; border-radius: 5px; margin-top: 15px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="header">
+                            <h1>✨ Match Found!</h1>
+                        </div>
+                        <div class="content">
+                            <p>Dear <strong>%s</strong>,</p>
+                            <p>Great news! We have found a potential match for your <strong>%s</strong>.</p>
+                            
+                            <div class="info-box">
+                                <p><span class="label">Match ID:</span> %s</p>
+                                <p><span class="label">Matched With:</span> %s (%s)</p>
+                                <p><span class="label">Matched At:</span> %s</p>
+                                <p><span class="label">Compatibility Score:</span> %.1f%%</p>
+                            </div>
+                            
+                            <p>%s</p>
+                            
+                            <a href="http://localhost:3000%s" class="btn">View %s Profile</a>
+                            
+                            <p>Best regards,<br><strong>The LifeLink Team</strong></p>
+                        </div>
+                        <div class="footer">
+                            <p>© 2025 LifeLink - The Digital Bridge. All rights reserved.</p>
+                        </div>
+                    </div>
+                </body>
+                </html>
+                """,
+                userName,
+                typeDescription,
+                event.getMatchId(),
+                otherUserName,
+                roleText,
+                event.getMatchedAt(),
+                event.getCompatibilityScore() * 100,
+                actionText,
+                otherUserProfileLink,
+                roleText
+        );
+    }
 }

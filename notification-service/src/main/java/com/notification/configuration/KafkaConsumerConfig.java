@@ -1,5 +1,6 @@
 package com.notification.configuration;
 
+import com.notification.kafka.event.MatchFoundEvent;
 import com.notification.kafka.event.donor_events.*;
 import com.notification.kafka.event.recipient_events.*;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -100,6 +101,20 @@ public class KafkaConsumerConfig {
     public ConcurrentKafkaListenerContainerFactory<String, RequestCancelledEvent> requestCancelledKafkaListenerFactory() {
         var factory = new ConcurrentKafkaListenerContainerFactory<String, RequestCancelledEvent>();
         factory.setConsumerFactory(requestCancelledConsumerFactory());
+        return factory;
+    }
+
+    @Bean
+    public ConsumerFactory<String, MatchFoundEvent> matchFoundEventConsumerFactory() {
+        Map<String, Object> props = new HashMap<>(baseConsumerProps());
+        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, MatchFoundEvent.class.getName());
+        return new DefaultKafkaConsumerFactory<>(props);
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, MatchFoundEvent> matchFoundListenerFactory() {
+        var factory = new ConcurrentKafkaListenerContainerFactory<String, MatchFoundEvent>();
+        factory.setConsumerFactory(matchFoundEventConsumerFactory());
         return factory;
     }
 }

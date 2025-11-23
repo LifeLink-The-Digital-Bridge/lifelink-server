@@ -54,4 +54,14 @@ public class NotificationEventConsumer {
         log.info("Received RequestCancelledEvent: {}", event.getRequestId());
         notificationService.processRequestCancelledEvent(event);
     }
+
+    @KafkaListener(
+            topics = "match-found-events",
+            groupId = "notification-service-group",
+            containerFactory = "matchFoundListenerFactory"
+    )
+    public void consumeMatchFoundEvent(com.notification.kafka.event.MatchFoundEvent event) {
+        log.info("Received MatchFoundEvent: {}", event.getMatchId());
+        notificationService.processMatchFoundEvent(event);
+    }
 }
