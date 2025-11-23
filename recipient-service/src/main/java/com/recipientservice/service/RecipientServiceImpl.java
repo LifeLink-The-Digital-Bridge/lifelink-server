@@ -304,7 +304,19 @@ public class RecipientServiceImpl implements RecipientService {
         profileLockService.releaseLock(receiveRequest.getRecipient().getId());
         boolean profileUnlocked = !profileLockService.isRecipientProfileLocked(receiveRequest.getRecipient().getId());
 
-        RequestCancelledEvent event = RequestCancelledEvent.builder().requestId(requestId).recipientId(receiveRequest.getRecipient().getId()).recipientUserId(userId).cancellationReason(request.getReason()).cancelledAt(java.time.LocalDateTime.now()).eventType("REQUEST_CANCELLED").build();
+        RequestCancelledEvent event = RequestCancelledEvent.builder()
+                .requestId(requestId)
+                .recipientId(receiveRequest.getRecipient().getId())
+                .recipientUserId(userId)
+                .cancellationReason(request.getReason())
+                .cancelledAt(java.time.LocalDateTime.now())
+                .eventType("REQUEST_CANCELLED")
+                .requestType(receiveRequest.getRequestType())
+                .requestedBloodType(receiveRequest.getRequestedBloodType())
+                .requestedOrgan(receiveRequest.getRequestedOrgan())
+                .requestedTissue(receiveRequest.getRequestedTissue())
+                .requestedStemCellType(receiveRequest.getRequestedStemCellType())
+                .build();
 
         try {
             eventPublisher.publishRequestCancelledEvent(event);

@@ -81,6 +81,16 @@ public class RecipientController {
         return recipientService.getRecipientById(id);
     }
 
+    @InternalOnly
+    @GetMapping("/internal/{id}")
+    public ResponseEntity<RecipientDTO> getRecipientByIdInternal(@PathVariable UUID id) {
+        RecipientDTO recipient = recipientService.getRecipientById(id);
+        if (recipient == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(recipient);
+    }
+
     @GetMapping("/{recipientId}/requests")
     public ResponseEntity<?> getReceiveRequests(@PathVariable UUID recipientId, @RequestHeader("id") String requesterId) {
 
@@ -156,6 +166,16 @@ public class RecipientController {
     public ResponseEntity<ProfileLockInfoDTO> getProfileLockInfo(@RequestHeader("id") UUID userId) {
         ProfileLockInfoDTO lockInfo = recipientService.getProfileLockInfo(userId);
         return ResponseEntity.ok(lockInfo);
+    }
+
+    @InternalOnly
+    @GetMapping("/requests/internal/{requestId}")
+    public ResponseEntity<ReceiveRequestDTO> getRequestByIdInternal(@PathVariable UUID requestId) {
+        ReceiveRequestDTO request = recipientService.getRequestById(requestId);
+        if (request == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(request);
     }
 
 }
