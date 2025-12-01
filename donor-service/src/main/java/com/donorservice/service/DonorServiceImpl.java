@@ -27,14 +27,16 @@ public class DonorServiceImpl implements DonorService {
     private final EventPublisher eventPublisher;
     private final ProfileLockService profileLockService;
     private final UserGrpcClient userGrpcClient;
+    private final UserClient userClient;
 
-    public DonorServiceImpl(DonorRepository donorRepository, DonationRepository donationRepository, LocationRepository locationRepository, EventPublisher eventPublisher, ProfileLockService profileLockService, UserGrpcClient userGrpcClient) {
+    public DonorServiceImpl(DonorRepository donorRepository, DonationRepository donationRepository, LocationRepository locationRepository, EventPublisher eventPublisher, ProfileLockService profileLockService, UserGrpcClient userGrpcClient, UserClient userClient) {
         this.donorRepository = donorRepository;
         this.donationRepository = donationRepository;
         this.locationRepository = locationRepository;
         this.eventPublisher = eventPublisher;
         this.profileLockService = profileLockService;
         this.userGrpcClient = userGrpcClient;
+        this.userClient = userClient;
     }
 
     @Override
@@ -610,5 +612,53 @@ public class DonorServiceImpl implements DonorService {
         }
     }
 
+    @Override
+    public List<NearbyDonationActivityDTO> getNearbyDonors(double latitude, double longitude, double radius) {
+        List<Donor> nearbyDonors = donorRepository.findNearbyDonors(latitude, longitude, radius);
+
+        if (nearbyDonors.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<UUID> userIds = nearbyDonors.stream()
+                .map(Donor::getUserId)
+                .distinct()
+                .collect(Collectors.toList());
+
+        List<UserDTO> users = userClient.getUsersByIds(userIds);
+        Map<UUID, UserDTO> userMap = users.stream()
+                .collect(Collectors.toMap(UserDTO::getId, user -> user));
+
+        return nearbyDonors.stream()
+                .map(donor -> {
+                    List<Donation> donations = donationRepository.findByDonorId(donor.getId());
+                    
+                    List<DonationDTO> pendingDonations = donations.stream()
+                            .filter(d -> d.getStatus() == DonationStatus.PENDING)
+                            .map(this::convertToDTO)
+                            .collect(Collectors.toList());
+
+                    if (pendingDonations.isEmpty()) {
+                        return null;
+                    }
+
+                    UserDTO userDTO = userMap.get(donor.getUserId());
+                    PublicUserDTO publicUser = new PublicUserDTO();
+                    if (userDTO != null) {
+                        publicUser.setId(userDTO.getId());
+                        publicUser.setUsername(userDTO.getUsername());
+                        publicUser.setName(userDTO.getName());
+                        publicUser.setProfileImageUrl(userDTO.getProfileImageUrl());
+                    }
+
+                    NearbyDonationActivityDTO activity = new NearbyDonationActivityDTO();
+                    activity.setUser(publicUser);
+                    activity.setPendingDonations(pendingDonations);
+                    return activity;
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
 
 }
+

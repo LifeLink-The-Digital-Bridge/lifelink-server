@@ -31,4 +31,6 @@ public interface DonorService {
     ProfileLockInfoDTO getProfileLockInfo(UUID userId);
 
     boolean canCancelDonation(UUID donationId, UUID userId);
+
+    List<NearbyDonationActivityDTO> getNearbyDonors(double latitude, double longitude, double radius);
 }

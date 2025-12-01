@@ -178,4 +178,13 @@ public class DonorController {
         return ResponseEntity.ok(donation);
     }
 
+    @GetMapping("/nearby")
+    public ResponseEntity<List<NearbyDonationActivityDTO>> getNearbyDonors(
+            @RequestParam("latitude") double latitude,
+            @RequestParam("longitude") double longitude,
+            @RequestParam("radius") double radius) {
+        List<NearbyDonationActivityDTO> donors = donorService.getNearbyDonors(latitude, longitude, radius);
+        return ResponseEntity.ok(donors);
+    }
+
 }
