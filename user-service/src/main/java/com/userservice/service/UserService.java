@@ -30,5 +30,6 @@ public interface UserService {
 
     boolean checkFollowStatus(UUID followerId, String username);
 
+    List<UserDTO> getUsersByIds(List<UUID> userIds);
 
 }

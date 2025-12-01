@@ -143,4 +143,9 @@ public class UserController {
         System.out.println("Sample endpoint called");
         return ResponseEntity.ok("Sample endpoint is working");
     }
+
+    @PostMapping("/batch")
+    public ResponseEntity<List<UserDTO>> getUsersByIds(@RequestBody List<UUID> userIds) {
+        return ResponseEntity.ok(userService.getUsersByIds(userIds));
+    }
 }

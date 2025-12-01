@@ -264,6 +264,21 @@ public class UserServiceImpl implements UserService {
         User followedUser = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
         return followService.isFollowing(followerId, followedUser.getId());
+        }
+
+    @Override
+    public List<UserDTO> getUsersByIds(List<UUID> userIds) {
+        List<User> users = userRepository.findAllById(userIds);
+        return users.stream()
+                .map(user -> {
+                    UserDTO dto = new UserDTO();
+                    BeanUtils.copyProperties(user, dto);
+                    dto.setRoles(user.getUserRoles().stream()
+                            .map(ur -> ur.getRole().getName().name())
+                            .collect(Collectors.toSet()));
+                    return dto;
+                })
+                .collect(Collectors.toList());
     }
 
 }
