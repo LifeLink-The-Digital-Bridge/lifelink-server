@@ -178,4 +178,13 @@ public class RecipientController {
         return ResponseEntity.ok(request);
     }
 
+    @GetMapping("/nearby")
+    public ResponseEntity<List<NearbyRequestActivityDTO>> getNearbyRecipients(
+            @RequestParam("latitude") double latitude,
+            @RequestParam("longitude") double longitude,
+            @RequestParam("radius") double radius) {
+        List<NearbyRequestActivityDTO> recipients = recipientService.getNearbyRecipients(latitude, longitude, radius);
+        return ResponseEntity.ok(recipients);
+    }
+
 }

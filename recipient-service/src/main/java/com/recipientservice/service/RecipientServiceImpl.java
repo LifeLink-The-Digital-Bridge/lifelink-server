@@ -1,7 +1,6 @@
 package com.recipientservice.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.recipientservice.client.UserClient;
 import com.recipientservice.client.UserGrpcClient;
 import com.recipientservice.dto.*;
 import com.recipientservice.enums.*;
@@ -32,14 +31,16 @@ public class RecipientServiceImpl implements RecipientService {
     private final EventPublisher eventPublisher;
     private final ProfileLockService profileLockService;
     private final UserGrpcClient userGrpcClient;
+    private final UserClient userClient;
 
-    public RecipientServiceImpl(RecipientRepository recipientRepository, LocationRepository locationRepository, ReceiveRequestRepository receiveRequestRepository, EventPublisher eventPublisher, ProfileLockService profileLockService, UserGrpcClient userGrpcClient) {
+    public RecipientServiceImpl(RecipientRepository recipientRepository, LocationRepository locationRepository, ReceiveRequestRepository receiveRequestRepository, EventPublisher eventPublisher, ProfileLockService profileLockService, UserGrpcClient userGrpcClient, UserClient userClient) {
         this.recipientRepository = recipientRepository;
         this.locationRepository = locationRepository;
         this.receiveRequestRepository = receiveRequestRepository;
         this.eventPublisher = eventPublisher;
         this.profileLockService = profileLockService;
         this.userGrpcClient = userGrpcClient;
+        this.userClient = userClient;
     }
 
 
@@ -557,5 +558,53 @@ public class RecipientServiceImpl implements RecipientService {
         }
     }
 
+
+    @Override
+    public List<NearbyRequestActivityDTO> getNearbyRecipients(double latitude, double longitude, double radius) {
+        List<Recipient> nearbyRecipients = recipientRepository.findNearbyRecipients(latitude, longitude, radius);
+
+        if (nearbyRecipients.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<UUID> userIds = nearbyRecipients.stream()
+                .map(Recipient::getUserId)
+                .distinct()
+                .collect(Collectors.toList());
+
+        List<UserDTO> users = userClient.getUsersByIds(userIds);
+        Map<UUID, UserDTO> userMap = users.stream()
+                .collect(Collectors.toMap(UserDTO::getId, user -> user));
+
+        return nearbyRecipients.stream()
+                .map(recipient -> {
+                    List<ReceiveRequest> requests = receiveRequestRepository.findAllByRecipientId(recipient.getId());
+                    
+                    List<ReceiveRequestDTO> pendingRequests = requests.stream()
+                            .filter(r -> r.getStatus() == RequestStatus.PENDING)
+                            .map(this::convertToDTO)
+                            .collect(Collectors.toList());
+
+                    if (pendingRequests.isEmpty()) {
+                        return null;
+                    }
+
+                    UserDTO userDTO = userMap.get(recipient.getUserId());
+                    PublicUserDTO publicUser = new PublicUserDTO();
+                    if (userDTO != null) {
+                        publicUser.setId(userDTO.getId());
+                        publicUser.setUsername(userDTO.getUsername());
+                        publicUser.setName(userDTO.getName());
+                        publicUser.setProfileImageUrl(userDTO.getProfileImageUrl());
+                    }
+
+                    NearbyRequestActivityDTO activity = new NearbyRequestActivityDTO();
+                    activity.setUser(publicUser);
+                    activity.setPendingRequests(pendingRequests);
+                    return activity;
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
 
 }

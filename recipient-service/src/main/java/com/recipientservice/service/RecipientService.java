@@ -31,4 +31,6 @@ public interface RecipientService {
     ProfileLockInfoDTO getProfileLockInfo(UUID userId);
 
     boolean canCancelRequest(UUID requestId, UUID userId);
+
+    List<NearbyRequestActivityDTO> getNearbyRecipients(double latitude, double longitude, double radius);
 }
