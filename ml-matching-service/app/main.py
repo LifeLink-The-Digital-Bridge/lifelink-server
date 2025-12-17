@@ -2,14 +2,32 @@ from fastapi import FastAPI, HTTPException
 from contextlib import asynccontextmanager
 import uvicorn
 import time
+import asyncio
 
 from app.models.request_models import RecipientRequest, DonationData
 from app.models.response_models import BatchMatchRequest, BatchMatchResponse, Match
 from app.config import SERVICE_NAME, SERVICE_PORT, SERVICE_HOST, LOCAL_IP, EUREKA_SERVER
 from app.logger_config import logger
-from app.integrations.eureka import register_with_eureka, deregister_from_eureka
+from app.integrations.eureka import register_with_eureka, deregister_from_eureka, send_heartbeat
 from app.utils.data_printer import print_batch_match_request
 from app.services.donation_router import DonationRouter
+
+
+# Background task for heartbeat
+async def heartbeat_loop():
+    """Send periodic heartbeats to Eureka every 30 seconds"""
+    await asyncio.sleep(10)  # Wait for initial registration to complete
+
+    while True:
+        try:
+            success = send_heartbeat()
+            if not success:
+                logger.warning("Heartbeat failed, attempting re-registration...")
+                register_with_eureka()
+        except Exception as e:
+            logger.error(f"Error in heartbeat loop: {e}")
+
+        await asyncio.sleep(30)  # Send heartbeat every 30 seconds
 
 
 @asynccontextmanager
@@ -23,11 +41,28 @@ async def lifespan(app: FastAPI):
     logger.info(f"Eureka: {EUREKA_SERVER}")
     logger.info("=" * 120)
 
+    # Register with Eureka
     register_with_eureka()
+
+    # Start heartbeat background task
+    heartbeat_task = asyncio.create_task(heartbeat_loop())
+    logger.info("💓 Heartbeat task started")
+
     yield
+
+    # Cleanup on shutdown
     logger.info("=" * 120)
     logger.info("SHUTTING DOWN ML MATCHING SERVICE")
     logger.info("=" * 120)
+
+    # Cancel heartbeat task
+    heartbeat_task.cancel()
+    try:
+        await heartbeat_task
+    except asyncio.CancelledError:
+        logger.info("💓 Heartbeat task stopped")
+
+    # Deregister from Eureka
     deregister_from_eureka()
 
 
