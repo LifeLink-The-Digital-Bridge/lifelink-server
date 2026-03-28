@@ -1,0 +1,359 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: lifelink-postgres
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Kolkata
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - lifelink-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: lifelink-redis
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Kolkata
+    ports:
+      - "${REDIS_PORT}:6379"
+    networks:
+      - lifelink-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: kafka-zookeeper
+    restart: unless-stopped
+    ports:
+      - "${ZOOKEEPER_CLIENT_PORT}:2181"
+    environment:
+      TZ: Asia/Kolkata
+      ZOOKEEPER_CLIENT_PORT: ${ZOOKEEPER_CLIENT_PORT}
+      ZOOKEEPER_TICK_TIME: ${ZOOKEEPER_TICK_TIME}
+    networks:
+      - lifelink-network
+    healthcheck:
+      test: ["CMD-SHELL", "echo srvr | nc localhost 2181 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka-broker
+    restart: unless-stopped
+    ports:
+      - "29092:9092"
+    environment:
+      TZ: Asia/Kolkata
+      KAFKA_BROKER_ID: ${KAFKA_BROKER_ID}
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    networks:
+      - lifelink-network
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server kafka:9092 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - lifelink-network
+    entrypoint: ['/bin/sh', '-c']
+    command: |
+      "
+      echo 'Waiting for Kafka to be ready...'
+      sleep 10
+
+      echo 'Creating Kafka topics...'
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic donor-events --replication-factor 1 --partitions 3
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic donation-events --replication-factor 1 --partitions 3
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic donor-location-events --replication-factor 1 --partitions 3
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic receive-request-events --replication-factor 1 --partitions 3
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic recipient-events --replication-factor 1 --partitions 3
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic recipient-location-events --replication-factor 1 --partitions 3
+
+      echo 'Topics created successfully!'
+      kafka-topics --bootstrap-server kafka:9092 --list
+      "
+    restart: "no"
+
+  eureka-server:
+    build:
+      context: ./service-registry
+      dockerfile: Dockerfile
+    container_name: lifelink-eureka
+    restart: unless-stopped
+    ports:
+      - "${EUREKA_PORT}:8761"
+    environment:
+      TZ: Asia/Kolkata
+      EUREKA_HOSTNAME: eureka-server
+    networks:
+      - lifelink-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8761/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  user-service:
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+    container_name: lifelink-user-service
+    restart: unless-stopped
+    ports:
+      - "${USER_SERVICE_PORT}:9081"
+      - "50051:9090"
+    environment:
+      TZ: Asia/Kolkata
+      DATABASE_URL: ${USER_DB_URL}
+      DATABASE_USER: ${POSTGRES_USER}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      SERVICE_EUREKA_URL: ${SERVICE_EUREKA_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - lifelink-network
+
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: lifelink-auth-service
+    restart: unless-stopped
+    ports:
+      - "${AUTH_SERVICE_PORT}:8000"
+    environment:
+      TZ: Asia/Kolkata
+      DATABASE_URL: ${USER_DB_URL}
+      DATABASE_USER: ${POSTGRES_USER}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      GRPC_USER_SERVICE: ${GRPC_USER_SERVICE}
+      SERVICE_EUREKA_URL: ${SERVICE_EUREKA_URL}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - lifelink-network
+
+  donor-service:
+    build:
+      context: ./donor-service
+      dockerfile: Dockerfile
+    container_name: lifelink-donor-service
+    restart: unless-stopped
+    ports:
+      - "${DONOR_SERVICE_PORT}:8083"
+    environment:
+      TZ: Asia/Kolkata
+      DATABASE_URL: ${DONOR_DB_URL}
+      DATABASE_USER: ${POSTGRES_USER}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
+      GRPC_USER_SERVICE: ${GRPC_USER_SERVICE}
+      SERVICE_EUREKA_URL: ${SERVICE_EUREKA_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+      eureka-server:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+    networks:
+      - lifelink-network
+
+  recipient-service:
+    build:
+      context: ./recipient-service
+      dockerfile: Dockerfile
+    container_name: lifelink-recipient-service
+    restart: unless-stopped
+    ports:
+      - "${RECIPIENT_SERVICE_PORT}:8084"
+    environment:
+      TZ: Asia/Kolkata
+      DATABASE_URL: ${RECIPIENT_DB_URL}
+      DATABASE_USER: ${POSTGRES_USER}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
+      GRPC_USER_SERVICE: ${GRPC_USER_SERVICE}
+      SERVICE_EUREKA_URL: ${SERVICE_EUREKA_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+      eureka-server:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+    networks:
+      - lifelink-network
+
+  matching-service:
+    build:
+      context: ./matching-service
+      dockerfile: Dockerfile
+    container_name: lifelink-matching-service
+    restart: unless-stopped
+    ports:
+      - "${MATCHING_SERVICE_PORT}:8085"
+    environment:
+      TZ: Asia/Kolkata
+      DATABASE_URL: ${MATCHING_DB_URL}
+      DATABASE_USER: ${POSTGRES_USER}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING.KAFKA.BOOTSTRAP-SERVERS: kafka:9092
+      SERVICE_EUREKA_URL: ${SERVICE_EUREKA_URL}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - lifelink-network
+
+  ml-matching-service:
+    build:
+      context: ./ml-matching-service
+      dockerfile: Dockerfile
+    container_name: lifelink-ml-matching
+    restart: unless-stopped
+    ports:
+      - "${ML_MATCHING_SERVICE_PORT}:8001"
+    environment:
+      TZ: Asia/Kolkata
+      EUREKA_SERVER: ${SERVICE_EUREKA_URL}
+      SERVICE_PORT: 8001
+      SERVICE_HOST: 0.0.0.0
+      SERVICE_NAME: ML-MATCHING-SERVICE
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - lifelink-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 -O /dev/null http://localhost:8001/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  notification-service:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    container_name: lifelink-notification-service
+    restart: unless-stopped
+    ports:
+      - "${NOTIFICATION_SERVICE_PORT}:8086"
+    environment:
+      TZ: Asia/Kolkata
+      DATABASE_URL: ${NOTIFICATION_DB_URL}
+      DATABASE_USER: ${POSTGRES_USER}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
+      SERVICE_EUREKA_URL: ${SERVICE_EUREKA_URL}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+      eureka-server:
+        condition: service_healthy
+      donor-service:
+        condition: service_started
+      recipient-service:
+        condition: service_started
+      user-service:
+        condition: service_started
+    networks:
+      - lifelink-network
+
+  gateway-service:
+    build:
+      context: ./gateway-service
+      dockerfile: Dockerfile
+    container_name: lifelink-gateway
+    restart: unless-stopped
+    ports:
+      - "${GATEWAY_SERVICE_PORT}:8080"
+    environment:
+      TZ: Asia/Kolkata
+      SERVICE_EUREKA_URL: ${SERVICE_EUREKA_URL}
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - lifelink-network
+
+networks:
+  lifelink-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

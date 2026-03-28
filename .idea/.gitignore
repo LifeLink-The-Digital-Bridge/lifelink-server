@@ -6,3 +6,13 @@
 # Datasource local storage ignored files
 /dataSources/
 /dataSources.local.xml
+# Environment files with sensitive data
+.env
+.env.local
+.env.*.local
+
+# Docker volumes
+postgres_data/
+
+# Keep the template
+!.env.example
