@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -25,6 +26,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidReceiveRequestException.class)
     public ResponseEntity<?> handleInvalidReceiveRequestException(InvalidReceiveRequestException ex) {
         return buildResponse(ex.getMessage(), HttpStatus.BAD_REQUEST, "Invalid Receive Request");
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<?> handleResponseStatusException(ResponseStatusException ex) {
+        return buildResponse(ex.getReason(), HttpStatus.valueOf(ex.getStatusCode().value()), ex.getStatusCode().toString());
     }
 
     @ExceptionHandler(Exception.class)

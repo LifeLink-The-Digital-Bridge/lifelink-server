@@ -4,3 +4,4 @@ CREATE DATABASE donor_db;
 CREATE DATABASE recipient_db;
 CREATE DATABASE matching_db;
 CREATE DATABASE notification_db;
+CREATE DATABASE health_db;

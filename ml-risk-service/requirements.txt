@@ -1,0 +1,10 @@
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.12.3
+python-dotenv==1.0.0
+httpx==0.26.0
+requests==2.31.0
+langchain==0.2.16
+langchain-community==0.2.16
+pypdf==4.3.1
+numpy==1.26.4

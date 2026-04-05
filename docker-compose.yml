@@ -37,6 +37,28 @@ services:
       timeout: 5s
       retries: 5
 
+  minio:
+    image: minio/minio
+    container_name: lifelink-minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      TZ: Asia/Kolkata
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - lifelink-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: kafka-zookeeper
@@ -102,6 +124,9 @@ services:
       kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic receive-request-events --replication-factor 1 --partitions 3
       kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic recipient-events --replication-factor 1 --partitions 3
       kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic recipient-location-events --replication-factor 1 --partitions 3
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic health-record-events --replication-factor 1 --partitions 3
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic emergency-health-events --replication-factor 1 --partitions 3
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic migrant-location-events --replication-factor 1 --partitions 3
 
       echo 'Topics created successfully!'
       kafka-topics --bootstrap-server kafka:9092 --list
@@ -122,7 +147,7 @@ services:
     networks:
       - lifelink-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8761/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8761/ || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -139,10 +164,15 @@ services:
       - "50051:9090"
     environment:
       TZ: Asia/Kolkata
+      SERVER_PORT: 9081
       DATABASE_URL: ${USER_DB_URL}
       DATABASE_USER: ${POSTGRES_USER}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      JPA_DDL_AUTO: ${JPA_DDL_AUTO:-update}
+      JPA_SHOW_SQL: ${JPA_SHOW_SQL:-false}
       SERVICE_EUREKA_URL: ${SERVICE_EUREKA_URL}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${SERVICE_EUREKA_URL}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN}
     depends_on:
       postgres:
         condition: service_healthy
@@ -164,10 +194,15 @@ services:
       DATABASE_URL: ${USER_DB_URL}
       DATABASE_USER: ${POSTGRES_USER}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      JPA_DDL_AUTO: ${JPA_DDL_AUTO:-update}
+      JPA_SHOW_SQL: ${JPA_SHOW_SQL:-false}
       REDIS_HOST: ${REDIS_HOST}
       REDIS_PORT: ${REDIS_PORT}
       GRPC_USER_SERVICE: ${GRPC_USER_SERVICE}
       SERVICE_EUREKA_URL: ${SERVICE_EUREKA_URL}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${SERVICE_EUREKA_URL}
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT}
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       INTERNAL_TOKEN: ${INTERNAL_TOKEN}
@@ -196,9 +231,13 @@ services:
       DATABASE_URL: ${DONOR_DB_URL}
       DATABASE_USER: ${POSTGRES_USER}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      JPA_DDL_AUTO: ${JPA_DDL_AUTO:-update}
+      JPA_SHOW_SQL: ${JPA_SHOW_SQL:-false}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
       GRPC_USER_SERVICE: ${GRPC_USER_SERVICE}
       SERVICE_EUREKA_URL: ${SERVICE_EUREKA_URL}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${SERVICE_EUREKA_URL}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN}
     depends_on:
       postgres:
         condition: service_healthy
@@ -226,9 +265,13 @@ services:
       DATABASE_URL: ${RECIPIENT_DB_URL}
       DATABASE_USER: ${POSTGRES_USER}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      JPA_DDL_AUTO: ${JPA_DDL_AUTO:-update}
+      JPA_SHOW_SQL: ${JPA_SHOW_SQL:-false}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
       GRPC_USER_SERVICE: ${GRPC_USER_SERVICE}
       SERVICE_EUREKA_URL: ${SERVICE_EUREKA_URL}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${SERVICE_EUREKA_URL}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN}
     depends_on:
       postgres:
         condition: service_healthy
@@ -256,9 +299,12 @@ services:
       DATABASE_URL: ${MATCHING_DB_URL}
       DATABASE_USER: ${POSTGRES_USER}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      JPA_DDL_AUTO: ${JPA_DDL_AUTO:-update}
+      JPA_SHOW_SQL: ${JPA_SHOW_SQL:-false}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       SPRING.KAFKA.BOOTSTRAP-SERVERS: kafka:9092
       SERVICE_EUREKA_URL: ${SERVICE_EUREKA_URL}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${SERVICE_EUREKA_URL}
       INTERNAL_TOKEN: ${INTERNAL_TOKEN}
     depends_on:
       postgres:
@@ -271,6 +317,77 @@ services:
         condition: service_healthy
     networks:
       - lifelink-network
+
+  health-service:
+    build:
+      context: ./health-service
+      dockerfile: Dockerfile
+    container_name: lifelink-health-service
+    restart: unless-stopped
+    ports:
+      - "${HEALTH_SERVICE_PORT}:8086"
+    environment:
+      TZ: Asia/Kolkata
+      SERVER_PORT: 8086
+      DATABASE_URL: ${HEALTH_DB_URL}
+      DATABASE_USER: ${POSTGRES_USER}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      JPA_DDL_AUTO: update
+      JPA_SHOW_SQL: false
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
+      KAFKA_CONSUMER_GROUP_ID: health-service-group
+      KAFKA_CLIENT_ID: health-service
+      SERVICE_EUREKA_URL: ${SERVICE_EUREKA_URL}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${SERVICE_EUREKA_URL}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-health-documents}
+      ML_RISK_ENABLED: ${ML_RISK_ENABLED:-true}
+      ML_RISK_BASE_URL: ${ML_RISK_BASE_URL:-http://ml-risk-service:8002}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+      eureka-server:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - lifelink-network
+
+  ml-risk-service:
+    build:
+      context: ./ml-risk-service
+      dockerfile: Dockerfile
+    container_name: lifelink-ml-risk
+    restart: unless-stopped
+    ports:
+      - "${ML_RISK_SERVICE_PORT:-8002}:8002"
+    environment:
+      TZ: Asia/Kolkata
+      SERVICE_PORT: 8002
+      SERVICE_HOST: 0.0.0.0
+      SERVICE_NAME: ML-RISK-SERVICE
+      HEALTH_SERVICE_BASE_URL: ${ML_RISK_HEALTH_BASE_URL:-http://health-service:8086}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN}
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      GROQ_MODEL: ${GROQ_MODEL:-qwen/qwen3-32b}
+    depends_on:
+      health-service:
+        condition: service_started
+    networks:
+      - lifelink-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 -O /dev/null http://localhost:8002/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
   ml-matching-service:
     build:
@@ -311,9 +428,14 @@ services:
       DATABASE_URL: ${NOTIFICATION_DB_URL}
       DATABASE_USER: ${POSTGRES_USER}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      JPA_DDL_AUTO: ${JPA_DDL_AUTO:-update}
+      JPA_SHOW_SQL: ${JPA_SHOW_SQL:-false}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
       SERVICE_EUREKA_URL: ${SERVICE_EUREKA_URL}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${SERVICE_EUREKA_URL}
       INTERNAL_TOKEN: ${INTERNAL_TOKEN}
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT}
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
     depends_on:
@@ -344,7 +466,10 @@ services:
       - "${GATEWAY_SERVICE_PORT}:8080"
     environment:
       TZ: Asia/Kolkata
+      SERVER_PORT: 8080
+      SERVER_ADDRESS: 0.0.0.0
       SERVICE_EUREKA_URL: ${SERVICE_EUREKA_URL}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${SERVICE_EUREKA_URL}
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -357,3 +482,4 @@ networks:
 
 volumes:
   postgres_data:
+  minio_data:

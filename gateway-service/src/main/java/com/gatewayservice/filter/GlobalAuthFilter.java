@@ -26,7 +26,8 @@ public class GlobalAuthFilter implements GlobalFilter, Ordered {
             "/auth/login",
             "/auth/refresh",
             "/auth/password-recovery",
-            "/users/register"
+            "/users/register",
+            "/api/health/records/documents/"
     );
 
     public GlobalAuthFilter(WebClient.Builder webClientBuilder) {
