@@ -21,5 +21,8 @@ public class UserDTO {
     private String profileImageUrl;
     private Set<String> roles;
     private Visibility profileVisibility;
+    private MigrantDetailsDTO migrantDetails;
+    private DoctorDetailsDTO doctorDetails;
+    private NGODetailsDTO ngoDetails;
 
 }

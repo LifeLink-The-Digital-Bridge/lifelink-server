@@ -27,6 +27,14 @@ public interface UserService {
     UserDTO getUserProfileById(UUID userId, UUID requesterId);
 
     List<UserDTO> searchUsers(String query, UUID requesterId);
+    
+    List<UserDTO> searchDoctors();
+    
+    List<UserDTO> searchNGOs();
+
+    List<NearbyUserDTO> searchNearbyUsers(double latitude, double longitude, double radiusKm, List<String> roles);
+
+    AdminUserAnalyticsDTO getAdminUserAnalytics();
 
     boolean checkFollowStatus(UUID followerId, String username);
 

@@ -3,6 +3,7 @@ package com.userservice.dto;
 import jakarta.validation.constraints.*;
 import lombok.Data;
 import java.time.LocalDate;
+import java.util.List;
 
 @Data
 public class SignUpRequest {
@@ -32,6 +33,14 @@ public class SignUpRequest {
 
     @NotBlank(message = "Profile image URL is required")
     private String profileImageUrl;
+
+    private List<String> roles;
+
+    private MigrantDetailsDTO migrantDetails;
+    
+    private DoctorDetailsDTO doctorDetails;
+    
+    private NGODetailsDTO ngoDetails;
 }
 
 

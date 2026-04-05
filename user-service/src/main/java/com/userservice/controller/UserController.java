@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -86,6 +87,32 @@ public class UserController {
         List<UserDTO> results = userService.searchUsers(query, requesterUUID);
         return ResponseEntity.ok(results);
     }
+    
+    @GetMapping("/doctors/search")
+    public ResponseEntity<List<UserDTO>> getDoctors() {
+        return ResponseEntity.ok(userService.searchDoctors());
+    }
+
+    @GetMapping("/ngos/search")
+    public ResponseEntity<List<UserDTO>> getNgos() {
+        return ResponseEntity.ok(userService.searchNGOs());
+    }
+
+    @GetMapping("/nearby")
+    public ResponseEntity<List<NearbyUserDTO>> getNearbyUsers(
+            @RequestParam double latitude,
+            @RequestParam double longitude,
+            @RequestParam(defaultValue = "10") double radiusKm,
+            @RequestParam(required = false) List<String> roles) {
+        return ResponseEntity.ok(userService.searchNearbyUsers(latitude, longitude, radiusKm, roles));
+    }
+
+    @GetMapping("/admin/analytics")
+    public ResponseEntity<AdminUserAnalyticsDTO> getAdminAnalytics(
+            @RequestHeader(value = "roles", required = false) String rolesHeader) {
+        validateAdminAccess(rolesHeader);
+        return ResponseEntity.ok(userService.getAdminUserAnalytics());
+    }
 
     @GetMapping("/profile/{username}/follow-status")
     public ResponseEntity<Boolean> checkFollowStatus(
@@ -147,5 +174,17 @@ public class UserController {
     @PostMapping("/batch")
     public ResponseEntity<List<UserDTO>> getUsersByIds(@RequestBody List<UUID> userIds) {
         return ResponseEntity.ok(userService.getUsersByIds(userIds));
+    }
+
+    private void validateAdminAccess(String rolesHeader) {
+        if (rolesHeader == null || rolesHeader.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin access required");
+        }
+        boolean isAdmin = Arrays.stream(rolesHeader.split(","))
+                .map(String::trim)
+                .anyMatch(role -> "ADMIN".equalsIgnoreCase(role));
+        if (!isAdmin) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin access required");
+        }
     }
 }

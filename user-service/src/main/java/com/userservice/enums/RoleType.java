@@ -4,5 +4,8 @@ public enum RoleType {
     DEFAULT,
     DONOR,
     RECIPIENT,
-    ADMIN
+    ADMIN,
+    MIGRANT,
+    DOCTOR,
+    NGO
 }

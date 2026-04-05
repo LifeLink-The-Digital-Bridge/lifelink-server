@@ -17,7 +17,11 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.time.LocalDateTime;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -52,21 +56,58 @@ public class UserServiceImpl implements UserService {
         }
 
         User user = new User();
-        BeanUtils.copyProperties(userDTO, user);
+        BeanUtils.copyProperties(userDTO, user, "migrantDetails", "doctorDetails", "ngoDetails", "roles");
         user.setPassword(passwordEncoder.encode(userDTO.getPassword()));
 
-        Role defaultRole = roleRepository.findByName(RoleType.DEFAULT)
-                .orElseGet(() -> {
-                    Role newRole = new Role();
-                    newRole.setName(RoleType.DEFAULT);
-                    return roleRepository.save(newRole);
-                });
+        if (userDTO.getMigrantDetails() != null) {
+            com.userservice.model.MigrantDetails migrantDetails = new com.userservice.model.MigrantDetails();
+            BeanUtils.copyProperties(userDTO.getMigrantDetails(), migrantDetails);
+            migrantDetails.setUser(user);
+            user.setMigrantDetails(migrantDetails);
+        }
 
-        UserRole userRole = new UserRole();
-        userRole.setUser(user);
-        userRole.setRole(defaultRole);
+        if (userDTO.getDoctorDetails() != null) {
+            com.userservice.model.DoctorDetails doctorDetails = new com.userservice.model.DoctorDetails();
+            BeanUtils.copyProperties(userDTO.getDoctorDetails(), doctorDetails);
+            doctorDetails.setUser(user);
+            user.setDoctorDetails(doctorDetails);
+        }
 
-        user.getUserRoles().add(userRole);
+        if (userDTO.getNgoDetails() != null) {
+            com.userservice.model.NGODetails ngoDetails = new com.userservice.model.NGODetails();
+            BeanUtils.copyProperties(userDTO.getNgoDetails(), ngoDetails);
+            ngoDetails.setUser(user);
+            user.setNgoDetails(ngoDetails);
+        }
+
+        if (userDTO.getRoles() != null && !userDTO.getRoles().isEmpty()) {
+            for (String roleName : userDTO.getRoles()) {
+                RoleType roleType = RoleType.valueOf(roleName.toUpperCase());
+                Role role = roleRepository.findByName(roleType)
+                        .orElseGet(() -> {
+                            Role newRole = new Role();
+                            newRole.setName(roleType);
+                            return roleRepository.save(newRole);
+                        });
+                
+                UserRole userRole = new UserRole();
+                userRole.setUser(user);
+                userRole.setRole(role);
+                user.getUserRoles().add(userRole);
+            }
+        } else {
+            Role defaultRole = roleRepository.findByName(RoleType.DEFAULT)
+                    .orElseGet(() -> {
+                        Role newRole = new Role();
+                        newRole.setName(RoleType.DEFAULT);
+                        return roleRepository.save(newRole);
+                    });
+
+            UserRole userRole = new UserRole();
+            userRole.setUser(user);
+            userRole.setRole(defaultRole);
+            user.getUserRoles().add(userRole);
+        }
 
         return getUserDTO(user);
     }
@@ -210,6 +251,25 @@ public class UserServiceImpl implements UserService {
         responseDTO.setRoles(userDB.getUserRoles().stream()
                 .map(role -> role.getRole().getName().name())
                 .collect(Collectors.toSet()));
+        
+        if (userDB.getMigrantDetails() != null) {
+            MigrantDetailsDTO migrantDTO = new MigrantDetailsDTO();
+            BeanUtils.copyProperties(userDB.getMigrantDetails(), migrantDTO);
+            responseDTO.setMigrantDetails(migrantDTO);
+        }
+        
+        if (userDB.getDoctorDetails() != null) {
+            DoctorDetailsDTO doctorDTO = new DoctorDetailsDTO();
+            BeanUtils.copyProperties(userDB.getDoctorDetails(), doctorDTO);
+            responseDTO.setDoctorDetails(doctorDTO);
+        }
+        
+        if (userDB.getNgoDetails() != null) {
+            NGODetailsDTO ngoDTO = new NGODetailsDTO();
+            BeanUtils.copyProperties(userDB.getNgoDetails(), ngoDTO);
+            responseDTO.setNgoDetails(ngoDTO);
+        }
+        
         return responseDTO;
     }
 
@@ -247,16 +307,193 @@ public class UserServiceImpl implements UserService {
         List<User> users = userRepository.findByUsernameContainingIgnoreCaseOrEmailContainingIgnoreCase(query, query);
 
         return users.stream()
-                .map(user -> {
-                    UserDTO dto = new UserDTO();
-                    BeanUtils.copyProperties(user, dto);
-                    dto.setRoles(user.getUserRoles().stream()
-                            .map(ur -> ur.getRole().getName().name())
-                            .collect(Collectors.toSet()));
-                    return dto;
-                })
+                .map(this::mapUserToDTO)
                 .limit(20)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<UserDTO> searchDoctors() {
+        return userRepository.findByDoctorDetailsIsNotNull().stream()
+                .map(this::mapUserToDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<UserDTO> searchNGOs() {
+        return userRepository.findByNgoDetailsIsNotNull().stream()
+                .map(this::mapUserToDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public AdminUserAnalyticsDTO getAdminUserAnalytics() {
+        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
+        return new AdminUserAnalyticsDTO(
+                userRepository.count(),
+                userRepository.countByMigrantDetailsIsNotNull(),
+                userRepository.countByDoctorDetailsIsNotNull(),
+                userRepository.countByNgoDetailsIsNotNull(),
+                userRepository.countByCreatedAtAfter(thirtyDaysAgo)
+        );
+    }
+
+    @Override
+    public List<NearbyUserDTO> searchNearbyUsers(double latitude, double longitude, double radiusKm, List<String> roles) {
+        double normalizedRadius = radiusKm <= 0 ? 10.0 : Math.min(radiusKm, 100.0);
+        Set<String> roleFilter = normalizeRoleFilter(roles);
+        List<User> users = userRepository.findAllWithRolesAndDetails();
+        List<NearbyUserDTO> results = new ArrayList<>();
+
+        for (User user : users) {
+            Set<String> userRoles = user.getUserRoles().stream()
+                    .map(ur -> ur.getRole().getName().name())
+                    .collect(Collectors.toSet());
+            if (roleFilter.isEmpty() || userRoles.stream().noneMatch(roleFilter::contains)) {
+                continue;
+            }
+
+            NearbyCoordinate coordinate = resolveCoordinate(user, roleFilter);
+            if (coordinate == null) {
+                continue;
+            }
+
+            double distanceKm = calculateDistanceKm(latitude, longitude, coordinate.latitude(), coordinate.longitude());
+            if (distanceKm > normalizedRadius) {
+                continue;
+            }
+
+            results.add(new NearbyUserDTO(
+                    user.getId(),
+                    user.getName(),
+                    user.getUsername(),
+                    coordinate.role(),
+                    userRoles,
+                    coordinate.latitude(),
+                    coordinate.longitude(),
+                    roundDistance(distanceKm),
+                    user.getProfileImageUrl(),
+                    coordinate.detail()
+            ));
+        }
+
+        return results.stream()
+                .sorted(Comparator.comparing(NearbyUserDTO::getDistanceKm))
+                .limit(100)
+                .collect(Collectors.toList());
+    }
+
+    private UserDTO mapUserToDTO(User userDB) {
+        UserDTO responseDTO = new UserDTO();
+        BeanUtils.copyProperties(userDB, responseDTO);
+        responseDTO.setRoles(userDB.getUserRoles().stream()
+                .map(ur -> ur.getRole().getName().name())
+                .collect(Collectors.toSet()));
+        
+        if (userDB.getMigrantDetails() != null) {
+            MigrantDetailsDTO migrantDTO = new MigrantDetailsDTO();
+            BeanUtils.copyProperties(userDB.getMigrantDetails(), migrantDTO);
+            responseDTO.setMigrantDetails(migrantDTO);
+        }
+        
+        if (userDB.getDoctorDetails() != null) {
+            DoctorDetailsDTO doctorDTO = new DoctorDetailsDTO();
+            BeanUtils.copyProperties(userDB.getDoctorDetails(), doctorDTO);
+            responseDTO.setDoctorDetails(doctorDTO);
+        }
+        
+        if (userDB.getNgoDetails() != null) {
+            NGODetailsDTO ngoDTO = new NGODetailsDTO();
+            BeanUtils.copyProperties(userDB.getNgoDetails(), ngoDTO);
+            responseDTO.setNgoDetails(ngoDTO);
+        }
+        
+        return responseDTO;
+    }
+
+    private Set<String> normalizeRoleFilter(List<String> roles) {
+        Set<String> normalized = new HashSet<>();
+        if (roles == null || roles.isEmpty()) {
+            normalized.add(RoleType.DOCTOR.name());
+            normalized.add(RoleType.MIGRANT.name());
+            normalized.add(RoleType.NGO.name());
+            return normalized;
+        }
+
+        for (String role : roles) {
+            if (role == null || role.isBlank()) {
+                continue;
+            }
+            for (String token : role.split(",")) {
+                if (token == null || token.isBlank()) {
+                    continue;
+                }
+                try {
+                    normalized.add(RoleType.valueOf(token.trim().toUpperCase()).name());
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+        }
+        return normalized;
+    }
+
+    private NearbyCoordinate resolveCoordinate(User user, Set<String> roleFilter) {
+        if (user.getDoctorDetails() != null
+                && user.getDoctorDetails().getLatitude() != null
+                && user.getDoctorDetails().getLongitude() != null
+                && roleFilter.contains(RoleType.DOCTOR.name())) {
+            return new NearbyCoordinate(
+                    RoleType.DOCTOR.name(),
+                    user.getDoctorDetails().getLatitude(),
+                    user.getDoctorDetails().getLongitude(),
+                    user.getDoctorDetails().getHospitalName()
+            );
+        }
+
+        if (user.getNgoDetails() != null
+                && user.getNgoDetails().getLatitude() != null
+                && user.getNgoDetails().getLongitude() != null
+                && roleFilter.contains(RoleType.NGO.name())) {
+            return new NearbyCoordinate(
+                    RoleType.NGO.name(),
+                    user.getNgoDetails().getLatitude(),
+                    user.getNgoDetails().getLongitude(),
+                    user.getNgoDetails().getOrganizationName()
+            );
+        }
+
+        if (user.getMigrantDetails() != null
+                && user.getMigrantDetails().getLatitude() != null
+                && user.getMigrantDetails().getLongitude() != null
+                && roleFilter.contains(RoleType.MIGRANT.name())) {
+            return new NearbyCoordinate(
+                    RoleType.MIGRANT.name(),
+                    user.getMigrantDetails().getLatitude(),
+                    user.getMigrantDetails().getLongitude(),
+                    null
+            );
+        }
+
+        return null;
+    }
+
+    private double calculateDistanceKm(double lat1, double lon1, double lat2, double lon2) {
+        double earthRadiusKm = 6371.0;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double originLat = Math.toRadians(lat1);
+        double targetLat = Math.toRadians(lat2);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(originLat) * Math.cos(targetLat) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return earthRadiusKm * c;
+    }
+
+    private double roundDistance(double value) {
+        return Math.round(value * 100.0) / 100.0;
+    }
+
+    private record NearbyCoordinate(String role, Double latitude, Double longitude, String detail) {
     }
 
     @Override
@@ -270,14 +507,7 @@ public class UserServiceImpl implements UserService {
     public List<UserDTO> getUsersByIds(List<UUID> userIds) {
         List<User> users = userRepository.findAllById(userIds);
         return users.stream()
-                .map(user -> {
-                    UserDTO dto = new UserDTO();
-                    BeanUtils.copyProperties(user, dto);
-                    dto.setRoles(user.getUserRoles().stream()
-                            .map(ur -> ur.getRole().getName().name())
-                            .collect(Collectors.toSet()));
-                    return dto;
-                })
+                .map(this::mapUserToDTO)
                 .collect(Collectors.toList());
     }
 

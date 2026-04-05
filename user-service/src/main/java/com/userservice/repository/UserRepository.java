@@ -10,6 +10,7 @@ import org.springframework.lang.NonNullApi;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 public interface UserRepository extends JpaRepository<User, UUID> {
@@ -27,5 +28,25 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByPhone(String phone);
 
     List<User> findByUsernameContainingIgnoreCaseOrEmailContainingIgnoreCase(String query, String query1);
+    
+    List<User> findByDoctorDetailsIsNotNull();
+    
+    List<User> findByNgoDetailsIsNotNull();
+
+    long countByMigrantDetailsIsNotNull();
+
+    long countByDoctorDetailsIsNotNull();
+
+    long countByNgoDetailsIsNotNull();
+
+    long countByCreatedAtAfter(LocalDateTime threshold);
+
+    @Query("SELECT DISTINCT u FROM User u " +
+            "LEFT JOIN FETCH u.userRoles ur " +
+            "LEFT JOIN FETCH ur.role " +
+            "LEFT JOIN FETCH u.migrantDetails " +
+            "LEFT JOIN FETCH u.doctorDetails " +
+            "LEFT JOIN FETCH u.ngoDetails")
+    List<User> findAllWithRolesAndDetails();
 }
 
