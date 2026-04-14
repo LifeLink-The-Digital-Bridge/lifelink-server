@@ -7,7 +7,6 @@ import com.authservice.exception.UserNotFoundException;
 import com.userservice.grpc.*;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
-import net.devh.boot.grpc.client.inject.GrpcClient;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -17,8 +16,11 @@ import java.util.UUID;
 @Component
 public class UserGrpcClient {
 
-    @GrpcClient("user-service")
-    private UserServiceGrpc.UserServiceBlockingStub userServiceStub;
+    private final UserServiceGrpc.UserServiceBlockingStub userServiceStub;
+
+    public UserGrpcClient(UserServiceGrpc.UserServiceBlockingStub userServiceStub) {
+        this.userServiceStub = userServiceStub;
+    }
 
     public UserDTO getUserById(String id) {
         GetUserByIdRequest request = GetUserByIdRequest.newBuilder().setId(id).build();

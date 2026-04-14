@@ -15,7 +15,7 @@ import java.util.UUID;
 @Slf4j
 public class UserGrpcClient {
 
-    @Value("${spring.grpc.client.user-service.address}")
+    @Value("${spring.grpc.client.channels.user-service.address}")
     private String grpcServerAddress;
 
     private ManagedChannel channel;
